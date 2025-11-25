@@ -71,7 +71,6 @@ router.get("/login", (req, res) => {
   <title>Manager Login — MostlyPostly</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Tailwind CDN -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
 
   <style>
@@ -83,76 +82,104 @@ router.get("/login", (req, res) => {
 
     .login-card {
       background: #FFFFFF;
-      border-radius: 20px;
-      padding: 40px;
-      border: 1px solid rgba(116,134,195,0.18);
-      box-shadow: 0 20px 50px rgba(32, 35, 48, 0.08);
-      transition: all 0.2s ease;
-    }
-
-    .login-card:hover {
-      box-shadow: 0 26px 60px rgba(32, 35, 48, 0.12);
+      border-radius: 14px;
+      padding: 44px 40px;
+      border: 1px solid rgba(116,134,195,0.20);
+      box-shadow: 0 25px 45px rgba(32,35,48,0.08);
+      width: 100%;
+      max-width: 420px;
     }
 
     .mp-logo {
-      height: 54px;
-      width: 54px;
-      border-radius: 16px;
+      height: 60px;
+      width: 60px;
+      border-radius: 18px;
       background: linear-gradient(135deg, #7486C3, #5C6FA8);
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 600;
-      margin: 0 auto 12px auto;
+      margin: 0 auto 14px auto;
+    }
+
+    .login-btn {
+      background: #202330;
+      color: #FFFFFF;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 12px 0;
+      font-size: 14px;
+      transition: 0.2s;
+      box-shadow: 0 4px 14px rgba(32,35,48,0.15);
+    }
+
+    .login-btn:hover {
+      background: #2A2E3A;
+    }
+
+    .input-box {
+      border: 1px solid #D3D6E3;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-top: 4px;
+      font-size: 14px;
+      color: #202330;
+      width: 100%;
+    }
+
+    .input-box:focus {
+      border-color: #7486C3;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(116,134,195,0.25);
     }
   </style>
 </head>
 
 <body>
-  <div class="min-h-screen flex flex-col justify-center items-center px-6">
+  <div class="min-h-screen flex flex-col justify-center items-center px-4">
 
-    <!-- Logo + Title -->
+    <!-- Brand -->
     <div class="text-center mb-6">
       <div class="mp-logo">MP</div>
-      <h1 class="text-xl font-semibold tracking-tight text-[#202330]">MostlyPostly</h1>
-      <p class="text-xs mt-1 text-[#656B80]">Salon Manager Login</p>
+      <h1 class="text-2xl font-semibold tracking-tight text-[#202330]">MostlyPostly</h1>
+      <p class="text-sm mt-1 text-[#656B80]">Salon Manager Login</p>
     </div>
 
     <!-- LOGIN CARD -->
-    <div class="login-card w-full max-w-md">
+    <div class="login-card">
 
-      <h2 class="text-lg font-semibold text-center mb-5">Welcome back</h2>
+      <h2 class="text-xl font-semibold text-center mb-6">Welcome back</h2>
 
-      <form method="POST" action="/manager/login" class="space-y-4">
+      <form method="POST" action="/manager/login" class="space-y-5">
 
         <!-- Email -->
-        <label class="block">
-          <span class="text-xs text-[#656B80]">Email address</span>
+        <div>
+          <label class="text-xs text-[#656B80]">Email address</label>
           <input
             type="email"
             name="email"
             required
-            class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-[#202330] focus:outline-none focus:ring-2 focus:ring-[#7486C3]/70"
+            class="input-box"
+            placeholder="Enter your email"
           />
-        </label>
+        </div>
 
         <!-- Password -->
-        <label class="block">
-          <span class="text-xs text-[#656B80]">Password</span>
+        <div>
+          <label class="text-xs text-[#656B80]">Password</label>
           <input
             type="password"
             name="password"
             required
-            class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-[#202330] focus:outline-none focus:ring-2 focus:ring-[#7486C3]/70"
+            class="input-box"
+            placeholder="Enter your password"
           />
-        </label>
+        </div>
 
         <!-- Login Button -->
-        <button
-          type="submit"
-          class="w-full mt-2 rounded-full bg-[#7486C3] py-3 text-sm font-semibold text-white hover:bg-[#5C6FA8] shadow-md shadow-[#7486C3]/30">
+        <button type="submit" class="login-btn w-full">
           Log in
         </button>
 
@@ -178,7 +205,7 @@ router.get("/login", (req, res) => {
 
     </div>
 
-    <!-- Legal -->
+    <!-- Footer Legal -->
     <div class="text-center mt-6 text-xs text-[#656B80]">
       By continuing, you agree to our
       <a href="/legal/terms.html" class="text-[#7486C3] hover:underline">Terms</a> and
@@ -188,6 +215,7 @@ router.get("/login", (req, res) => {
   </div>
 </body>
 </html>
+
   `);
 });
 
