@@ -70,87 +70,121 @@ router.get("/login", (req, res) => {
   <meta charset="UTF-8" />
   <title>Manager Login — MostlyPostly</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Tailwind CDN -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+
   <style>
     body {
       background: #F6F7FB;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       color: #202330;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
     }
-    .card {
+
+    .login-card {
       background: #FFFFFF;
-      border-radius: 16px;
-      padding: 32px;
+      border-radius: 20px;
+      padding: 40px;
       border: 1px solid rgba(116,134,195,0.18);
-      box-shadow: 0 24px 60px rgba(32,35,48,0.08);
+      box-shadow: 0 20px 50px rgba(32, 35, 48, 0.08);
+      transition: all 0.2s ease;
     }
-    .footer-text {
-      font-size: 12px;
-      color: #656B80;
+
+    .login-card:hover {
+      box-shadow: 0 26px 60px rgba(32, 35, 48, 0.12);
+    }
+
+    .mp-logo {
+      height: 54px;
+      width: 54px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #7486C3, #5C6FA8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0 auto 12px auto;
     }
   </style>
 </head>
 
-<body class="text-sm">
-  <div class="min-h-screen flex flex-col justify-center items-center px-4">
-    <div class="w-full max-w-md">
-      <div class="text-center">
-        <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#7486C3] to-[#5C6FA8] text-xs font-semibold text-white">
-          MP
-        </div>
-        <h1 class="text-lg font-semibold tracking-tight text-[#202330]">MostlyPostly</h1>
-        <p class="mt-1 text-xs text-[#656B80]">Manager sign in</p>
-      </div>
+<body>
+  <div class="min-h-screen flex flex-col justify-center items-center px-6">
 
-      <div class="card w-full mt-6">
-        <h2 class="text-center text-xl font-semibold mb-5 text-[#202330]">Sign in to your salon</h2>
-
-        <form method="POST" action="/manager/login" class="space-y-4">
-          <label class="block">
-            <span class="text-xs text-[#656B80]">Email address</span>
-            <input
-              type="email"
-              name="email"
-              required
-              class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-[#202330] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7486C3]/70"
-            />
-          </label>
-
-          <label class="block">
-            <span class="text-xs text-[#656B80]">Password</span>
-            <input
-              type="password"
-              name="password"
-              required
-              class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-[#202330] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7486C3]/70"
-            />
-          </label>
-
-          <button
-            type="submit"
-            class="mt-2 w-full rounded-full bg-[#7486C3] py-2.5 text-sm font-semibold text-white hover:bg-[#5C6FA8]">
-            Sign in
-          </button>
-
-          <div class="mt-3 flex items-center justify-between text-xs">
-            <a href="/manager/forgot-password" class="text-[#7486C3] hover:underline">
-              Forgot password?
-            </a>
-            <span class="text-[#656B80]">
-              New to MostlyPostly?
-              <a href="/manager/signup" class="text-[#7486C3] hover:underline">Sign up</a>
-            </span>
-          </div>
-        </form>
-
-        <div class="mt-6 text-center footer-text">
-          By continuing, you agree to our
-          <a href="/legal/terms" class="text-[#7486C3] hover:underline">Terms of Service</a>
-          and
-          <a href="/legal/privacy" class="text-[#7486C3] hover:underline">Privacy Policy</a>.
-        </div>
-      </div>
+    <!-- Logo + Title -->
+    <div class="text-center mb-6">
+      <div class="mp-logo">MP</div>
+      <h1 class="text-xl font-semibold tracking-tight text-[#202330]">MostlyPostly</h1>
+      <p class="text-xs mt-1 text-[#656B80]">Salon Manager Login</p>
     </div>
+
+    <!-- LOGIN CARD -->
+    <div class="login-card w-full max-w-md">
+
+      <h2 class="text-lg font-semibold text-center mb-5">Welcome back</h2>
+
+      <form method="POST" action="/manager/login" class="space-y-4">
+
+        <!-- Email -->
+        <label class="block">
+          <span class="text-xs text-[#656B80]">Email address</span>
+          <input
+            type="email"
+            name="email"
+            required
+            class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-[#202330] focus:outline-none focus:ring-2 focus:ring-[#7486C3]/70"
+          />
+        </label>
+
+        <!-- Password -->
+        <label class="block">
+          <span class="text-xs text-[#656B80]">Password</span>
+          <input
+            type="password"
+            name="password"
+            required
+            class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-[#202330] focus:outline-none focus:ring-2 focus:ring-[#7486C3]/70"
+          />
+        </label>
+
+        <!-- Login Button -->
+        <button
+          type="submit"
+          class="w-full mt-2 rounded-full bg-[#7486C3] py-3 text-sm font-semibold text-white hover:bg-[#5C6FA8] shadow-md shadow-[#7486C3]/30">
+          Log in
+        </button>
+
+      </form>
+
+      <!-- Forgot Password -->
+      <div class="mt-4 text-center">
+        <a href="/manager/forgot-password" class="text-xs text-[#7486C3] hover:underline">
+          Forgot your password?
+        </a>
+      </div>
+
+      <!-- Divider -->
+      <div class="my-6 border-t border-slate-200"></div>
+
+      <!-- Sign Up -->
+      <div class="text-center text-sm">
+        <span class="text-[#656B80]">Not registered yet?</span>
+        <a href="/manager/signup" class="text-[#7486C3] font-medium hover:underline">
+          Create an account
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Legal -->
+    <div class="text-center mt-6 text-xs text-[#656B80]">
+      By continuing, you agree to our
+      <a href="/legal/terms.html" class="text-[#7486C3] hover:underline">Terms</a> and
+      <a href="/legal/privacy.html" class="text-[#7486C3] hover:underline">Privacy Policy</a>.
+    </div>
+
   </div>
 </body>
 </html>
