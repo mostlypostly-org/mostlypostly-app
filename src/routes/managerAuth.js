@@ -498,6 +498,120 @@ router.get("/signup", (req, res) => {
 `);
 });
 
+/* -------------------------------
+   POST /manager/signup
+   - Create manager account
+   - Validate + hash password
+   - Prevent duplicate emails
+   - Start session
+   - Redirect to onboarding
+---------------------------------*/
+router.post("/signup", (req, res) => {
+  const { email, password, phone, company, marketing_opt_in } = req.body || {};
+
+  // 🛑 Honeypot catch (spam bots)
+  if (company && company.trim() !== "") {
+    return res
+      .status(400)
+      .type("html")
+      .send("<h2>Form invalid</h2><p>Please try again.</p>");
+  }
+
+  // 🧪 Simple validation
+  if (!email || !password || !phone) {
+    return res
+      .status(400)
+      .type("html")
+      .send("<h2>Missing fields</h2><p>Please complete all required fields.</p>");
+  }
+
+  if (password.length < 8) {
+    return res
+      .status(400)
+      .type("html")
+      .send(
+        "<h2>Password too short</h2><p>Your password must be at least 8 characters long.</p>"
+      );
+  }
+
+  // 🔎 Check for duplicate email
+  const existing = db
+    .prepare(`SELECT id FROM managers WHERE email = ? LIMIT 1`)
+    .get(email);
+
+  if (existing) {
+    return res
+      .status(409)
+      .type("html")
+      .send(`
+        <h2>This email is already registered.</h2>
+        <p>Please <a href="/manager/login">sign in here</a>.</p>
+      `);
+  }
+
+  // 🔐 Hash password
+  const passwordHash = bcrypt.hashSync(password, 10);
+
+  // 🆔 Create manager ID
+  const managerId = db
+    .prepare(`SELECT lower(hex(randomblob(16))) AS id`)
+    .get().id;
+
+  // 📝 Insert manager (no salon_id yet — Option A)
+  db.prepare(
+    `
+    INSERT INTO managers (
+      id,
+      email,
+      password_hash,
+      phone,
+      role,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      @id,
+      @email,
+      @password_hash,
+      @phone,
+      'manager',
+      datetime('now'),
+      datetime('now')
+    )
+  `
+  ).run({
+    id: managerId,
+    email,
+    password_hash: passwordHash,
+    phone
+  });
+
+  // 📩 OPTIONAL: Store marketing opt-in
+  if (marketing_opt_in === "yes") {
+    try {
+      db.prepare(
+        `
+        INSERT INTO manager_tokens (
+          id, manager_id, token, expires_at, salon_id, manager_phone, created_at
+        ) VALUES (
+          lower(hex(randomblob(16))), ?, 'marketing-opt-in', NULL, NULL, ?, datetime('now')
+        )
+      `
+      ).run(managerId, phone);
+    } catch (_) {
+      // non-blocking — ignore failures
+    }
+  }
+
+  // 🔓 Auto-login the new manager
+  req.session.managerId = managerId;
+  req.session.managerEmail = email;
+  req.session.salonId = null; // not created yet
+
+  // 👉 Redirect to the unified onboarding wizard
+  return res.redirect("/onboarding/salon");
+});
+
 
 /* -------------------------------
    POST /manager/login
@@ -544,18 +658,6 @@ router.post("/login", (req, res) => {
   req.session.managerEmail = manager.email;
 
   return res.redirect("/manager/dashboard");
-});
-
-/* -------------------------------
-   GET /manager/signup (view)
----------------------------------*/
-router.get("/signup", (_req, res) => {
-  res
-    .status(200)
-    .type("html")
-    .send(
-      `<h2>Manager sign-up coming soon.</h2><p>This will be wired to salon onboarding in the pilot.</p>`
-    );
 });
 
 /* -------------------------------
