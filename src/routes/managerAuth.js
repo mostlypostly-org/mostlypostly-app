@@ -653,8 +653,9 @@ router.post("/signup", (req, res) => {
 
     // Start session
     req.session.manager_id = managerId;
+    
     // (optional) store salon in session if you like:
-    // req.session.salon_id = salonRow.slug;
+    req.session.salon_id = salonRow.slug;
 
     // Redirect to onboarding wizard
     return res.redirect("/onboarding/salon");

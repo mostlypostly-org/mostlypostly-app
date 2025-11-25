@@ -203,6 +203,8 @@ router.post("/salon", (req, res) => {
     role: manager_title
   });
 
+  req.session.salon_id = salonSlug;
+
   return res.redirect("/dashboard");
 });
 
