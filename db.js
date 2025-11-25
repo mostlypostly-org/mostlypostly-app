@@ -77,7 +77,6 @@ try {
   console.warn("⚠️ managers.email migration error:", e.message);
 }
 
-
 // =====================================================
 // 3) Recommended PRAGMAs
 // =====================================================
@@ -89,19 +88,121 @@ try {
 }
 
 // =====================================================
-// 4) Minimal legacy bootstrap – manager_tokens
+// 4) manager_tokens table — unify legacy + new schema
+//    Goal: table has at least columns:
+//      id, manager_id, token, salon_id, manager_phone,
+//      expires_at, used_at, created_at
 // =====================================================
 try {
-  db.prepare(`
-    CREATE TABLE IF NOT EXISTS manager_tokens (
-      token TEXT PRIMARY KEY,
-      salon_id TEXT,
-      manager_phone TEXT,
-      expires_at TEXT
+  // Does manager_tokens exist at all?
+  const hasManagerTokens = db
+    .prepare(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='manager_tokens'`
+    )
+    .get();
+
+  if (!hasManagerTokens) {
+    // Fresh create with superset schema (covers both old + new code paths)
+    db.prepare(`
+      CREATE TABLE manager_tokens (
+        id            TEXT PRIMARY KEY,
+        manager_id    TEXT,
+        token         TEXT NOT NULL UNIQUE,
+        salon_id      TEXT,
+        manager_phone TEXT,
+        expires_at    TEXT NOT NULL,
+        used_at       TEXT,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `).run();
+    console.log("🧱 (db.js) created manager_tokens with unified schema");
+  } else {
+    // Table exists — inspect columns and patch any missing ones
+    const cols = db.prepare("PRAGMA table_info(manager_tokens)").all() || [];
+    const names = new Set(cols.map((c) => c.name));
+
+    const ensureColumn = (name, ddl) => {
+      if (!names.has(name)) {
+        try {
+          db.prepare(`ALTER TABLE manager_tokens ADD COLUMN ${ddl};`).run();
+          console.log(`🧱 (db.js) added manager_tokens.${name}`);
+        } catch (err) {
+          console.warn(
+            `⚠️ (db.js) could not add manager_tokens.${name}:`,
+            err.message
+          );
+        }
+      }
+    };
+
+    // Ensure all needed columns exist
+    ensureColumn("id", "id TEXT");
+    ensureColumn("manager_id", "manager_id TEXT");
+    ensureColumn("salon_id", "salon_id TEXT");
+    ensureColumn("manager_phone", "manager_phone TEXT");
+    ensureColumn("used_at", "used_at TEXT");
+    ensureColumn(
+      "created_at",
+      "created_at TEXT NOT NULL DEFAULT (datetime('now'))"
     );
-  `).run();
+
+    // Backfill id for any existing rows missing it
+    try {
+      db.prepare(`
+        UPDATE manager_tokens
+        SET id = lower(hex(randomblob(16)))
+        WHERE id IS NULL OR id = ''
+      `).run();
+      console.log("🔑 (db.js) backfilled manager_tokens.id where missing");
+    } catch (err) {
+      console.warn(
+        "⚠️ (db.js) failed to backfill manager_tokens.id:",
+        err.message
+      );
+    }
+
+    // Backfill created_at where null
+    try {
+      db.prepare(`
+        UPDATE manager_tokens
+        SET created_at = COALESCE(created_at, datetime('now'))
+      `).run();
+      console.log(
+        "⏱️ (db.js) ensured manager_tokens.created_at has default values"
+      );
+    } catch (err) {
+      console.warn(
+        "⚠️ (db.js) failed to backfill manager_tokens.created_at:",
+        err.message
+      );
+    }
+
+    // Backfill manager_id from managers table when possible
+    try {
+      db.prepare(`
+        UPDATE manager_tokens
+        SET manager_id = (
+          SELECT m.id
+          FROM managers m
+          WHERE m.phone = manager_tokens.manager_phone
+          AND (m.salon_id = manager_tokens.salon_id OR manager_tokens.salon_id IS NULL)
+          LIMIT 1
+        )
+        WHERE (manager_id IS NULL OR manager_id = '')
+          AND manager_phone IS NOT NULL;
+      `).run();
+      console.log(
+        "🧬 (db.js) linked manager_tokens.manager_id from managers where possible"
+      );
+    } catch (err) {
+      console.warn(
+        "⚠️ (db.js) failed to backfill manager_tokens.manager_id:",
+        err.message
+      );
+    }
+  }
 } catch (e) {
-  console.error("⚠️ Failed creating manager_tokens:", e.message);
+  console.error("⚠️ Failed ensuring manager_tokens schema:", e.message);
 }
 
 // =====================================================
@@ -109,9 +210,11 @@ try {
 // =====================================================
 export function verifyTokenRow(token) {
   try {
-    const row = db.prepare(
-      "SELECT token, salon_id, manager_phone, expires_at FROM manager_tokens WHERE token = ?"
-    ).get(token);
+    const row = db
+      .prepare(
+        "SELECT token, salon_id, manager_phone, expires_at FROM manager_tokens WHERE token = ?"
+      )
+      .get(token);
     console.log("🔍 Verified token readback:", row || "❌ Not found");
     return row;
   } catch (err) {
