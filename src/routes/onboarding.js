@@ -1,5 +1,5 @@
 import express from "express";
-import db from "../core/analyticsDb.js";
+import { db } from "../../db.js";
 
 const router = express.Router();
 
