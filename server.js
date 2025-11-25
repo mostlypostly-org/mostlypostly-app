@@ -66,6 +66,7 @@ import managerRoute from "./src/routes/manager.js";
 import managerAuth from "./src/routes/managerAuth.js";
 import stylistPortal from "./src/routes/stylistPortal.js";
 import facebookAuthRoutes from "./src/routes/facebookAuth.js";
+import onboardingRoutes from "./src/routes/onboarding.js";
 
 // Scheduler
 import { enqueuePost, runSchedulerOnce, startScheduler } from "./src/scheduler.js";
@@ -129,6 +130,9 @@ app.use("/public", express.static(PUBLIC_DIR));
 // MOUNT AUTH ROUTES (managers login FIRST)
 // =====================================================
 app.use("/manager", managerAuth);
+
+
+app.use("/onboarding", onboardingRoutes);
 
 // =====================================================
 // Stylist Portal (token-based, no login)
