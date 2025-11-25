@@ -276,6 +276,200 @@ router.get("/login", (req, res) => {
 });
 
 /* -------------------------------
+   GET /manager/signup
+---------------------------------*/
+router.get("/signup", (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Create Account — MostlyPostly</title>
+      <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+
+      <style>
+        body {
+          margin: 0;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+          background: #0F172A;
+          color: #F8FAFC;
+        }
+
+        .split-wrapper {
+          display: flex;
+          min-height: 100vh;
+        }
+
+        .left-panel {
+          flex: 1;
+          padding: 4rem 3rem;
+          background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 2.5rem;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .left-panel h1 {
+          font-size: 2rem;
+          font-weight: 700;
+          color: #FFFFFF;
+        }
+
+        .feat {
+          background: rgba(255,255,255,0.04);
+          padding: 1.25rem;
+          border-radius: 1rem;
+          border: 1px solid rgba(255,255,255,0.06);
+          backdrop-filter: blur(4px);
+        }
+
+        .feat h3 {
+          font-size: 1rem;
+          font-weight: 600;
+          margin-bottom: 0.4rem;
+        }
+
+        .feat p {
+          font-size: 0.85rem;
+          color: #CBD5E1;
+        }
+
+        .right-panel {
+          flex: 1;
+          background: #FFFFFF;
+          color: #1E293B;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2rem;
+        }
+
+        .signup-card {
+          width: 100%;
+          max-width: 420px;
+          background: #FFFFFF;
+          padding: 2.75rem;
+          border-radius: 1.25rem;
+          border: 1px solid rgba(15,23,42,0.12);
+          box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        }
+
+        .input-box {
+          width: 100%;
+          border-radius: 8px;
+          padding: 12px;
+          border: 1px solid #CBD5E1;
+          margin-top: 4px;
+          font-size: 14px;
+        }
+
+        .input-box:focus {
+          border-color: #3B82F6;
+          outline: none;
+          box-shadow: 0 0 0 2px rgba(59,130,246,0.25);
+        }
+
+        .signup-btn {
+          width: 100%;
+          background: #3B82F6;
+          color: #FFFFFF;
+          border-radius: 999px;
+          padding: 12px;
+          font-weight: 600;
+          margin-top: 0.75rem;
+          transition: 0.2s;
+        }
+
+        .signup-btn:hover {
+          background: #2563EB;
+        }
+
+        @media(max-width: 900px) {
+          .split-wrapper {
+            flex-direction: column;
+          }
+          .left-panel {
+            padding: 2rem 1.5rem;
+          }
+        }
+      </style>
+    </head>
+
+    <body>
+      <div class="split-wrapper">
+
+        <!-- MARKETING LEFT SIDE -->
+        <div class="left-panel">
+          <h1>Grow your salon with effortless social posting.</h1>
+
+          <div class="feat">
+            <h3>AI That Writes for Stylists</h3>
+            <p>Turn any photo sent by a stylist into a ready-to-post caption, hashtags, and CTA automatically.</p>
+          </div>
+
+          <div class="feat">
+            <h3>Managers Stay in Control</h3>
+            <p>Approval flow built-in. Stylists simply text a photo — no apps or logins needed.</p>
+          </div>
+
+          <div class="feat">
+            <h3>Posts Go Out Automatically</h3>
+            <p>Smart scheduling publishes to Facebook & Instagram without your team lifting a finger.</p>
+          </div>
+        </div>
+
+        <!-- RIGHT SIDE SIGNUP -->
+        <div class="right-panel">
+          <div class="signup-card">
+
+            <h2 class="text-xl font-semibold mb-1 text-center">Create your account</h2>
+            <p class="text-sm text-center text-slate-500 mb-6">Start your MostlyPostly setup.</p>
+
+            <form method="POST" action="/manager/signup" class="space-y-5">
+
+              <div>
+                <label class="text-xs font-medium text-slate-600">Email</label>
+                <input type="email" name="email" required class="input-box" placeholder="Enter your email" />
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600">Password</label>
+                <input type="password" name="password" required minlength="8" class="input-box" placeholder="Create a password" />
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600">Phone Number</label>
+                <input type="tel" name="phone" required class="input-box" placeholder="Mobile number" />
+              </div>
+
+              <!-- Honeypot anti-spam field -->
+              <input type="text" name="company" style="display:none" tabindex="-1" autocomplete="off" />
+
+              <button type="submit" class="signup-btn">Get Started</button>
+            </form>
+
+            <div class="mt-6 text-center text-sm">
+              <span class="text-slate-600">Already have an account?</span>
+              <a href="/manager/login" class="font-semibold text-blue-600 underline hover:text-blue-800">
+                Sign In
+              </a>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+
+/* -------------------------------
    POST /manager/login
    - Email/password login
 ---------------------------------*/
