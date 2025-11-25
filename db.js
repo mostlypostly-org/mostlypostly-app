@@ -78,6 +78,34 @@ try {
 }
 
 // =====================================================
+// Ensure salons.website exists
+// =====================================================
+try {
+  db.prepare("SELECT website FROM salons LIMIT 1").get();
+} catch (e) {
+  console.log("🧱 (db.js) added salons.website");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN website TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.website:", err.message);
+  }
+}
+
+// =====================================================
+// Ensure salons.business_type exists
+// =====================================================
+try {
+  db.prepare("SELECT business_type FROM salons LIMIT 1").get();
+} catch (e) {
+  console.log("🧱 (db.js) added salons.business_type");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN business_type TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.business_type:", err.message);
+  }
+}
+
+// =====================================================
 // 3) Recommended PRAGMAs
 // =====================================================
 try {
