@@ -130,8 +130,6 @@ app.use("/public", express.static(PUBLIC_DIR));
 // =====================================================
 app.use("/manager", managerAuth);
 
-app.use("/manager", require("./src/routes/managerAuth"));
-
 // =====================================================
 // Stylist Portal (token-based, no login)
 // =====================================================
