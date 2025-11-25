@@ -276,7 +276,8 @@ router.get("/login", (req, res) => {
 });
 
 /* -------------------------------
-   GET /manager/signup
+   GET: /manager/signup
+   Split layout signup page
 ---------------------------------*/
 router.get("/signup", (req, res) => {
   res.send(`
@@ -449,8 +450,13 @@ router.get("/signup", (req, res) => {
       <form action="/manager/signup" method="POST" class="space-y-5">
 
         <div>
+          <label class="text-xs font-semibold text-gray-700">Business Name</label>
+          <input type="text" name="business_name" required class="input-box" placeholder="Your salon or business name" />
+        </div>
+
+        <div>
           <label class="text-xs font-semibold text-gray-700">Email</label>
-          <input type="email" name="email" required class="input-box" placeholder="you@salon.com" />
+          <input type="email" name="email" required class="input-box" placeholder="you@business.com" />
         </div>
 
         <div>
@@ -495,21 +501,20 @@ router.get("/signup", (req, res) => {
 
 </body>
 </html>
-`);
+  `);
 });
 
 /* -------------------------------
    POST /manager/signup
-   - Create manager account
-   - Validate + hash password
-   - Prevent duplicate emails
-   - Start session
-   - Redirect to onboarding
+   - Create salon from Business Name
+   - Create manager with salon_id
+   - Prevent duplicate email/phone
+   - Start session, redirect to onboarding
 ---------------------------------*/
 router.post("/signup", (req, res) => {
-  const { email, password, phone, company, marketing_opt_in } = req.body || {};
+  const { email, password, phone, business_name, company } = req.body || {};
 
-  // 🛑 Honeypot catch (spam bots)
+  // 🛑 Honeypot (spam bots)
   if (company && company.trim() !== "") {
     return res
       .status(400)
@@ -517,8 +522,8 @@ router.post("/signup", (req, res) => {
       .send("<h2>Form invalid</h2><p>Please try again.</p>");
   }
 
-  // 🧪 Simple validation
-  if (!email || !password || !phone) {
+  // Basic validation
+  if (!email || !password || !phone || !business_name) {
     return res
       .status(400)
       .type("html")
@@ -534,84 +539,133 @@ router.post("/signup", (req, res) => {
       );
   }
 
-  // 🔎 Check for duplicate email
-  const existing = db
-    .prepare(`SELECT id FROM managers WHERE email = ? LIMIT 1`)
-    .get(email);
+  try {
+    // Check duplicates
+    const existingByEmail = db
+      .prepare("SELECT id FROM managers WHERE email = ? LIMIT 1")
+      .get(email);
 
-  if (existing) {
-    return res
-      .status(409)
-      .type("html")
-      .send(`
-        <h2>This email is already registered.</h2>
-        <p>Please <a href="/manager/login">sign in here</a>.</p>
-      `);
-  }
+    if (existingByEmail) {
+      return res
+        .status(409)
+        .type("html")
+        .send(`
+          <h2>This email is already registered.</h2>
+          <p>Please <a href="/manager/login">sign in here</a> or use a different email.</p>
+        `);
+    }
 
-  // 🔐 Hash password
-  const passwordHash = bcrypt.hashSync(password, 10);
+    const existingByPhone = db
+      .prepare("SELECT id FROM managers WHERE phone = ? LIMIT 1")
+      .get(phone);
 
-  // 🆔 Create manager ID
-  const managerId = db
-    .prepare(`SELECT lower(hex(randomblob(16))) AS id`)
-    .get().id;
+    if (existingByPhone) {
+      return res
+        .status(409)
+        .type("html")
+        .send(`
+          <h2>This phone number is already in use.</h2>
+          <p>Please <a href="/manager/login">sign in here</a> or use a different number.</p>
+        `);
+    }
 
-  // 📝 Insert manager (no salon_id yet — Option A)
-  db.prepare(
-    `
-    INSERT INTO managers (
-      id,
-      email,
-      password_hash,
-      phone,
-      role,
-      created_at,
-      updated_at
-    )
-    VALUES (
-      @id,
-      @email,
-      @password_hash,
-      @phone,
-      'manager',
-      datetime('now'),
-      datetime('now')
-    )
-  `
-  ).run({
-    id: managerId,
-    email,
-    password_hash: passwordHash,
-    phone
-  });
+    // Generate a slug from Business Name
+    const rawName = String(business_name || "").trim();
+    let baseSlug = rawName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
 
-  // 📩 OPTIONAL: Store marketing opt-in
-  if (marketing_opt_in === "yes") {
-    try {
+    if (!baseSlug) {
+      baseSlug = "business";
+    }
+
+    let salonSlug = baseSlug;
+
+    // See if a salon with this slug already exists
+    let salonRow = db
+      .prepare("SELECT id, slug FROM salons WHERE slug = ? LIMIT 1")
+      .get(salonSlug);
+
+    if (!salonRow) {
+      // Create new salon
+      const salonId = db
+        .prepare("SELECT lower(hex(randomblob(16))) AS id")
+        .get().id;
+
       db.prepare(
         `
-        INSERT INTO manager_tokens (
-          id, manager_id, token, expires_at, salon_id, manager_phone, created_at
-        ) VALUES (
-          lower(hex(randomblob(16))), ?, 'marketing-opt-in', NULL, NULL, ?, datetime('now')
-        )
+        INSERT INTO salons (id, slug, name)
+        VALUES (@id, @slug, @name)
       `
-      ).run(managerId, phone);
-    } catch (_) {
-      // non-blocking — ignore failures
+      ).run({
+        id: salonId,
+        slug: salonSlug,
+        name: rawName || "New Business"
+      });
+
+      salonRow = { id: salonId, slug: salonSlug };
     }
+
+    // Create manager
+    const managerId = db
+      .prepare("SELECT lower(hex(randomblob(16))) AS id")
+      .get().id;
+
+    const passwordHash = bcrypt.hashSync(password, 10);
+
+    db.prepare(
+      `
+      INSERT INTO managers (
+        id,
+        salon_id,
+        name,
+        phone,
+        chat_id,
+        role,
+        pin,
+        created_at,
+        updated_at,
+        password_hash,
+        email
+      )
+      VALUES (
+        @id,
+        @salon_id,
+        NULL,
+        @phone,
+        NULL,
+        'manager',
+        NULL,
+        datetime('now'),
+        datetime('now'),
+        @password_hash,
+        @email
+      )
+    `
+    ).run({
+      id: managerId,
+      salon_id: salonRow.slug, // managers.salon_id references salons.slug
+      phone,
+      password_hash: passwordHash,
+      email
+    });
+
+    // Start session
+    req.session.manager_id = managerId;
+    // (optional) store salon in session if you like:
+    // req.session.salon_id = salonRow.slug;
+
+    // Redirect to onboarding wizard
+    return res.redirect("/onboarding/salon");
+  } catch (err) {
+    console.error("❌ Signup error:", err.message);
+    return res
+      .status(500)
+      .type("html")
+      .send("<h2>Something went wrong.</h2><p>Please try again.</p>");
   }
-
-  // 🔓 Auto-login the new manager
-  req.session.managerId = managerId;
-  req.session.managerEmail = email;
-  req.session.salonId = null; // not created yet
-
-  // 👉 Redirect to the unified onboarding wizard
-  return res.redirect("/onboarding/salon");
 });
-
 
 /* -------------------------------
    POST /manager/login
