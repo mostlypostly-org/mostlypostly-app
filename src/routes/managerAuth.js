@@ -16,10 +16,11 @@ function findValidTokenRow(token) {
   const row = db
     .prepare(
       `
-      SELECT *
-      FROM manager_tokens
-      WHERE token = ?
-        AND (expires_at IS NULL OR expires_at > datetime('now'))
+      SELECT mt.*, m.email, m.salon_id
+      FROM manager_tokens mt
+      JOIN managers m ON m.id = mt.manager_id
+      WHERE mt.token = ?
+        AND (mt.expires_at IS NULL OR datetime(mt.expires_at) > datetime('now'))
       LIMIT 1
     `
     )
@@ -29,11 +30,8 @@ function findValidTokenRow(token) {
 }
 
 /* -------------------------------
-   GET: /manager/login
-   - If ?token is present, treat as magic link:
-     - validate token
-     - set session
-     - redirect to /manager
+   GET /manager/login
+   - If token: validate token & log them in
    - Otherwise show login form
 ---------------------------------*/
 router.get("/login", (req, res) => {
@@ -48,18 +46,25 @@ router.get("/login", (req, res) => {
         .status(401)
         .type("html")
         .send(
-          `<h2>Invalid or expired login link</h2><p>Please request a new manager approval link.</p>`
+          `<h2>Invalid or expired login link</h2><p>Please request a new login link from your MostlyPostly manager.</p>`
         );
     }
 
-    // Mark token as used (optional, but safer)
+    // Mark token as used
     db.prepare(
-      `UPDATE manager_tokens SET used_at = datetime('now') WHERE token = ?`
+      `
+      UPDATE manager_tokens
+      SET used_at = datetime('now')
+      WHERE token = ?
+    `
     ).run(token);
 
-    // Create session and redirect to manager dashboard
-    req.session.manager_id = row.manager_id;
-    return res.redirect("/manager");
+    // Basic session payload
+    req.session.managerId = row.manager_id;
+    req.session.salonId = row.salon_id;
+    req.session.managerEmail = row.email;
+
+    return res.redirect("/manager/dashboard");
   }
 
   // 🧑‍💻 Normal email/password login form
@@ -70,221 +75,268 @@ router.get("/login", (req, res) => {
   <meta charset="UTF-8" />
   <title>Manager Login — MostlyPostly</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
 
   <style>
     body {
-      background: #F6F7FB;
+      margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      color: #202330;
+      background: #0F172A;
+      color: #F8FAFC;
     }
 
-    .login-card {
-      background: #FFFFFF;
-      border-radius: 14px;
-      padding: 44px 40px;
-      border: 1px solid rgba(116,134,195,0.20);
-      box-shadow: 0 25px 45px rgba(32,35,48,0.08);
-      width: 100%;
-      max-width: 420px;
+    /* Split screen */
+    .split-wrapper {
+      display: flex;
+      min-height: 100vh;
     }
 
-    .mp-logo {
-      height: 60px;
-      width: 60px;
-      border-radius: 18px;
-      background: linear-gradient(135deg, #7486C3, #5C6FA8);
+    .left-panel {
+      flex: 1;
+      background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+      position: relative;
+      overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: white;
-      font-size: 15px;
-      font-weight: 600;
-      margin: 0 auto 14px auto;
+      padding: 40px;
+    }
+
+    /* Abstract glowing shapes */
+    .glow {
+      position: absolute;
+      border-radius: 999px;
+      filter: blur(80px);
+      opacity: 0.35;
+    }
+    .glow-1 { width: 300px; height: 300px; top: -40px; left: -40px; background: #3B82F6; }
+    .glow-2 { width: 260px; height: 260px; bottom: -40px; right: -20px; background: #4F46E5; }
+
+    /* Floating fake UI card */
+    .fake-card {
+      background: #1E293B;
+      padding: 24px;
+      width: 320px;
+      border-radius: 14px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .fake-title {
+      height: 16px;
+      width: 80%;
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+      margin-bottom: 14px;
+    }
+
+    .fake-img {
+      width: 100%;
+      height: 180px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 8px;
+      margin-bottom: 14px;
+    }
+
+    .fake-lines div {
+      height: 10px;
+      width: 100%;
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+
+    /* Right panel (login) */
+    .right-panel {
+      flex: 1;
+      background: #FFFFFF;
+      color: #1E293B;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 400px;
+      background: #FFFFFF;
+      padding: 42px;
+      border-radius: 16px;
+      border: 1px solid rgba(15,23,42,0.12);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.08);
     }
 
     .login-btn {
-      background: #202330;
+      background: #3B82F6;
       color: #FFFFFF;
       font-weight: 600;
       border-radius: 999px;
       padding: 12px 0;
-      font-size: 14px;
+      width: 100%;
+      margin-top: 10px;
       transition: 0.2s;
-      box-shadow: 0 4px 14px rgba(32,35,48,0.15);
+      box-shadow: 0 4px 14px rgba(59,130,246,0.35);
     }
-
     .login-btn:hover {
-      background: #2A2E3A;
+      background: #2563EB;
     }
 
     .input-box {
-      border: 1px solid #D3D6E3;
-      padding: 10px 14px;
+      width: 100%;
       border-radius: 8px;
+      padding: 12px;
+      border: 1px solid #CBD5E1;
       margin-top: 4px;
       font-size: 14px;
-      color: #202330;
-      width: 100%;
+    }
+    .input-box:focus {
+      border-color: #3B82F6;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(59,130,246,0.25);
     }
 
-    .input-box:focus {
-      border-color: #7486C3;
-      outline: none;
-      box-shadow: 0 0 0 2px rgba(116,134,195,0.25);
+    /* Mobile stack */
+    @media(max-width: 900px) {
+      .split-wrapper {
+        flex-direction: column;
+      }
+      .left-panel {
+        min-height: 220px;
+      }
     }
   </style>
 </head>
 
 <body>
-  <div class="min-h-screen flex flex-col justify-center items-center px-4">
 
-    <!-- Brand -->
-    <div class="text-center mb-6">
-      <div class="mp-logo">MP</div>
-      <h1 class="text-2xl font-semibold tracking-tight text-[#202330]">MostlyPostly</h1>
-      <p class="text-sm mt-1 text-[#656B80]">Salon Manager Login</p>
+<div class="split-wrapper">
+
+  <!-- LEFT SPLIT PANEL -->
+  <div class="left-panel">
+    <div class="glow glow-1"></div>
+    <div class="glow glow-2"></div>
+
+    <div class="fake-card">
+      <div class="fake-title"></div>
+      <div class="fake-img"></div>
+      <div class="fake-lines">
+        <div></div>
+        <div style="width: 90%;"></div>
+        <div style="width: 70%;"></div>
+      </div>
     </div>
+  </div>
 
-    <!-- LOGIN CARD -->
+  <!-- RIGHT LOGIN PANEL -->
+  <div class="right-panel">
     <div class="login-card">
 
-      <h2 class="text-xl font-semibold text-center mb-6">Welcome back</h2>
+      <h1 class="text-xl font-semibold mb-1 text-center">Welcome</h1>
+      <p class="text-sm text-center text-slate-500 mb-6">Sign in to your account.</p>
 
       <form method="POST" action="/manager/login" class="space-y-5">
 
-        <!-- Email -->
         <div>
-          <label class="text-xs text-[#656B80]">Email address</label>
-          <input
-            type="email"
-            name="email"
-            required
-            class="input-box"
-            placeholder="Enter your email"
-          />
+          <label class="text-xs font-medium text-slate-600">Email address</label>
+          <input type="email" name="email" class="input-box" placeholder="Enter your email" required>
         </div>
 
-        <!-- Password -->
         <div>
-          <label class="text-xs text-[#656B80]">Password</label>
-          <input
-            type="password"
-            name="password"
-            required
-            class="input-box"
-            placeholder="Enter your password"
-          />
+          <label class="text-xs font-medium text-slate-600">Password</label>
+          <input type="password" name="password" class="input-box" placeholder="Enter your password" required>
         </div>
 
-        <!-- Login Button -->
-        <button type="submit" class="login-btn w-full">
-          Log in
-        </button>
-
+        <button type="submit" class="login-btn">Log in</button>
       </form>
 
-      <!-- Forgot Password -->
       <div class="mt-4 text-center">
-        <a href="/manager/forgot-password" class="text-xs text-[#7486C3] hover:underline">
+        <a href="/manager/forgot-password" class="text-xs text-blue-600 hover:underline">
           Forgot your password?
         </a>
       </div>
 
-      <!-- Divider -->
       <div class="my-6 border-t border-slate-200"></div>
 
-      <!-- Sign Up -->
       <div class="text-center text-sm">
-        <span class="text-[#656B80]">Not registered yet?</span>
-        <a href="/manager/signup" class="text-[#7486C3] font-medium hover:underline">
-          Create an account
+        <span class="text-slate-600">Not using MostlyPostly?</span>
+        <a href="/manager/signup" class="font-semibold text-blue-600 underline hover:text-blue-800">
+          Sign Up
         </a>
       </div>
 
     </div>
-
-    <!-- Footer Legal -->
-    <div class="text-center mt-6 text-xs text-[#656B80]">
-      By continuing, you agree to our
-      <a href="/legal/terms.html" class="text-[#7486C3] hover:underline">Terms</a> and
-      <a href="/legal/privacy.html" class="text-[#7486C3] hover:underline">Privacy Policy</a>.
-    </div>
-
   </div>
+
+</div>
+
 </body>
 </html>
-
   `);
 });
 
 /* -------------------------------
-   POST: /manager/login
-   - Standard email/password login
+   POST /manager/login
+   - Email/password login
 ---------------------------------*/
 router.post("/login", (req, res) => {
-  const { email, password } = req.body;
+  const { email, password } = req.body || {};
 
-  // Make sure schema has email + password_hash
-  const cols = db.prepare("PRAGMA table_info(managers)").all();
-  const hasEmail = cols.some((c) => c.name === "email");
-  const hasHash = cols.some((c) => c.name === "password_hash");
-
-  if (!hasEmail || !hasHash) {
+  if (!email || !password) {
     return res
-      .status(500)
+      .status(400)
       .type("html")
-      .send(
-        `<h2>Email login not available yet</h2><p>Your account has not been upgraded for password login.</p>`
-      );
+      .send("Email and password are required.");
   }
 
-  const mgr = db.prepare(`SELECT * FROM managers WHERE email = ?`).get(email);
-  if (!mgr) {
-    return res.status(401).type("html").send("Invalid login");
+  const manager = db
+    .prepare(
+      `
+      SELECT *
+      FROM managers
+      WHERE email = ?
+      LIMIT 1
+    `
+    )
+    .get(email);
+
+  if (!manager || !manager.password_hash) {
+    return res
+      .status(401)
+      .type("html")
+      .send("Invalid credentials.");
   }
 
-  const ok = bcrypt.compareSync(password, mgr.password_hash || "");
+  const ok = bcrypt.compareSync(password, manager.password_hash);
   if (!ok) {
-    return res.status(401).type("html").send("Invalid password");
+    return res
+      .status(401)
+      .type("html")
+      .send("Invalid credentials.");
   }
 
-  req.session.manager_id = mgr.id;
-  return res.redirect("/manager");
+  req.session.managerId = manager.id;
+  req.session.salonId = manager.salon_id;
+  req.session.managerEmail = manager.email;
+
+  return res.redirect("/manager/dashboard");
 });
 
 /* -------------------------------
-   GET: /manager/signup (placeholder)
+   GET /manager/signup (view)
 ---------------------------------*/
-router.get("/signup", (req, res) => {
+router.get("/signup", (_req, res) => {
   res
     .status(200)
     .type("html")
     .send(
-      `<h2>Signup coming soon</h2><p>You will be able to create accounts here.</p><a href="/manager/login">Back to login</a>`
-    );
-});
-
-router.post("/signup", (req, res) => {
-  return res.type("html").send("Signup disabled for now.");
-});
-
-/* -------------------------------
-   GET: /manager/forgot-password (placeholder)
----------------------------------*/
-router.get("/forgot-password", (req, res) => {
-  res
-    .status(200)
-    .type("html")
-    .send(
-      `<h2>Password reset coming soon</h2><p>Reset emails will be available once mail service is active.</p><a href="/manager/login">Back to login</a>`
+      `<h2>Manager sign-up coming soon.</h2><p>This will be wired to salon onboarding in the pilot.</p>`
     );
 });
 
 /* -------------------------------
-   GET: /manager/login-with-token
-   - Backwards-compatible: just redirect into /manager/login?token=...
+   Magic link helper:
+   GET /manager/login-with-token?token=...
 ---------------------------------*/
 router.get("/login-with-token", (req, res) => {
   const { token } = req.query || {};

@@ -70,66 +70,152 @@ router.get("/login", (req, res) => {
   <meta charset="UTF-8" />
   <title>Manager Login — MostlyPostly</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+
   <style>
-    body { background: #0B1223; }
-    .card {
-      background: #111827;
-      border: 1px solid rgba(255,255,255,0.05);
-      border-radius: 12px;
-      padding: 32px;
+    body {
+      background: #F6F7FB;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #202330;
     }
+
+    .login-card {
+      background: #FFFFFF;
+      border-radius: 14px;
+      padding: 44px 40px;
+      border: 1px solid rgba(116,134,195,0.20);
+      box-shadow: 0 25px 45px rgba(32,35,48,0.08);
+      width: 100%;
+      max-width: 420px;
+    }
+
     .mp-logo {
-      width: 52px;
-      margin: 0 auto 12px;
-      display: block;
+      height: 60px;
+      width: 60px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #7486C3, #5C6FA8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 auto 14px auto;
     }
-    .footer-text {
-      font-size: 12px;
-      color: #8892a6;
+
+    .login-btn {
+      background: #202330;
+      color: #FFFFFF;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 12px 0;
+      font-size: 14px;
+      transition: 0.2s;
+      box-shadow: 0 4px 14px rgba(32,35,48,0.15);
+    }
+
+    .login-btn:hover {
+      background: #2A2E3A;
+    }
+
+    .input-box {
+      border: 1px solid #D3D6E3;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-top: 4px;
+      font-size: 14px;
+      color: #202330;
+      width: 100%;
+    }
+
+    .input-box:focus {
+      border-color: #7486C3;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(116,134,195,0.25);
     }
   </style>
 </head>
 
-<body class="text-gray-200">
+<body>
   <div class="min-h-screen flex flex-col justify-center items-center px-4">
-    <div class="card w-full max-w-md mt-4">
-      <h2 class="text-center text-3xl font-bold mb-6">Sign In</h2>
 
-      <form method="POST" action="/manager/login">
-        <label class="block mb-3">
-          <span class="text-gray-300 text-sm">Email Address</span>
-          <input type="email" name="email" required
-            class="mt-1 w-full p-3 rounded bg-gray-800 border border-gray-700 text-gray-200 focus:ring focus:ring-blue-500" />
-        </label>
+    <!-- Brand -->
+    <div class="text-center mb-6">
+      <div class="mp-logo">MP</div>
+      <h1 class="text-2xl font-semibold tracking-tight text-[#202330]">MostlyPostly</h1>
+      <p class="text-sm mt-1 text-[#656B80]">Salon Manager Login</p>
+    </div>
 
-        <label class="block mb-4">
-          <span class="text-gray-300 text-sm">Password</span>
-          <input type="password" name="password" required
-            class="mt-1 w-full p-3 rounded bg-gray-800 border border-gray-700 text-gray-200 focus:ring focus:ring-blue-500" />
-        </label>
+    <!-- LOGIN CARD -->
+    <div class="login-card">
 
-        <button type="submit"
-          class="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded text-white font-semibold transition">
-          Sign In
+      <h2 class="text-xl font-semibold text-center mb-6">Welcome back</h2>
+
+      <form method="POST" action="/manager/login" class="space-y-5">
+
+        <!-- Email -->
+        <div>
+          <label class="text-xs text-[#656B80]">Email address</label>
+          <input
+            type="email"
+            name="email"
+            required
+            class="input-box"
+            placeholder="Enter your email"
+          />
+        </div>
+
+        <!-- Password -->
+        <div>
+          <label class="text-xs text-[#656B80]">Password</label>
+          <input
+            type="password"
+            name="password"
+            required
+            class="input-box"
+            placeholder="Enter your password"
+          />
+        </div>
+
+        <!-- Login Button -->
+        <button type="submit" class="login-btn w-full">
+          Log in
         </button>
 
-        <div class="flex justify-between text-sm mt-3">
-          <a href="/manager/forgot-password" class="text-blue-400 hover:underline">Forgot password?</a>
-          <a href="/manager/signup" class="text-blue-400 hover:underline">Create Account</a>
-        </div>
       </form>
 
-      <div class="mt-6 text-center footer-text">
-        By continuing, you agree to our
-        <a href="/legal/terms" class="text-blue-400 hover:underline">Terms of Service</a>
-        and
-        <a href="/legal/privacy" class="text-blue-400 hover:underline">Privacy Policy</a>.
+      <!-- Forgot Password -->
+      <div class="mt-4 text-center">
+        <a href="/manager/forgot-password" class="text-xs text-[#7486C3] hover:underline">
+          Forgot your password?
+        </a>
       </div>
+
+      <!-- Divider -->
+      <div class="my-6 border-t border-slate-200"></div>
+
+      <!-- Sign Up -->
+      <div class="text-center text-sm">
+        <span class="text-[#656B80]">Not registered yet?</span>
+        <a href="/manager/signup" class="text-[#7486C3] font-medium hover:underline">
+          Create an account
+        </a>
+      </div>
+
     </div>
+
+    <!-- Footer Legal -->
+    <div class="text-center mt-6 text-xs text-[#656B80]">
+      By continuing, you agree to our
+      <a href="/legal/terms.html" class="text-[#7486C3] hover:underline">Terms</a> and
+      <a href="/legal/privacy.html" class="text-[#7486C3] hover:underline">Privacy Policy</a>.
+    </div>
+
   </div>
 </body>
 </html>
+
   `);
 });
 
