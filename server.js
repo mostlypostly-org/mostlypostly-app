@@ -186,13 +186,40 @@ app.use("/inbound/twilio",
 
 // =====================================================
 // Manager UI Routes (dashboard, admin, posts, etc.)
+// AUTO-INJECT salon context if missing
 // =====================================================
+app.use((req, res, next) => {
+  const path = req.path;
+
+  // Only enforce salon context on dashboard/admin-style routes
+  const needsSalon = [
+    "/dashboard",
+    "/posts",
+    "/analytics",
+    "/analytics/scheduler",
+    "/manager/admin",
+    "/manager/settings"
+  ];
+
+  const hit = needsSalon.some((p) => path.startsWith(p));
+
+  if (hit && !req.query.salon) {
+    const salonId = req.session.salon_id;
+    if (salonId) {
+      return res.redirect(`${req.originalUrl}?salon=${salonId}`);
+    }
+  }
+
+  next();
+});
+
 app.use("/dashboard", dashboardRoute);
 app.use("/posts", postsRoute);
 app.use("/analytics", analyticsRoute);
 app.use("/analytics/scheduler", analyticsSchedulerRoute);
 app.use("/auth/facebook", facebookAuthRoutes);
 app.use("/manager", managerRoute);
+
 
 // =====================================================
 // JOIN Onboarding endpoints

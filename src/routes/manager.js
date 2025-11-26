@@ -57,8 +57,8 @@ function navBar(current = "manager", salon_id = "", manager_phone = "") {
         ${link(`/dashboard${qsSalon}`, "Database", "database")}
         ${link(`/analytics${qsSalon}`, "Scheduler Analytics", "scheduler")}
         ${link(`/manager/admin${qsSalon}`, "Admin", "admin")}
-        ${link(`/index.html`, "Policies", "policies")}
-        ${link("/manager/logout", "Logout", "logout")}
+        ${link(`/index.html${qsSalon}`, "Policies", "policies")}
+        ${link(`/manager/logout${qsSalon}`, "Logout", "logout")}
       </nav>
     </div>
   </div>
@@ -543,7 +543,7 @@ router.get("/", requireAuth, async (req, res) => {
             const body = `
       <section class="mb-8">
         <div class="flex flex-col gap-2">
-          <h1 class="text-3xl font-semibold text-white">
+          <h1 class="text-2xl font-semibold text-white">
             Manager Dashboard — <span class="text-mpPrimary">${getSalonName(salon_id)}</span>
           </h1>
           <p class="text-sm text-slate-400">
@@ -839,7 +839,7 @@ router.get("/admin", requireAuth, (req, res) => {
   const body = `
     <section class="mb-6">
       <h1 class="text-2xl font-bold mb-2">
-        Admin — <span class="text-blue-400">${getSalonName(salon_id)}</span>
+        Admin — <span class="text-mpPrimary">${getSalonName(salon_id)}</span>
       </h1>
       <p class="text-sm text-zinc-400">
         Manage social connections, posting rules, and stylist configuration for this salon.
@@ -848,7 +848,7 @@ router.get("/admin", requireAuth, (req, res) => {
 
     <!-- Social Connections -->
     <section class="mb-6 grid gap-4 md:grid-cols-[1.2fr,0.8fr]">
-      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4">
         <h2 class="text-sm font-semibold text-zinc-50 mb-2">Social Connections</h2>
         <dl class="space-y-1 text-xs text-zinc-300">
           <div class="flex justify-between gap-3">
@@ -886,7 +886,7 @@ router.get("/admin", requireAuth, (req, res) => {
         </div>
       </div>
 
-      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4">
         <h2 class="text-sm font-semibold text-zinc-50 mb-2">Salon Info</h2>
         <dl class="space-y-1 text-xs text-zinc-300">
           <div class="flex justify-between gap-3">
@@ -929,7 +929,7 @@ router.get("/admin", requireAuth, (req, res) => {
 
     <!-- Posting Rules -->
     <section class="mb-6 grid gap-4 md:grid-cols-2">
-      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4">
         <h2 class="text-sm font-semibold text-zinc-50 mb-2">Posting Window</h2>
         <p class="text-xs text-zinc-300">
           MostlyPostly only posts inside your configured window (salon local time).
@@ -946,7 +946,7 @@ router.get("/admin", requireAuth, (req, res) => {
         </dl>
       </div>
 
-      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4">
         <h2 class="text-sm font-semibold text-zinc-50 mb-2">Manager Rules</h2>
         <dl class="space-y-1 text-xs text-zinc-300">
           <div class="flex justify-between gap-3">
@@ -985,7 +985,7 @@ router.get("/admin", requireAuth, (req, res) => {
 
     <!-- Managers & Stylists -->
     <section class="mb-6 grid gap-4 md:grid-cols-2">
-      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4">
         <h2 class="text-sm font-semibold text-zinc-50 mb-3">Managers</h2>
         <div class="overflow-x-auto">
           <table class="w-full border-collapse text-xs">
@@ -1008,7 +1008,7 @@ router.get("/admin", requireAuth, (req, res) => {
         </div>
       </div>
 
-      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4">
         <h2 class="text-sm font-semibold text-zinc-50 mb-3">Stylists</h2>
         <div class="overflow-x-auto">
           <table class="w-full border-collapse text-xs">
@@ -1034,14 +1034,14 @@ router.get("/admin", requireAuth, (req, res) => {
   `;
 
   res.send(
-    pageShell({
-      title: `Admin — ${info.name || salon_id}`,
-      body,
-      salon_id,
-      manager_phone,
-      current: "admin",
-    })
-  );
+  pageShell({
+    title: `Admin — ${info.name || salon_id}`,
+    body,
+    salon_id,
+    manager_phone,
+    current: "admin",
+  })
+);
 });
 
 export default router;

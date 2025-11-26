@@ -29,37 +29,44 @@ function salonNameFromId(salonId) {
   );
 }
 
-function navBar(current = "database", salon_id = "", manager_phone = "") {
-  const link = (href, label, key) =>
-    `<a href="${href}" class="${
-      current === key
-        ? "text-white bg-blue-600"
-        : "text-blue-300 hover:text-white hover:bg-blue-500"
-    } px-3 py-1 rounded transition">${label}</a>`;
-
+function navBar(current = "database", salon_id = "") {
   const qsSalon = salon_id ? `?salon=${encodeURIComponent(salon_id)}` : "";
 
+  const link = (href, label, key) =>
+    `<a href="${href}" 
+      class="hover:text-white ${
+        current === key ? "text-white" : "text-slate-300"
+      } transition">
+      ${label}
+    </a>`;
+
   return `
-  <header class="bg-black/95 text-blue-300 shadow-md sticky top-0 z-10">
-    <div class="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
-      <div class="flex items-center gap-2">
-        <span class="inline-block w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_2px_rgba(59,130,246,0.9)]"></span>
-        <a href="${appHost()}/manager" class="font-semibold tracking-wide">MostlyPostly — Portal</a>
-      </div>
-      <nav class="flex gap-2">
-        ${link("/manager", "Manager", "manager")}
+<header class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
+  <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between py-4">
+
+      <!-- Updated MP Logo -->
+      <a href="/manager${qsSalon}" class="flex items-center gap-2" aria-label="MostlyPostly manager home">
+        <div class="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-mpPrimary to-mpAccent text-xs font-semibold text-white shadow-md shadow-mpPrimary/40">
+          MP
+        </div>
+        <span class="text-lg font-semibold tracking-tight text-white">MostlyPostly</span>
+      </a>
+
+      <!-- Desktop Nav -->
+      <nav class="hidden items-center gap-8 text-sm font-medium text-slate-200 md:flex" aria-label="Primary navigation">
+        ${link(`/manager${qsSalon}`, "Manager", "manager")}
         ${link(`/dashboard${qsSalon}`, "Database", "database")}
         ${link(`/analytics${qsSalon}`, "Scheduler Analytics", "scheduler")}
         ${link(`/manager/admin${qsSalon}`, "Admin", "admin")}
-        ${link(`/index.html`, "Policies", "policies")}
-        ${link("/manager/logout", "Logout", "logout")}
+        ${link(`/index.html${qsSalon}`, "Policies", "policies")}
+        ${link(`/manager/logout${qsSalon}`, "Logout", "logout")}
       </nav>
     </div>
-  </header>
-  <div class="bg-gradient-to-b from-black via-zinc-950 to-black h-[1px]"></div>
-  `;
+  </div>
+</header>
+`;
 }
-
 
 function pageShell({
   title,
