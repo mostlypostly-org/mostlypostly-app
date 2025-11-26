@@ -57,7 +57,6 @@ function navBar(current = "manager", salon_id = "", manager_phone = "") {
         ${link(`/dashboard${qsSalon}`, "Database", "database")}
         ${link(`/analytics${qsSalon}`, "Scheduler Analytics", "scheduler")}
         ${link(`/manager/admin${qsSalon}`, "Admin", "admin")}
-        ${link(`/index.html${qsSalon}`, "Policies", "policies")}
         ${link(`/manager/logout${qsSalon}`, "Logout", "logout")}
       </nav>
     </div>
