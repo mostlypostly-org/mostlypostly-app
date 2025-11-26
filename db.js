@@ -106,6 +106,174 @@ try {
 }
 
 // =====================================================
+// Ensure salons.status_step exists
+// =====================================================
+try {
+  db.prepare("SELECT status_step FROM salons LIMIT 1").get();
+} catch (e) {
+  console.log("🧱 (db.js) added salons.status_step");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN status_step TEXT DEFAULT 'salon'").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.status_step:", err.message);
+  }
+}
+
+// =====================================================
+// Ensure remaining onboarding columns for salons
+// =====================================================
+try { db.prepare("SELECT status FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.status");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN status TEXT DEFAULT 'setup_incomplete'").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.status:", err.message);
+  }
+}
+
+try { db.prepare("SELECT booking_link FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.booking_link");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN booking_link TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.booking_link:", err.message);
+  }
+}
+
+try { db.prepare("SELECT timezone FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.timezone");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN timezone TEXT DEFAULT 'America/Chicago'").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.timezone:", err.message);
+  }
+}
+
+// Ensure timezone has a default even if column existed before migration
+try {
+  db.prepare(`
+    UPDATE salons
+    SET timezone = COALESCE(timezone, 'America/Chicago')
+  `).run();
+  console.log("🧱 (db.js) backfilled salons.timezone where NULL");
+} catch (err) {
+  console.warn("⚠️ Could not backfill salons.timezone:", err.message);
+}
+
+try { db.prepare("SELECT instagram_handle FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.instagram_handle");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN instagram_handle TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.instagram_handle:", err.message);
+  }
+}
+
+try { db.prepare("SELECT facebook_page_id FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.facebook_page_id");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN facebook_page_id TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.facebook_page_id:", err.message);
+  }
+}
+
+try { db.prepare("SELECT default_cta FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.default_cta");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN default_cta TEXT DEFAULT 'Book via link in bio.'").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.default_cta:", err.message);
+  }
+}
+
+try { db.prepare("SELECT posting_start_time FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.posting_start_time");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN posting_start_time TEXT DEFAULT '09:00'").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.posting_start_time:", err.message);
+  }
+}
+
+try { db.prepare("SELECT posting_end_time FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.posting_end_time");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN posting_end_time TEXT DEFAULT '19:00'").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.posting_end_time:", err.message);
+  }
+}
+
+try { db.prepare("SELECT auto_approval FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.auto_approval");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN auto_approval INTEGER DEFAULT 0").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.auto_approval:", err.message);
+  }
+}
+
+try { db.prepare("SELECT spacing_min FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.spacing_min");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN spacing_min INTEGER DEFAULT 20").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.spacing_min:", err.message);
+  }
+}
+
+try { db.prepare("SELECT spacing_max FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.spacing_max");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN spacing_max INTEGER DEFAULT 45").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.spacing_max:", err.message);
+  }
+}
+
+try { db.prepare("SELECT manager_display_name FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.manager_display_name");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN manager_display_name TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.manager_display_name:", err.message);
+  }
+}
+
+try { db.prepare("SELECT manager_title FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.manager_title");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN manager_title TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.manager_title:", err.message);
+  }
+}
+
+try { db.prepare("SELECT manager_phone FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.manager_phone");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN manager_phone TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.manager_phone:", err.message);
+  }
+}
+
+// =====================================================
 // 3) Recommended PRAGMAs
 // =====================================================
 try {

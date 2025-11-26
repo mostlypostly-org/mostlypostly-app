@@ -514,138 +514,86 @@ router.get("/signup", (req, res) => {
 router.post("/signup", (req, res) => {
   const { email, password, phone, business_name, company } = req.body || {};
 
-  // 🛑 Honeypot (spam bots)
+  // 🛑 Anti-spam honeypot
   if (company && company.trim() !== "") {
-    return res
-      .status(400)
-      .type("html")
-      .send("<h2>Form invalid</h2><p>Please try again.</p>");
+    return res.status(400).type("html").send("<h2>Form invalid.</h2>");
   }
 
-  // Basic validation
   if (!email || !password || !phone || !business_name) {
-    return res
-      .status(400)
-      .type("html")
-      .send("<h2>Missing fields</h2><p>Please complete all required fields.</p>");
+    return res.status(400).send("Missing required fields.");
   }
 
   if (password.length < 8) {
-    return res
-      .status(400)
-      .type("html")
-      .send(
-        "<h2>Password too short</h2><p>Your password must be at least 8 characters long.</p>"
-      );
+    return res.status(400).send("Password must be at least 8 characters.");
   }
 
   try {
-    // Check duplicates
-    const existingByEmail = db
-      .prepare("SELECT id FROM managers WHERE email = ? LIMIT 1")
-      .get(email);
-
-    if (existingByEmail) {
-      return res
-        .status(409)
-        .type("html")
-        .send(`
-          <h2>This email is already registered.</h2>
-          <p>Please <a href="/manager/login">sign in here</a> or use a different email.</p>
-        `);
+    // Duplicate checks
+    const existingEmail = db.prepare(`SELECT id FROM managers WHERE email = ?`).get(email);
+    if (existingEmail) {
+      return res.status(409).send(`
+        <h2>Email already registered.</h2>
+        <p><a href="/manager/login">Sign in here</a>.</p>
+      `);
     }
 
-    const existingByPhone = db
-      .prepare("SELECT id FROM managers WHERE phone = ? LIMIT 1")
-      .get(phone);
-
-    if (existingByPhone) {
-      return res
-        .status(409)
-        .type("html")
-        .send(`
-          <h2>This phone number is already in use.</h2>
-          <p>Please <a href="/manager/login">sign in here</a> or use a different number.</p>
-        `);
+    const existingPhone = db.prepare(`SELECT id FROM managers WHERE phone = ?`).get(phone);
+    if (existingPhone) {
+      return res.status(409).send(`
+        <h2>Phone already in use.</h2>
+        <p><a href="/manager/login">Sign in here</a>.</p>
+      `);
     }
 
-    // Generate a slug from Business Name
-    const rawName = String(business_name || "").trim();
-    let baseSlug = rawName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-
-    if (!baseSlug) {
-      baseSlug = "business";
-    }
+    // Generate salon slug
+    const rawName = business_name.trim();
+    let baseSlug = rawName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    if (!baseSlug) baseSlug = "business";
 
     let salonSlug = baseSlug;
 
-    // See if a salon with this slug already exists
-    let salonRow = db
-      .prepare("SELECT id, slug FROM salons WHERE slug = ? LIMIT 1")
-      .get(salonSlug);
+    // Create salon
+    const salonId = db.prepare(`SELECT lower(hex(randomblob(16))) AS id`).get().id;
 
-    if (!salonRow) {
-      // Create new salon
-      const salonId = db
-        .prepare("SELECT lower(hex(randomblob(16))) AS id")
-        .get().id;
-
-      db.prepare(
-        `
-        INSERT INTO salons (id, slug, name)
-        VALUES (@id, @slug, @name)
-      `
-      ).run({
-        id: salonId,
-        slug: salonSlug,
-        name: rawName || "New Business"
-      });
-
-      salonRow = { id: salonId, slug: salonSlug };
-    }
-
-    // Create manager
-    const managerId = db
-      .prepare("SELECT lower(hex(randomblob(16))) AS id")
-      .get().id;
-
-    const passwordHash = bcrypt.hashSync(password, 10);
-
-    db.prepare(
-      `
-      INSERT INTO managers (
-        id,
-        salon_id,
-        name,
-        phone,
-        chat_id,
-        role,
-        pin,
-        created_at,
-        updated_at,
-        password_hash,
-        email
+    db.prepare(`
+      INSERT INTO salons (
+        id, slug, name,
+        status, status_step,
+        website, booking_link, timezone,
+        created_at, updated_at
       )
       VALUES (
-        @id,
-        @salon_id,
-        NULL,
-        @phone,
-        NULL,
-        'manager',
-        NULL,
-        datetime('now'),
-        datetime('now'),
-        @password_hash,
-        @email
+        @id, @slug, @name,
+        'setup_incomplete', 'salon',
+        NULL, NULL, NULL,
+        datetime('now'), datetime('now')
       )
-    `
-    ).run({
+    `).run({
+      id: salonId,
+      slug: salonSlug,
+      name: rawName
+    });
+
+    // Create manager
+    const managerId = db.prepare(`SELECT lower(hex(randomblob(16))) AS id`).get().id;
+    const passwordHash = bcrypt.hashSync(password, 10);
+
+    db.prepare(`
+      INSERT INTO managers (
+        id, salon_id, name, phone, chat_id,
+        role, pin,
+        created_at, updated_at,
+        password_hash, email
+      )
+      VALUES (
+        @id, @salon_id, NULL, @phone, NULL,
+        'manager', NULL,
+        datetime('now'), datetime('now'),
+        @password_hash, @email
+      )
+    `).run({
       id: managerId,
-      salon_id: salonRow.slug, // managers.salon_id references salons.slug
+      salon_id: salonSlug,
       phone,
       password_hash: passwordHash,
       email
@@ -653,20 +601,18 @@ router.post("/signup", (req, res) => {
 
     // Start session
     req.session.manager_id = managerId;
-    
-    // (optional) store salon in session if you like:
-    req.session.salon_id = salonRow.slug;
+    req.session.salon_id = salonSlug;
+    req.session.manager_email = email;
 
-    // Redirect to onboarding wizard
+    // Redirect to onboarding step 1
     return res.redirect("/onboarding/salon");
+
   } catch (err) {
-    console.error("❌ Signup error:", err.message);
-    return res
-      .status(500)
-      .type("html")
-      .send("<h2>Something went wrong.</h2><p>Please try again.</p>");
+    console.error("Signup error:", err);
+    return res.status(500).send("Unexpected error during signup.");
   }
 });
+
 
 /* -------------------------------
    POST /manager/login

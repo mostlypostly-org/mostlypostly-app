@@ -42,109 +42,81 @@ function saveAllPosts(posts) {
 }
 
 // ======================================================
-// 🧱 DB helpers (safe, idempotent)
+// 🧱 DB helpers — updated for v1.3 schema
 // ======================================================
+
 const insertPostStmt = db.prepare(`
   INSERT INTO posts (
     id,
     salon_id,
     stylist_id,
+    manager_id,
+
     stylist_name,
     stylist_phone,
-    service_type,
-    caption,
+
+    image_url,
+
     base_caption,
     final_caption,
+    manual_caption,
     hashtags,
+    ai_hashtags,
+    service_type,
     cta,
-    original_notes,
-    image_url,
-    image_mime,
-    rehosted_image_url,
-    instagram_handle,
-    manager_id,
-    manager_phone,
-    manager_chat_id,
-    booking_url,
+
+    is_vision_generated,
+    vision_tags,
+    raw_ai_payload,
+
     status,
-    denied_reason,
-    platform_targets,
-    fb_post_id,
-    fb_response_id,
-    ig_container_id,
-    ig_media_id,
+    platform,
+    scheduled_for,
     published_at,
-    _meta,
+
+    error_message,
+    salon_post_number,
     created_at,
-    updated_at,
-    salon_post_number
-)
-VALUES (
+    updated_at
+  )
+  VALUES (
     @id,
     @salon_id,
     @stylist_id,
+    @manager_id,
+
     @stylist_name,
     @stylist_phone,
-    @service_type,
-    @caption,
+
+    @image_url,
+
     @base_caption,
     @final_caption,
+    @manual_caption,
     @hashtags,
+    @ai_hashtags,
+    @service_type,
     @cta,
-    @original_notes,
-    @image_url,
-    @image_mime,
-    @rehosted_image_url,
-    @instagram_handle,
-    @manager_id,
-    @manager_phone,
-    @manager_chat_id,
-    @booking_url,
+
+    @is_vision_generated,
+    @vision_tags,
+    @raw_ai_payload,
+
     @status,
-    @denied_reason,
-    @platform_targets,
-    @fb_post_id,
-    @fb_response_id,
-    @ig_container_id,
-    @ig_media_id,
+    @platform,
+    @scheduled_for,
     @published_at,
-    @_meta,
+
+    @error_message,
+    @salon_post_number,
     @created_at,
-    @updated_at,
-    @salon_post_number
-)
+    @updated_at
+  )
 `);
 
-function buildDynamicUpdate(table, id, patch = {}) {
-  // Build a dynamic UPDATE ... SET ... WHERE id=?
-  const allowed = [
-    "stylist_name", "stylist_phone", "service_type",
-    "caption", "base_caption", "final_caption", "hashtags",
-    "cta", "original_notes", "image_url", "image_mime",
-    "rehosted_image_url", "instagram_handle",
-    "manager_id", "manager_phone", "manager_chat_id",
-    "booking_url", "status", "denied_reason",
-    "platform_targets", "fb_post_id", "fb_response_id",
-    "ig_container_id", "ig_media_id", "published_at", "_meta"
-  ];
-
-  const sets = [];
-  const params = {};
-  for (const key of allowed) {
-    if (patch[key] !== undefined) {
-      sets.push(`${key} = @${key}`);
-      params[key] = patch[key];
-    }
-  }
-  sets.push(`updated_at = datetime('now')`);
-
-  const sql = `UPDATE ${table} SET ${sets.join(", ")} WHERE id = @id`;
-  const stmt = db.prepare(sql);
-  return (extra = {}) => stmt.run({ id, ...params, ...extra });
-}
 
 // ======================================================
-// 💾 Save a new post (DB + JSON mirror)
+// 💾 Save a new post (DB + JSON mirror) — v1.3 schema
 // ======================================================
 export function savePost(
   chatId,
@@ -156,121 +128,99 @@ export function savePost(
   salon = null
 ) {
   const posts = loadAllPosts();
-
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
 
-    // ----------------------------------------
-    // Assign per-salon post counter (correct)
-    // ----------------------------------------
-    let salon_post_number = 1;
+  // assign salon post number
+  let salon_post_number = 1;
+  try {
+    const row = db
+      .prepare(`SELECT MAX(salon_post_number) AS maxnum FROM posts WHERE salon_id = ?`)
+      .get(salon?.salon_id || null);
 
-    try {
-      const row = db
-        .prepare(`SELECT MAX(salon_post_number) AS maxnum FROM posts WHERE salon_id = ?`)
-        .get(salon?.salon_id || null);
+    if (row?.maxnum) salon_post_number = row.maxnum + 1;
+  } catch (err) {
+    console.warn("⚠️ Could not compute salon_post_number:", err.message);
+  }
 
-      if (row?.maxnum) salon_post_number = row.maxnum + 1;
-    } catch (err) {
-      console.warn("⚠️ Could not compute salon_post_number:", err.message);
-    }
-
-  const bookingUrl =
-    stylist.booking_url ||
-    stylist?.salon_info?.booking_url ||
-    salon?.salon_info?.booking_url ||
-    null;
-
-  // Normalize hashtags to JSON string for DB, array for JSON mirror
   const tagsArr = Array.isArray(hashtags) ? hashtags : [];
   const tagsJson = JSON.stringify(tagsArr);
 
-  // Unified fields
+  const aiHashtags = stylist.ai_hashtags || null;
+  const aiHashtagsJson = aiHashtags ? JSON.stringify(aiHashtags) : null;
+
   const payload = {
     id,
-    // Fix: correct salon_id for foreign key constraint
-    salon_id: salon?.salon_id || salon?.salon_info?.id || null,                          
-    stylist_id: null,
-    salon_post_number,
+    salon_id: salon?.salon_id || salon?.salon_info?.id || null,
+    stylist_id: stylist?.stylist_id || null,
+    manager_id: stylist?.manager_id || null,
+
     stylist_name: stylist.stylist_name || stylist.name || "Unknown Stylist",
     stylist_phone: String(chatId),
 
-    service_type: stylist.service_type || null,
-    caption: stylist.caption || caption || "",
-    base_caption: stylist.base_caption || caption || "",
-    final_caption: stylist.final_caption || caption || "",
-    hashtags: tagsJson,
-    cta: stylist.cta || "Book your next visit today!",
-    original_notes: stylist.original_notes || "",
-
     image_url: stylist.image_url || null,
-    image_mime: null,
-    rehosted_image_url: null,
-    instagram_handle: stylist.instagram_handle || stylist.instagramHandle || null,
 
-    manager_id: null,
-    manager_phone: stylist.manager_phone ? String(stylist.manager_phone) : null,
-    manager_chat_id: stylist.manager_chat_id ? String(stylist.manager_chat_id) : null,
-    booking_url: bookingUrl,
+    base_caption: caption || "",
+    final_caption: stylist.final_caption || caption || "",
+    manual_caption: stylist.manual_caption || null,
+    hashtags: tagsJson,
+    ai_hashtags: aiHashtagsJson,
+    service_type: stylist.service_type || null,
+    cta: stylist.cta || "Book via link in bio.",
+
+    is_vision_generated: 1,
+    vision_tags: stylist.vision_tags ? JSON.stringify(stylist.vision_tags) : null,
+    raw_ai_payload: stylist.raw_ai_payload ? JSON.stringify(stylist.raw_ai_payload) : null,
 
     status,
-    denied_reason: null,
-    platform_targets: JSON.stringify(stylist.platform_targets || null),
-    fb_post_id: null,
-    fb_response_id: null,
-    ig_container_id: null,
-    ig_media_id: null,
+    platform: "instagram",    // until multi-platform UI is added
+    scheduled_for: null,
     published_at: null,
-    _meta: JSON.stringify(stylist._meta || null),
+
+    error_message: null,
+    salon_post_number,
 
     created_at: now,
-    updated_at: now,
+    updated_at: now
   };
 
-  // 1) Write to DB
+  // 1) Insert into DB
   try {
     insertPostStmt.run(payload);
   } catch (err) {
     console.error("❌ DB insert failed (posts):", err.message);
   }
 
-  // 2) Mirror to JSON (for backup/legacy)
-  const newPostMirror = {
+  // 2) JSON mirror (simplified)
+  posts.push({
     id,
-    salon: stylist.salon_name || salon?.salon_info?.salon_name || "Unknown Salon",
+    salon: salon?.salon_info?.name || "Unknown Salon",
     stylist_name: payload.stylist_name,
     stylist_phone: payload.stylist_phone,
     service_type: payload.service_type,
-    caption: payload.caption,
     base_caption: payload.base_caption,
     final_caption: payload.final_caption,
     hashtags: tagsArr,
     cta: payload.cta,
     image_url: payload.image_url,
-    instagram_handle: payload.instagram_handle,
-    manager_phone: payload.manager_phone,
-    manager_chat_id: payload.manager_chat_id,
-    booking_url: payload.booking_url,
     status: payload.status,
     created_at: payload.created_at,
-    updated_at: payload.updated_at,
-    denied_reason: null
-  };
-
-  posts.push(newPostMirror);
+    updated_at: payload.updated_at
+  });
   saveAllPosts(posts);
 
-  if (io) io.emit("post:new", newPostMirror);
+  if (io) io.emit("post:new", payload);
   console.log(`✅ Post saved to DB & JSON for ${payload.stylist_name} (${payload.status})`);
-  return newPostMirror;
+  return payload;
 }
 
 // ======================================================
 // 🧩 Update post status + merge extra (DB first, then JSON)
 // ======================================================
 export function updatePostStatus(id, status, reasonOrExtra = null) {
-  // Prepare patch
+  // Prepare patch for DB
   const patch = { status };
+
   if (typeof reasonOrExtra === "string") {
     patch.denied_reason = reasonOrExtra;
   } else if (reasonOrExtra && typeof reasonOrExtra === "object") {
@@ -278,56 +228,114 @@ export function updatePostStatus(id, status, reasonOrExtra = null) {
     if (Array.isArray(reasonOrExtra.hashtags)) {
       patch.hashtags = JSON.stringify(reasonOrExtra.hashtags);
     }
-    for (const k of [
-      "final_caption", "caption", "image_url", "instagram_handle",
-      "booking_url", "manager_phone", "manager_chat_id", "fb_post_id",
-      "ig_container_id", "ig_media_id", "published_at", "platform_targets", "_meta"
-    ]) {
+
+    // Only allow columns that actually exist in the new posts schema
+    const allowedExtraKeys = [
+      "final_caption",
+      "image_url",
+      "published_at",
+      "platform",
+      "scheduled_for",
+      "error_message",
+      "base_caption",
+      "manual_caption",
+      "ai_hashtags",
+      "service_type",
+      "cta",
+      "vision_tags",
+      "raw_ai_payload"
+    ];
+
+    for (const k of allowedExtraKeys) {
       if (reasonOrExtra[k] !== undefined) {
-        patch[k] = typeof reasonOrExtra[k] === "object" && reasonOrExtra[k] !== null
-          ? JSON.stringify(reasonOrExtra[k])
-          : reasonOrExtra[k];
+        const v = reasonOrExtra[k];
+        patch[k] =
+          typeof v === "object" && v !== null ? JSON.stringify(v) : v;
       }
     }
   }
 
-  // 1) DB update
+  // Always bump updated_at in DB
+  patch.updated_at = new Date().toISOString();
+
+  // 1) DB update (inline dynamic UPDATE instead of buildDynamicUpdate)
   try {
-    const run = buildDynamicUpdate("posts", id, patch);
-    run();
+    const allowedCols = new Set([
+      "status",
+      "denied_reason",
+      "final_caption",
+      "image_url",
+      "published_at",
+      "platform",
+      "scheduled_for",
+      "error_message",
+      "hashtags",
+      "base_caption",
+      "manual_caption",
+      "ai_hashtags",
+      "service_type",
+      "cta",
+      "vision_tags",
+      "raw_ai_payload",
+      "updated_at"
+    ]);
+
+    const keys = Object.keys(patch).filter((k) => allowedCols.has(k));
+
+    if (keys.length > 0) {
+      const setClause = keys.map((k) => `${k} = @${k}`).join(", ");
+      const stmt = db.prepare(`UPDATE posts SET ${setClause} WHERE id = @id`);
+      stmt.run({ id, ...patch });
+    }
   } catch (err) {
     console.error("❌ DB update failed (posts):", err.message);
   }
 
-  // 2) JSON mirror update
+  // 2) JSON mirror update (keeps legacy structure, including caption)
   const posts = loadAllPosts();
   const idx = posts.findIndex((p) => p.id === id);
   if (idx !== -1) {
     posts[idx].status = status;
     posts[idx].updated_at = new Date().toISOString();
+
     if (typeof reasonOrExtra === "string") {
       posts[idx].denied_reason = reasonOrExtra;
     } else if (reasonOrExtra && typeof reasonOrExtra === "object") {
       posts[idx] = {
         ...posts[idx],
         ...reasonOrExtra,
-        // keep hashtags array in JSON
         ...(Array.isArray(reasonOrExtra.hashtags)
           ? { hashtags: reasonOrExtra.hashtags }
           : {}),
       };
     }
+
     saveAllPosts(posts);
   } else {
-    console.warn(`⚠️ updatePostStatus: Post ${id} not found in JSON mirror (DB was updated).`);
+    console.warn(
+      `⚠️ updatePostStatus: Post ${id} not found in JSON mirror (DB was updated).`
+    );
   }
 
-  // Return a merged view from DB (best-effort)
+  // 3) Return a merged view from DB (best-effort)
   try {
-    const row = db.prepare(`
-      SELECT id, stylist_name, stylist_phone, status, final_caption, denied_reason, created_at, updated_at
-      FROM posts WHERE id = ?
-    `).get(id);
+    const row = db
+      .prepare(
+        `
+      SELECT
+        id,
+        stylist_name,
+        stylist_phone,
+        status,
+        final_caption,
+        denied_reason,
+        created_at,
+        updated_at
+      FROM posts
+      WHERE id = ?
+    `
+      )
+      .get(id);
     return row || null;
   } catch {
     return null;

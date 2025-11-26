@@ -1,173 +1,164 @@
--- ===========================
--- MostlyPostly Unified Schema
--- ===========================
+/* ============================================================
+   SCHEMA.SQL — FULL DATABASE SCHEMA FOR MOSTLYPOSTLY v1.3+
+   ============================================================ */
 
-PRAGMA foreign_keys = ON;
-
-BEGIN TRANSACTION;
-
--- ===== Core reference =====
+/* ------------------------------------------------------------
+   SALONS — multi-tenant config (now DB-backed)
+   ------------------------------------------------------------ */
 CREATE TABLE IF NOT EXISTS salons (
-  id                TEXT PRIMARY KEY,
-  slug              TEXT UNIQUE NOT NULL,
-  name              TEXT NOT NULL,
-  phone             TEXT,
-  city              TEXT,
-  timezone          TEXT NOT NULL DEFAULT 'America/Indiana/Indianapolis',
-  default_hashtags  TEXT,
-  booking_url       TEXT,
-  tone              TEXT,
-  auto_publish      INTEGER NOT NULL DEFAULT 0,
-  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+  id                   TEXT PRIMARY KEY,              
+  slug                 TEXT UNIQUE NOT NULL,          
+  name                 TEXT NOT NULL,
+
+  phone                TEXT,
+  city                 TEXT,
+  state                TEXT,
+  industry             TEXT,
+
+  status               TEXT DEFAULT 'setup_incomplete',
+  status_step          TEXT DEFAULT 'salon',
+
+  website              TEXT,
+  booking_link         TEXT,
+  timezone             TEXT DEFAULT 'America/Chicago',
+
+  instagram_handle     TEXT,
+  facebook_page_id     TEXT,
+  default_cta          TEXT DEFAULT 'Book via link in bio.',
+
+  posting_start_time   TEXT DEFAULT '09:00',
+  posting_end_time     TEXT DEFAULT '19:00',
+  auto_approval        INTEGER DEFAULT 0,
+  spacing_min          INTEGER DEFAULT 20,
+  spacing_max          INTEGER DEFAULT 45,
+
+  manager_display_name TEXT,
+  manager_title        TEXT,
+  manager_phone        TEXT,
+
+  default_hashtags     TEXT,
+  tone                 TEXT,
+  auto_publish         INTEGER DEFAULT 0,
+  booking_url          TEXT,
+
+  created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+/* ------------------------------------------------------------
+   MANAGERS — login + ownership
+   ------------------------------------------------------------ */
 CREATE TABLE IF NOT EXISTS managers (
-  id           TEXT PRIMARY KEY,
-  salon_id     TEXT NOT NULL REFERENCES salons(slug) ON DELETE CASCADE,
-  name         TEXT,
-  phone        TEXT UNIQUE,
-  chat_id      TEXT,
-  role         TEXT DEFAULT 'manager',
-  pin          TEXT,
-  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  id             TEXT PRIMARY KEY,
+  salon_id       TEXT NOT NULL,
+  name           TEXT,
+  phone          TEXT UNIQUE,
+  chat_id        TEXT,
+  role           TEXT DEFAULT 'manager',
+  pin            TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  password_hash  TEXT,
+  email          TEXT UNIQUE,
+  FOREIGN KEY (salon_id) REFERENCES salons(slug)
 );
 
+/* ------------------------------------------------------------
+   MANAGER TOKENS — magic login links + approval tokens
+   ------------------------------------------------------------ */
+CREATE TABLE IF NOT EXISTS manager_tokens (
+  id             TEXT PRIMARY KEY,
+  manager_id     TEXT,
+  token          TEXT,
+  expires_at     TEXT,
+  used_at        TEXT,
+  salon_id       TEXT,
+  manager_phone  TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (manager_id) REFERENCES managers(id)
+);
+
+/* ------------------------------------------------------------
+   STYLISTS — optional, but supported
+   ------------------------------------------------------------ */
 CREATE TABLE IF NOT EXISTS stylists (
-  id               TEXT PRIMARY KEY,
-  salon_id         TEXT NOT NULL REFERENCES salons(slug) ON DELETE CASCADE,
-  name             TEXT,
-  phone            TEXT UNIQUE,
-  chat_id          TEXT,
-  instagram_handle TEXT,
-  specialties      TEXT,
-  is_active        INTEGER NOT NULL DEFAULT 1,
-  consent_sms      INTEGER NOT NULL DEFAULT 0,
-  created_at       TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+  id                 TEXT PRIMARY KEY,
+  salon_id           TEXT NOT NULL,
+  name               TEXT,
+  phone              TEXT,
+  instagram_handle   TEXT,
+  specialties        TEXT,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (salon_id) REFERENCES salons(slug)
 );
 
--- ===========================
--- POSTS TABLE
--- ===========================
+/* ------------------------------------------------------------
+   POSTS — new v1.3+ schema (MATCHES storage.js EXACTLY)
+   ------------------------------------------------------------ */
 CREATE TABLE IF NOT EXISTS posts (
   id                 TEXT PRIMARY KEY,
   salon_id           TEXT NOT NULL,
-  stylist_id         TEXT REFERENCES stylists(id) ON DELETE SET NULL,
+  stylist_id         TEXT,                        -- NEW
+  manager_id         TEXT,                        -- NEW
+
   stylist_name       TEXT,
   stylist_phone      TEXT,
 
-  service_type       TEXT,
-  caption            TEXT,
-  base_caption       TEXT,
-  final_caption      TEXT,
+  image_url          TEXT,
+
+  -- AI captioning pipeline
+  base_caption       TEXT,                        -- NEW (raw AI caption)
+  final_caption      TEXT,                        -- NEW (after stylist edits)
+  manual_caption     TEXT,                        -- NEW (if manually overridden)
   hashtags           TEXT,
+  ai_hashtags        TEXT,                        -- NEW
+  service_type       TEXT,
   cta                TEXT,
-  original_notes     TEXT,
 
-  image_url              TEXT,
-  image_mime             TEXT,
-  rehosted_image_url     TEXT,
-  instagram_handle       TEXT,
+  is_vision_generated INTEGER DEFAULT 1,          -- NEW
+  vision_tags         TEXT,                       -- NEW
+  raw_ai_payload      TEXT,                       -- NEW (JSON from OpenAI)
 
-  manager_id         TEXT REFERENCES managers(id) ON DELETE SET NULL,
-  manager_phone      TEXT,
-  manager_chat_id    TEXT,
-
-  status             TEXT NOT NULL,
-  denied_reason      TEXT,
-  booking_url        TEXT,
-  platform_targets   TEXT,
-
-  fb_post_id         TEXT,
-  fb_response_id     TEXT,
-  ig_container_id    TEXT,
-  ig_media_id        TEXT,
-
-  published_at       TEXT,
+  status             TEXT,                        -- draft | manager_pending | scheduled | published | failed
+  platform           TEXT,                        -- facebook | instagram | both
   scheduled_for      TEXT,
-  retry_count        INTEGER DEFAULT 0,
-  retry_log          TEXT,
+  published_at       TEXT,
 
-  approved_by        TEXT,
-  approved_at        TEXT,
+  error_message      TEXT,                        -- NEW failure logging
+
   salon_post_number  INTEGER,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
 
-  _meta              TEXT,
-  created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+  FOREIGN KEY (salon_id) REFERENCES salons(slug),
+  FOREIGN KEY (stylist_id) REFERENCES stylists(id),
+  FOREIGN KEY (manager_id) REFERENCES managers(id)
 );
 
--- ===== Scheduler =====
-CREATE TABLE IF NOT EXISTS scheduler_queue (
-  id            TEXT PRIMARY KEY,
-  post_id       TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-  salon_id      TEXT NOT NULL REFERENCES salons(slug) ON DELETE CASCADE,
-  scheduled_for TEXT NOT NULL,
-  window_label  TEXT,
-  priority      INTEGER NOT NULL DEFAULT 0,
-  attempts      INTEGER NOT NULL DEFAULT 0,
-  last_error    TEXT,
-  status        TEXT NOT NULL DEFAULT 'queued',
-  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_posts_scheduled_for ON scheduler_queue(status, scheduled_for);
-
--- ===== Moderation =====
+/* ------------------------------------------------------------
+   MODERATION — AI and manual safety checks
+   ------------------------------------------------------------ */
 CREATE TABLE IF NOT EXISTS moderation_flags (
-  id          TEXT PRIMARY KEY,
-  salon_id    TEXT REFERENCES salons(slug) ON DELETE CASCADE,
-  post_id     TEXT REFERENCES posts(id) ON DELETE CASCADE,
-  level       TEXT NOT NULL,
-  reasons     TEXT,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  id         TEXT PRIMARY KEY,
+  post_id    TEXT NOT NULL,
+  status     TEXT DEFAULT 'clean',
+  level      TEXT,
+  reasons    TEXT,
+  details    TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (post_id) REFERENCES posts(id)
 );
 
--- ===== Analytics =====
-CREATE TABLE IF NOT EXISTS analytics_events (
-  id          TEXT PRIMARY KEY,
-  salon_id    TEXT,
-  post_id     TEXT,
-  event       TEXT NOT NULL,
-  source      TEXT,
-  data        TEXT,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- ===== Manager Tokens (magic links) =====
-CREATE TABLE IF NOT EXISTS manager_tokens (
+/* ------------------------------------------------------------
+   ANALYTICS — lightweight event tracking
+   ------------------------------------------------------------ */
+CREATE TABLE IF NOT EXISTS analytics (
   id           TEXT PRIMARY KEY,
-  manager_id   TEXT NOT NULL REFERENCES managers(id) ON DELETE CASCADE,
-  token        TEXT NOT NULL UNIQUE,
-  expires_at   TEXT NOT NULL,
-  used_at      TEXT,
-  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  salon_id     TEXT NOT NULL,
+  event_type   TEXT,
+  post_id      TEXT,
+  stylist_name TEXT,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (salon_id) REFERENCES salons(slug)
 );
-
-CREATE TABLE IF NOT EXISTS stylist_portal_tokens (
-  id           TEXT PRIMARY KEY,
-  post_id      TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-  stylist_phone TEXT,
-  token        TEXT NOT NULL,
-  expires_at   TEXT NOT NULL,
-  used_at      TEXT
-);
-
--- ===== Media Cache =====
-CREATE TABLE IF NOT EXISTS media_cache (
-  id           TEXT PRIMARY KEY,
-  source       TEXT NOT NULL,
-  source_url   TEXT,
-  mime         TEXT,
-  bytes        INTEGER,
-  width        INTEGER,
-  height       INTEGER,
-  sha256       TEXT,
-  local_path   TEXT,
-  public_url   TEXT,
-  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-COMMIT;

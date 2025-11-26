@@ -106,6 +106,7 @@ app.use(
   })
 );
 
+
 // =====================================================
 // 🧩 Global Middleware (order matters)
 // =====================================================
@@ -138,12 +139,21 @@ if (!fs.existsSync(okPath)) fs.writeFileSync(okPath, "ok\n");
 app.use("/public", express.static(PUBLIC_DIR));
 
 // =====================================================
+// MOUNT ONBOARDING ROUTES FIRST (always allowed)
+// =====================================================
+app.use("/onboarding", onboardingRoutes);
+
+// =====================================================
+// 🔐 Force onboarding flow for new salons
+// (must come AFTER onboarding is mounted)
+// =====================================================
+import { onboardingGuard } from "./src/routes/onboardingGuard.js";
+app.use(onboardingGuard);
+
+// =====================================================
 // MOUNT AUTH ROUTES (managers login FIRST)
 // =====================================================
 app.use("/manager", managerAuth);
-
-
-app.use("/onboarding", onboardingRoutes);
 
 // =====================================================
 // Stylist Portal (token-based, no login)
