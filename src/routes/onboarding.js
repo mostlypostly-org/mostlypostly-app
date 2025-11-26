@@ -204,6 +204,7 @@ router.post("/salon", (req, res) => {
   });
 
   req.session.salon_id = salonSlug;
+  req.session.manager_id = managerId;
 
   return res.redirect("/dashboard");
 });

@@ -82,14 +82,25 @@ const app = express();
 // Static files for login, logos, etc.
 app.use("/public", express.static(path.join(__dirname, "public")));
 
+// =====================================================
+// Persistent Sessions (Fixes local logout & lost salon context)
+// =====================================================
+import SQLiteStoreFactory from "connect-sqlite3";
+
+const SQLiteStore = SQLiteStoreFactory(session);
+
 app.use(
   session({
+    store: new SQLiteStore({
+      db: "sessions.db",
+      dir: "./", // saved inside mostlypostly-app/
+    }),
     secret: process.env.SESSION_SECRET || "supersecretkey",
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false, // set to true on production with HTTPS
+      secure: false, // true on production with HTTPS
       maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
     }
   })

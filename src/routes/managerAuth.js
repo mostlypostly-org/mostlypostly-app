@@ -59,12 +59,12 @@ router.get("/login", (req, res) => {
     `
     ).run(token);
 
-    // Basic session payload
-    req.session.managerId = row.manager_id;
-    req.session.salonId = row.salon_id;
-    req.session.managerEmail = row.email;
+    // Basic session payload (using row from token lookup)
+    req.session.manager_id = row.manager_id;
+    req.session.salon_id = row.salon_id;
+    req.session.manager_email = row.email;
 
-    return res.redirect("/manager/dashboard");
+    return res.redirect("/dashboard");
   }
 
   // 🧑‍💻 Normal email/password login form
@@ -708,11 +708,14 @@ router.post("/login", (req, res) => {
       .send("Invalid credentials.");
   }
 
-  req.session.managerId = manager.id;
-  req.session.salonId = manager.salon_id;
-  req.session.managerEmail = manager.email;
+  // Use consistent session keys throughout the app
+  req.session.manager_id = manager.id;
+  req.session.salon_id = manager.salon_id;
+  req.session.manager_email = manager.email;
 
-  return res.redirect("/manager/dashboard");
+  // Redirect to dashboard
+  return res.redirect("/dashboard");
+
 });
 
 /* -------------------------------
