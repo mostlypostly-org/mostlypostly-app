@@ -17,7 +17,7 @@ export function sanitizeText(str = "") {
   const banned = [
     "bitch","fuck","shit","asshole","slut","hoe","dick","cock","pussy","whore",
     "bastard","cunt","nude","nsfw","sexy","seductive","sensual","provocative",
-    "erotic","fetish","killing","murder","suicide","hate"
+    "erotic","fetish","killing","murder","suicide","hate","ass","shit"
   ];
   let out = str;
   for (const w of banned) {
@@ -31,7 +31,8 @@ export function isContentSafe(caption = "", hashtags = [], stylistInput = "") {
   const text = `${caption} ${hashtags.join(" ")} ${stylistInput}`.toLowerCase();
   const blocked = [
     "nude","nsfw","erotic","sex","sexual","fetish","provocative",
-    "explicit","onlyfans","seductive","pussy","bitch","fuck","murder","suicide"
+    "explicit","onlyfans","seductive","pussy","bitch","fuck","murder","suicide",
+    "pussy","vagina","pussy","penis","dick"
   ];
   const disallowed = ["racist","sexist","hate","kill","die","violence","weapon"];
   const tokens = text.split(/\b/);

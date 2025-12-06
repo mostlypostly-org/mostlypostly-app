@@ -243,6 +243,39 @@ catch (e) {
   }
 }
 
+// Ensure salons.require_manager_approval exists
+try { db.prepare("SELECT require_manager_approval FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.require_manager_approval");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN require_manager_approval INTEGER DEFAULT 0").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.require_manager_approval:", err.message);
+  }
+}
+
+// Ensure salons.notify_on_approval exists
+try { db.prepare("SELECT notify_on_approval FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.notify_on_approval");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN notify_on_approval INTEGER DEFAULT 0").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.notify_on_approval:", err.message);
+  }
+}
+
+// Ensure salons.notify_on_denial exists
+try { db.prepare("SELECT notify_on_denial FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.notify_on_denial");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN notify_on_denial INTEGER DEFAULT 0").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.notify_on_denial:", err.message);
+  }
+}
+
 try { db.prepare("SELECT manager_display_name FROM salons LIMIT 1").get(); }
 catch (e) {
   console.log("🧱 (db.js) added salons.manager_display_name");

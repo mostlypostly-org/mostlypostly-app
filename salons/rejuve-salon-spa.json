@@ -1,0 +1,42 @@
+{
+  "salon_id": "rejuve-salon-spa",
+  "name": "Rejuve Salon Spa",
+  "phone": "3179385492",
+  "website": "https://www.rejuvesalonandspa.com/",
+  "booking_link": "https://booking.rejuvesalonandspa.com/webstoreNew/services",
+  "city": "Carmel",
+  "state": "IN",
+  "industry": "salon",
+  "timezone": "America/New_York",
+  "social": {
+    "instagram_handle": null,
+    "facebook_page_id": null
+  },
+  "posting_rules": {
+    "start": "07:00",
+    "end": "20:00",
+    "auto_approval": false,
+    "spacing_min": 20,
+    "spacing_max": 45,
+    "auto_publish": false,
+    "tone": "Warm & Friendly"
+  },
+  "manager": {
+    "display_name": "Troy Hardister",
+    "title": "Owner",
+    "phone": "3179385492"
+  },
+  "stylists": [
+    {
+      "id": "1a36e46c1f6bc28f4eb9a3832d5282d2",
+      "name": "Nicole Hardister",
+      "phone": "3176401450",
+      "instagram_handle": "@nicolehardister",
+      "specialties": [
+        "Coloring",
+        "Barber",
+        "Spa"
+      ]
+    }
+  ]
+}

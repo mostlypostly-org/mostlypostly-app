@@ -3,6 +3,11 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import { db } from "../../db.js";
+import crypto from "crypto";
+
+// Generate lowercase hex string for IDs
+const lowerHex = () =>
+  crypto.randomUUID().replace(/-/g, "").toLowerCase();
 
 const router = express.Router();
 
@@ -64,7 +69,7 @@ router.get("/login", (req, res) => {
     req.session.salon_id = row.salon_id;
     req.session.manager_email = row.email;
 
-    return res.redirect("/dashboard");
+    return res.redirect("/manager");
   }
 
   // 🧑‍💻 Normal email/password login form
@@ -449,24 +454,64 @@ router.get("/signup", (req, res) => {
 
       <form action="/manager/signup" method="POST" class="space-y-5">
 
+        <!-- Manager Full Name (required by backend) -->
+        <div>
+          <label class="text-xs font-semibold text-gray-700">Your Name</label>
+          <input
+            type="text"
+            name="name"
+            required
+            class="input-box"
+            placeholder="Your full name"
+          />
+        </div>
+
+        <!-- Business Name -->
         <div>
           <label class="text-xs font-semibold text-gray-700">Business Name</label>
-          <input type="text" name="business_name" required class="input-box" placeholder="Your salon or business name" />
+          <input
+            type="text"
+            name="businessName"
+            required
+            class="input-box"
+            placeholder="Your salon or business name"
+          />
         </div>
 
+        <!-- Email -->
         <div>
           <label class="text-xs font-semibold text-gray-700">Email</label>
-          <input type="email" name="email" required class="input-box" placeholder="you@business.com" />
+          <input
+            type="email"
+            name="email"
+            required
+            class="input-box"
+            placeholder="you@business.com"
+          />
         </div>
 
+        <!-- Password -->
         <div>
           <label class="text-xs font-semibold text-gray-700">Password</label>
-          <input type="password" name="password" required minlength="8" class="input-box" placeholder="Create a password" />
+          <input
+            type="password"
+            name="password"
+            required minlength="8"
+            class="input-box"
+            placeholder="Create a password"
+          />
         </div>
 
+        <!-- Phone Number -->
         <div>
           <label class="text-xs font-semibold text-gray-700">Phone Number</label>
-          <input type="tel" name="phone" required class="input-box" placeholder="Mobile number" />
+          <input
+            type="tel"
+            name="phone"
+            required
+            class="input-box"
+            placeholder="Mobile number"
+          />
         </div>
 
         <!-- Anti-spam honeypot -->
@@ -504,115 +549,122 @@ router.get("/signup", (req, res) => {
   `);
 });
 
-/* -------------------------------
-   POST /manager/signup
-   - Create salon from Business Name
-   - Create manager with salon_id
-   - Prevent duplicate email/phone
-   - Start session, redirect to onboarding
----------------------------------*/
-router.post("/signup", (req, res) => {
-  const { email, password, phone, business_name, company } = req.body || {};
 
-  // 🛑 Anti-spam honeypot
-  if (company && company.trim() !== "") {
-    return res.status(400).type("html").send("<h2>Form invalid.</h2>");
-  }
-
-  if (!email || !password || !phone || !business_name) {
-    return res.status(400).send("Missing required fields.");
-  }
-
-  if (password.length < 8) {
-    return res.status(400).send("Password must be at least 8 characters.");
-  }
-
+// ============================================
+// POST /manager/signup  (Create manager + salon)
+// ============================================
+router.post("/signup", async (req, res) => {
   try {
-    // Duplicate checks
-    const existingEmail = db.prepare(`SELECT id FROM managers WHERE email = ?`).get(email);
-    if (existingEmail) {
-      return res.status(409).send(`
-        <h2>Email already registered.</h2>
-        <p><a href="/manager/login">Sign in here</a>.</p>
-      `);
+    const body = req.body || {};
+    console.log("🔎 Signup body payload:", body);
+
+    // Normalize possible field names (defensive against old HTML / typos)
+    const name =
+      body.name || body.manager_name || body.fullName || body.owner_name || null;
+
+    const businessName =
+      body.businessName || body.business_name || body.salon_name || null;
+
+    const email = body.email || null;
+    const password = body.password || null;
+
+    const phone =
+      body.phone || body.phone_number || body.mobile || body.mobile_number || null;
+
+    // Basic required check
+    if (!email || !password || !phone || !businessName) {
+      console.warn("⚠️ Signup missing fields:", {
+        hasName: !!name,
+        hasBusinessName: !!businessName,
+        hasEmail: !!email,
+        hasPassword: !!password,
+        hasPhone: !!phone,
+      });
+
+      return res
+        .status(400)
+        .type("html")
+        .send("Missing required fields.");
     }
 
-    const existingPhone = db.prepare(`SELECT id FROM managers WHERE phone = ?`).get(phone);
-    if (existingPhone) {
-      return res.status(409).send(`
-        <h2>Phone already in use.</h2>
-        <p><a href="/manager/login">Sign in here</a>.</p>
-      `);
+    // Prevent duplicate email signup
+    const existing = db
+      .prepare("SELECT id FROM managers WHERE email = ?")
+      .get(email);
+
+    if (existing) {
+      console.log("Signup error: email exists");
+      return res.redirect("/manager/login?exists=1");
     }
 
-    // Generate salon slug
-    const rawName = business_name.trim();
-    let baseSlug = rawName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-    if (!baseSlug) baseSlug = "business";
+    // Create salon slug from businessName
+    const salonSlug = businessName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
 
-    let salonSlug = baseSlug;
+    const salonId = lowerHex();
 
-    // Create salon
-    const salonId = db.prepare(`SELECT lower(hex(randomblob(16))) AS id`).get().id;
-
+    // Insert SALON (setup_incomplete, status_step = 'salon')
     db.prepare(`
       INSERT INTO salons (
         id, slug, name,
-        status, status_step,
-        website, booking_link, timezone,
-        created_at, updated_at
+        phone, status, status_step,
+        timezone
       )
       VALUES (
         @id, @slug, @name,
-        'setup_incomplete', 'salon',
-        NULL, NULL, NULL,
-        datetime('now'), datetime('now')
+        @phone, 'setup_incomplete', 'salon',
+        'America/New_York'
       )
     `).run({
       id: salonId,
       slug: salonSlug,
-      name: rawName
+      name: businessName,
+      phone,
     });
 
-    // Create manager
-    const managerId = db.prepare(`SELECT lower(hex(randomblob(16))) AS id`).get().id;
-    const passwordHash = bcrypt.hashSync(password, 10);
+    // Hash password
+    const password_hash = await bcrypt.hash(password, 10);
+    const managerId = lowerHex();
 
+    // Insert MANAGER
     db.prepare(`
       INSERT INTO managers (
-        id, salon_id, name, phone, chat_id,
-        role, pin,
-        created_at, updated_at,
-        password_hash, email
+        id, salon_id, name, email, phone, password_hash, role
       )
-      VALUES (
-        @id, @salon_id, NULL, @phone, NULL,
-        'manager', NULL,
-        datetime('now'), datetime('now'),
-        @password_hash, @email
-      )
+      VALUES (@id, @salon_id, @name, @email, @phone, @password_hash, 'manager')
     `).run({
       id: managerId,
       salon_id: salonSlug,
+      name: name || businessName, // fallback to businessName if name missing
+      email,
       phone,
-      password_hash: passwordHash,
-      email
+      password_hash,
     });
 
-    // Start session
     req.session.manager_id = managerId;
     req.session.salon_id = salonSlug;
     req.session.manager_email = email;
 
-    // Redirect to onboarding step 1
-    return res.redirect("/onboarding/salon");
+    console.log("✅ Signup OK → redirecting to onboarding step 1:", salonSlug);
+
+    // Ensure session is persisted before redirect
+    req.session.save((err) => {
+      if (err) {
+        console.error("❌ Error saving session after signup:", err);
+        // fall back to login if session can't be saved
+        return res.redirect("/manager/login");
+      }
+
+      return res.redirect(`/onboarding/salon?salon=${encodeURIComponent(salonSlug)}`);
+    });
 
   } catch (err) {
     console.error("Signup error:", err);
-    return res.status(500).send("Unexpected error during signup.");
+    return res.status(500).type("html").send("Signup failed.");
   }
 });
-
 
 /* -------------------------------
    POST /manager/login
@@ -660,7 +712,7 @@ router.post("/login", (req, res) => {
   req.session.manager_email = manager.email;
 
   // Redirect to dashboard
-  return res.redirect("/dashboard");
+  return res.redirect("/manager");
 
 });
 
@@ -680,6 +732,15 @@ router.get("/login-with-token", (req, res) => {
   // Re-use the same flow as /manager/login?token=...
   const redirectUrl = `/manager/login?token=${encodeURIComponent(token)}`;
   return res.redirect(redirectUrl);
+});
+
+/* -------------------------------
+   GET /manager/logout
+---------------------------------*/
+router.get("/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.redirect("/manager/login");
+  });
 });
 
 export default router;

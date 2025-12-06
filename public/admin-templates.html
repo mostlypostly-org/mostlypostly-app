@@ -1,0 +1,398 @@
+<!-- ============================
+ Admin Modal Templates (FINAL)
+=============================== -->
+
+<!-- ============================
+ SALON INFO
+=============================== -->
+<template id="tpl-edit-salon-info">
+  <h3 class="text-lg font-semibold mb-4">Edit Salon Info</h3>
+
+  <form method="POST" action="/manager/admin/update-salon-info" class="space-y-4">
+    <input type="hidden" name="salon_id" value="{{salon_id}}" />
+
+    <!-- NAME -->
+    <div>
+      <label class="text-xs text-slate-400">Salon Name</label>
+      <input data-field="name" name="name"
+             class="w-full mt-1 p-2 bg-slate-800 rounded" value="{{name}}" />
+    </div>
+
+    <!-- CITY -->
+    <div>
+      <label class="text-xs text-slate-400">City</label>
+      <input data-field="city" name="city"
+             class="w-full mt-1 p-2 bg-slate-800 rounded" value="{{city}}" />
+    </div>
+
+    <!-- STATE -->
+    <div>
+      <label class="text-xs text-slate-400">State</label>
+      <select data-field="state" name="state" class="w-full mt-1 p-2 bg-slate-800 rounded uppercase">
+        <option value="">Select State</option>
+        <option value="AL">AL</option><option value="AK">AK</option><option value="AZ">AZ</option><option value="AR">AR</option>
+        <option value="CA">CA</option><option value="CO">CO</option><option value="CT">CT</option><option value="DE">DE</option>
+        <option value="FL">FL</option><option value="GA">GA</option><option value="HI">HI</option><option value="ID">ID</option>
+        <option value="IL">IL</option><option value="IN">IN</option><option value="IA">IA</option><option value="KS">KS</option>
+        <option value="KY">KY</option><option value="LA">LA</option><option value="MA">MA</option><option value="MD">MD</option>
+        <option value="ME">ME</option><option value="MI">MI</option><option value="MN">MN</option><option value="MO">MO</option>
+        <option value="MS">MS</option><option value="MT">MT</option><option value="NC">NC</option><option value="ND">ND</option>
+        <option value="NE">NE</option><option value="NH">NH</option><option value="NJ">NJ</option><option value="NM">NM</option>
+        <option value="NV">NV</option><option value="NY">NY</option><option value="OH">OH</option><option value="OK">OK</option>
+        <option value="OR">OR</option><option value="PA">PA</option><option value="RI">RI</option><option value="SC">SC</option>
+        <option value="SD">SD</option><option value="TN">TN</option><option value="TX">TX</option><option value="UT">UT</option>
+        <option value="VA">VA</option><option value="VT">VT</option><option value="WA">WA</option><option value="WI">WI</option>
+        <option value="WV">WV</option><option value="WY">WY</option>
+      </select>
+    </div>
+
+    <!-- WEBSITE -->
+    <div>
+      <label class="text-xs text-slate-400">Website</label>
+      <input data-field="website" name="website"
+             class="w-full mt-1 p-2 bg-slate-800 rounded" value="{{website}}" />
+    </div>
+
+    <!-- BOOKING URL -->
+    <div>
+      <label class="text-xs text-slate-400">Booking URL</label>
+      <input data-field="booking_url" name="booking_url"
+             class="w-full mt-1 p-2 bg-slate-800 rounded" value="{{booking_url}}" />
+    </div>
+
+    <!-- INDUSTRY -->
+    <div>
+      <label class="text-xs text-slate-400">Industry</label>
+      <select data-field="industry" name="industry"
+              class="w-full mt-1 p-2 bg-slate-800 rounded">
+        <option value="Hair Salon">Hair Salon</option>
+        <option value="Beauty Salon">Beauty Salon</option>
+        <option value="Nail Salon">Nail Salon</option>
+        <option value="Spa">Spa</option>
+        <option value="Barber Shop">Barber Shop</option>
+        <option value="Med Spa">Med Spa</option>
+      </select>
+    </div>
+
+    <!-- TIMEZONE -->
+    <div>
+      <label class="text-xs text-slate-400">Timezone</label>
+      <select data-field="timezone" name="timezone"
+              class="w-full mt-1 p-2 bg-slate-800 rounded">
+
+        <option value="America/New_York">Eastern (US & Canada)</option>
+        <option value="America/Chicago">Central (US & Canada)</option>
+        <option value="America/Denver">Mountain (US & Canada)</option>
+        <option value="America/Phoenix">Mountain (No DST) — Arizona</option>
+        <option value="America/Los_Angeles">Pacific (US & Canada)</option>
+        <option value="America/Anchorage">Alaska</option>
+        <option value="Pacific/Honolulu">Hawaii</option>
+
+      </select>
+    </div>
+
+    <!-- TONE PROFILE -->
+    <div>
+      <label class="text-xs text-slate-400">Tone Profile</label>
+      <select data-field="tone_profile" name="tone_profile"
+              class="w-full mt-1 p-2 bg-slate-800 rounded">
+        <option value="Professional">Professional</option>
+        <option value="Fun & Energetic">Fun & Energetic</option>
+        <option value="Clean & Modern">Clean & Modern</option>
+        <option value="Bold & Trendy">Bold & Trendy</option>
+        <option value="Warm & Friendly">Warm & Friendly</option>
+        <option value="Minimalistic">Minimalistic</option>
+        <option value="Classic Salon Voice">Classic Salon Voice</option>
+      </select>
+    </div>
+
+    <button class="w-full bg-indigo-600 hover:bg-indigo-700 rounded p-2 mt-4">
+      Save Changes
+    </button>
+  </form>
+</template>
+
+<!-- ============================
+ POSTING RULES
+=============================== -->
+<template id="tpl-posting-rules">
+  <h3 class="text-lg font-semibold mb-4">Posting Rules</h3>
+
+  <form method="POST" action="/manager/admin/update-posting-rules" class="space-y-4">
+    <input type="hidden" name="salon_id" value="{{salon_id}}" />
+
+    <!-- POSTING WINDOW -->
+    <div class="grid grid-cols-2 gap-4">
+
+      <div>
+        <label class="text-xs text-slate-400">Posting Window Start</label>
+        <select data-field="posting_start_time" name="posting_start_time"
+                class="w-full mt-1 p-2 bg-slate-800 rounded">
+          <option value="07:00">7:00 AM</option>
+          <option value="08:00">8:00 AM</option>
+          <option value="09:00">9:00 AM</option>
+          <option value="10:00">10:00 AM</option>
+          <option value="11:00">11:00 AM</option>
+          <option value="12:00">12:00 PM</option>
+          <option value="13:00">1:00 PM</option>
+          <option value="14:00">2:00 PM</option>
+          <option value="15:00">3:00 PM</option>
+          <option value="16:00">4:00 PM</option>
+          <option value="17:00">5:00 PM</option>
+          <option value="18:00">6:00 PM</option>
+          <option value="19:00">7:00 PM</option>
+          <option value="20:00">8:00 PM</option>
+          <option value="21:00">9:00 PM</option>
+          <option value="22:00">10:00 PM</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="text-xs text-slate-400">Posting Window End</label>
+        <select data-field="posting_end_time" name="posting_end_time"
+                class="w-full mt-1 p-2 bg-slate-800 rounded">
+          <option value="07:00">7:00 AM</option>
+          <option value="08:00">8:00 AM</option>
+          <option value="09:00">9:00 AM</option>
+          <option value="10:00">10:00 AM</option>
+          <option value="11:00">11:00 AM</option>
+          <option value="12:00">12:00 PM</option>
+          <option value="13:00">1:00 PM</option>
+          <option value="14:00">2:00 PM</option>
+          <option value="15:00">3:00 PM</option>
+          <option value="16:00">4:00 PM</option>
+          <option value="17:00">5:00 PM</option>
+          <option value="18:00">6:00 PM</option>
+          <option value="19:00">7:00 PM</option>
+          <option value="20:00">8:00 PM</option>
+          <option value="21:00">9:00 PM</option>
+          <option value="22:00">10:00 PM</option>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- SPACING -->
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="text-xs text-slate-400">Spacing Min (minutes)</label>
+        <input data-field="spacing_min" name="spacing_min" type="number"
+               class="w-full mt-1 p-2 bg-slate-800 rounded" value="{{spacing_min}}" />
+      </div>
+      <div>
+        <label class="text-xs text-slate-400">Spacing Max (minutes)</label>
+        <input data-field="spacing_max" name="spacing_max" type="number"
+               class="w-full mt-1 p-2 bg-slate-800 rounded" value="{{spacing_max}}" />
+      </div>
+    </div>
+
+    <button class="w-full bg-indigo-600 hover:bg-indigo-700 rounded p-2 mt-4">Save</button>
+  </form>
+</template>
+
+<!-- ============================
+ Manager RULES
+=============================== -->
+<template id="tpl-manager-rules">
+  <h3 class="text-lg font-semibold mb-4">Manager Rules</h3>
+
+  <form method="POST" action="/manager/admin/update-manager-rules" class="space-y-4">
+    <input type="hidden" name="salon_id" value="{{salon_id}}" />
+
+    <div>
+      <label class="text-xs text-slate-400">Require Manager Approval</label>
+      <select data-field="require_manager_approval" name="require_manager_approval"
+              class="w-full mt-1 p-2 bg-slate-800 rounded">
+        <option value="0">Disabled</option>
+        <option value="1">Enabled</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="text-xs text-slate-400">Notify Member on Approval</label>
+      <select data-field="notify_on_approval" name="notify_on_approval"
+              class="w-full mt-1 p-2 bg-slate-800 rounded">
+        <option value="0">Disabled</option>
+        <option value="1">Enabled</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="text-xs text-slate-400">Notify Member on Denial</label>
+      <select data-field="notify_on_denial" name="notify_on_denial"
+              class="w-full mt-1 p-2 bg-slate-800 rounded">
+        <option value="0">Disabled</option>
+        <option value="1">Enabled</option>
+      </select>
+    </div>
+
+    <!-- AUTO PUBLISH -->
+    <div>
+      <label class="text-xs text-slate-400">Auto Publish</label>
+      <select data-field="auto_publish" name="auto_publish"
+              class="w-full mt-1 p-2 bg-slate-800 rounded">
+        <option value="0">Disabled</option>
+        <option value="1">Enabled</option>
+      </select>
+    </div>
+
+    <button class="w-full bg-indigo-600 hover:bg-indigo-700 rounded p-2 mt-4">
+      Save
+    </button>
+  </form>
+</template>
+
+<!-- ============================
+ ADD STYLIST
+=============================== -->
+<template id="tpl-add-stylist">
+  <h3 class="text-lg font-semibold mb-4">Add Stylist</h3>
+
+  <form method="POST" action="/manager/admin/add-stylist" class="space-y-4">
+    <input type="hidden" name="salon_id" value="{{salon_id}}" />
+
+    <div>
+      <label class="text-xs text-slate-400">Full Name</label>
+      <input data-field="name" name="name"
+             class="w-full mt-1 p-2 bg-slate-800 rounded" />
+    </div>
+
+    <div>
+      <label class="text-xs text-slate-400">Phone</label>
+      <input data-field="phone" name="phone"
+             class="w-full mt-1 p-2 bg-slate-800 rounded" />
+    </div>
+
+    <div>
+      <label class="text-xs text-slate-400">Instagram Handle</label>
+      <div class="flex items-center gap-1 mt-1">
+        <span class="text-sm text-slate-500">@</span>
+        <input data-field="instagram_handle" name="instagram_handle"
+               class="w-full p-2 bg-slate-800 rounded" />
+      </div>
+    </div>
+
+    <!-- SPECIALTIES -->
+    <div>
+      <label class="text-xs text-slate-400">Specialties</label>
+      <div id="specialties-rows" class="space-y-2 mt-2"></div>
+      <input id="specialties-json" name="specialties_json" type="hidden" />
+      <p class="text-[11px] text-slate-500">Up to 5 specialties.</p>
+    </div>
+
+    <button class="w-full bg-indigo-600 hover:bg-indigo-700 rounded p-2 mt-4">
+      Add Stylist
+    </button>
+  </form>
+</template>
+
+
+<!-- ============================
+ EDIT STYLIST
+=============================== -->
+<template id="tpl-edit-stylist">
+  <h3 class="text-lg font-semibold mb-4">Edit Stylist</h3>
+
+  <form method="POST" action="/manager/admin/update-stylist" class="space-y-4">
+
+    <!-- Required hidden fields -->
+    <input type="hidden" data-field="salon_id" name="salon_id" value="{{salon_id}}" />
+    <input type="hidden" data-field="id" name="id" value="{{id}}" />
+
+    <!-- NAME -->
+    <div>
+      <label class="text-xs text-slate-400">Full Name</label>
+      <input
+        data-field="name"
+        name="name"
+        class="w-full mt-1 p-2 bg-slate-800 rounded"
+        value="{{name}}"
+      />
+    </div>
+
+    <!-- PHONE -->
+    <div>
+      <label class="text-xs text-slate-400">Phone</label>
+      <input
+        data-field="phone"
+        name="phone"
+        class="w-full mt-1 p-2 bg-slate-800 rounded"
+        value="{{phone}}"
+      />
+    </div>
+
+    <!-- INSTAGRAM -->
+    <div>
+      <label class="text-xs text-slate-400">Instagram Handle</label>
+      <div class="flex items-center gap-1 mt-1">
+        <span class="text-sm text-slate-500">@</span>
+        <input
+          data-field="instagram_handle"
+          name="instagram_handle"
+          class="w-full p-2 bg-slate-800 rounded"
+          value="{{instagram_handle}}"
+        />
+      </div>
+    </div>
+
+    <!-- SPECIALTIES -->
+    <div>
+      <label class="text-xs text-slate-400">Specialties</label>
+
+      <!-- THIS MUST EXIST OR TEXTBOX WILL NEVER APPEAR -->
+      <div id="edit-specialties-rows" class="space-y-2 mt-2"></div>
+
+      <!-- Hidden JSON field (admin.js requires EXACT id) -->
+      <input
+        type="hidden"
+        id="edit-specialties-json"
+        data-field="specialties_json"
+        name="specialties_json"
+      />
+
+      <p class="text-[11px] text-slate-500">Up to 5 specialties.</p>
+    </div>
+
+    <button class="w-full bg-indigo-600 hover:bg-indigo-700 rounded p-2 mt-4">
+      Save
+    </button>
+    <button
+      type="button"
+      onclick="window.admin.deleteCurrentMember()"
+      class="w-full bg-red-600 hover:bg-red-700 rounded p-2 mt-2"
+    >
+      Delete Member
+    </button>
+  </form>
+</template>
+
+
+<!-- ============================
+ HASHTAGS
+=============================== -->
+<template id="tpl-hashtags">
+  <h3 class="text-lg font-semibold mb-4">Edit Hashtags</h3>
+
+  <form method="POST" action="/manager/admin/update-hashtags" class="space-y-4">
+    <input type="hidden" name="salon_id" value="{{salon_id}}" />
+
+    <!-- SALON TAG -->
+    <div>
+      <label class="text-xs text-slate-400">Salon Tag</label>
+      <p data-field="salon_tag_display"
+         class="mt-1 inline-flex items-center rounded-full bg-slate-800 px-2 py-1 text-[11px]"></p>
+    </div>
+
+    <!-- CUSTOM TAGS -->
+    <div>
+      <label class="text-xs text-slate-400">Custom Hashtags</label>
+      <div id="hashtags-rows" class="space-y-2 mt-2"></div>
+      <input id="hashtags-json" name="hashtags_json" type="hidden" />
+      <p class="text-[11px] text-slate-500">Up to 4 hashtags.</p>
+    </div>
+
+    <button class="w-full bg-indigo-600 hover:bg-indigo-700 rounded p-2 mt-4">
+      Save
+    </button>
+  </form>
+</template>

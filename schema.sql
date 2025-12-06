@@ -28,9 +28,16 @@ CREATE TABLE IF NOT EXISTS salons (
 
   posting_start_time   TEXT DEFAULT '09:00',
   posting_end_time     TEXT DEFAULT '19:00',
+
   auto_approval        INTEGER DEFAULT 0,
+
   spacing_min          INTEGER DEFAULT 20,
   spacing_max          INTEGER DEFAULT 45,
+
+  -- NEW MANAGER RULES FIELDS
+  require_manager_approval INTEGER DEFAULT 0,
+  notify_on_approval       INTEGER DEFAULT 0,
+  notify_on_denial         INTEGER DEFAULT 0,
 
   manager_display_name TEXT,
   manager_title        TEXT,
@@ -44,6 +51,7 @@ CREATE TABLE IF NOT EXISTS salons (
   created_at           TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
 
 /* ------------------------------------------------------------
    MANAGERS — login + ownership

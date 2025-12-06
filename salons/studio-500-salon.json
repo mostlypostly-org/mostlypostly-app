@@ -1,0 +1,41 @@
+{
+  "salon_id": "studio-500-salon",
+  "name": "Studio 500 Salon",
+  "phone": "3176401450",
+  "website": "",
+  "booking_link": "",
+  "city": "Speedway",
+  "state": "IN",
+  "industry": "salon",
+  "timezone": "America/New_York",
+  "social": {
+    "instagram_handle": null,
+    "facebook_page_id": null
+  },
+  "posting_rules": {
+    "start": "09:00",
+    "end": "19:00",
+    "auto_approval": false,
+    "spacing_min": 20,
+    "spacing_max": 45,
+    "auto_publish": false,
+    "tone": "Bold & Trendy"
+  },
+  "manager": {
+    "display_name": "Nicole Hardister",
+    "title": "Owner",
+    "phone": "3176401450"
+  },
+  "stylists": [
+    {
+      "id": "fc6ebfc04eafbb3fa6e288705f99c944",
+      "name": "Braylinn Hardister",
+      "phone": "3178701700",
+      "instagram_handle": "@braylinnhardister",
+      "specialties": [
+        "Color",
+        "Highlights"
+      ]
+    }
+  ]
+}

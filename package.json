@@ -39,7 +39,8 @@
     "openai": "^6.8.1",
     "socket.io": "^4.8.1",
     "sqlite3": "^5.1.7",
-    "twilio": "^5.10.4"
+    "twilio": "^5.10.4",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "ajv": "^8.17.1",

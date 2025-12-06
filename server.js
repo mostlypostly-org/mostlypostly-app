@@ -16,7 +16,9 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 dotenv.config();
 
-// Load salons BEFORE routes
+// =====================================================
+// Load salons BEFORE routes (legacy JSON loader only)
+// =====================================================
 import {
   loadSalons,
   startSalonWatcher,
@@ -29,16 +31,19 @@ startSalonWatcher();
 console.log("💇 Salons loaded and file watcher active.");
 
 // =====================================================
-// Schema + Analytics must load before routes
+// Schema + analytics bootstrap
 // =====================================================
 import { initSchemaHealth } from "./src/core/initSchemaHealth.js";
 initSchemaHealth();
-
-// Load analytics DB triggers
 import "./src/core/analyticsDb.js";
 
 // =====================================================
-// Middleware imports (used later)
+// DB
+// =====================================================
+import { db } from "./db.js";
+
+// =====================================================
+// Middleware imports
 // =====================================================
 import tenantFromLink from "./src/middleware/tenantFromLink.js";
 
@@ -54,7 +59,7 @@ import {
 import { joinSessions } from "./src/core/joinSessionStore.js";
 
 // =====================================================
-// ROUTE imports (but DO NOT mount yet)
+// Route imports
 // =====================================================
 import dashboardRoute from "./src/routes/dashboard.js";
 import postsRoute from "./src/routes/posts.js";
@@ -62,11 +67,14 @@ import analyticsRoute from "./src/routes/analytics.js";
 import analyticsSchedulerRoute from "./src/routes/analyticsScheduler.js";
 import telegramRoute from "./src/routes/telegram.js";
 import twilioRoute from "./src/routes/twilio.js";
-import managerRoute from "./src/routes/manager.js";
-import managerAuth from "./src/routes/managerAuth.js";
-import stylistPortal from "./src/routes/stylistPortal.js";
 import facebookAuthRoutes from "./src/routes/facebookAuth.js";
+import stylistPortal from "./src/routes/stylistPortal.js";
+
+import managerAuthRoutes from "./src/routes/managerAuth.js";
+import managerRoutes from "./src/routes/manager.js";
 import onboardingRoutes from "./src/routes/onboarding.js";
+import onboardingGuard from "./src/routes/onboardingGuard.js";
+import adminRouter from "./src/routes/admin.js";
 
 // Scheduler
 import { enqueuePost, runSchedulerOnce, startScheduler } from "./src/scheduler.js";
@@ -75,62 +83,65 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // =====================================================
-// 🚀 Initialize Express app — MUST happen BEFORE app.use()
+// Express App Init
 // =====================================================
 const app = express();
 
-// Static files for login, logos, etc.
+// Correct Admin modal template loader (must come BEFORE ANY /manager routes)
+app.get("/manager/admin/templates", (req, res) => {
+  const templatePath = path.join(__dirname, "public", "admin-templates.html");
+  console.log("🔥 HIT /manager/admin/templates", templatePath);
+  res.sendFile(templatePath);
+});
+
+
+// Static assets
 app.use("/public", express.static(path.join(__dirname, "public")));
 
 // =====================================================
-// Persistent Sessions (Fixes local logout & lost salon context)
+// Persistent Session Store (SQLite)
 // =====================================================
 import SQLiteStoreFactory from "connect-sqlite3";
-
 const SQLiteStore = SQLiteStoreFactory(session);
 
 app.use(
   session({
     store: new SQLiteStore({
       db: "sessions.db",
-      dir: "./", // saved inside mostlypostly-app/
+      dir: "./",
     }),
     secret: process.env.SESSION_SECRET || "supersecretkey",
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false, // true on production with HTTPS
-      maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
-    }
+      secure: false,
+      maxAge: 1000 * 60 * 60 * 24 * 7,
+    },
   })
 );
 
-
 // =====================================================
-// 🧩 Global Middleware (order matters)
+// Global Middleware
 // =====================================================
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Tenant resolution before any multi-salon route
-app.use(tenantFromLink());
-
-// =====================================================
-// Public static assets
-// =====================================================
-app.use("/uploads",
+// Public uploads
+app.use(
+  "/uploads",
   express.static(path.join(process.cwd(), "public/uploads"), {
     setHeaders(res, filePath) {
       if (/\.(jpg|jpeg|png|gif|webp)$/i.test(filePath)) {
         res.setHeader("Cache-Control", "public, max-age=86400");
       }
     },
-}));
+  })
+);
 
-// Main public folder
+// Ensure public dir exists
 const PUBLIC_DIR = process.env.PUBLIC_DIR || path.join(process.cwd(), "public");
 if (!fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR, { recursive: true });
 const okPath = path.join(PUBLIC_DIR, "ok.txt");
@@ -139,38 +150,78 @@ if (!fs.existsSync(okPath)) fs.writeFileSync(okPath, "ok\n");
 app.use("/public", express.static(PUBLIC_DIR));
 
 // =====================================================
-// MOUNT ONBOARDING ROUTES FIRST (always allowed)
+// RESTORE MANAGER FROM SESSION (inline middleware)
 // =====================================================
+function restoreManagerSession(req, res, next) {
+  try {
+    if (!req.session?.manager_id) return next();
+
+    const mgr = db.prepare(
+      `SELECT id, name, phone AS manager_phone, salon_id, role
+       FROM managers WHERE id = ?`
+    ).get(req.session.manager_id);
+
+    if (mgr) req.manager = mgr;
+  } catch (err) {
+    console.error("restoreManagerSession failed:", err);
+  }
+
+  next();
+}
+
+
+// -------------------------------------------------------
+// 1. MANAGER AUTH (login/signup) — MUST COME FIRST
+// -------------------------------------------------------
+app.use("/manager", managerAuthRoutes);
+
+// -------------------------------------------------------
+// 2. MANAGER DASHBOARD (approval page)
+// -------------------------------------------------------
+app.use("/manager", managerRoutes);
+
+// -------------------------------------------------------
+// 3. ONBOARDING ROUTES (allowed BEFORE guard)
+// -------------------------------------------------------
 app.use("/onboarding", onboardingRoutes);
 
-// =====================================================
-// 🔐 Force onboarding flow for new salons
-// (must come AFTER onboarding is mounted)
-// =====================================================
-import { onboardingGuard } from "./src/routes/onboardingGuard.js";
+// -------------------------------------------------------
+// 4. ONBOARDING GUARD (must run AFTER onboarding)
+// -------------------------------------------------------
 app.use(onboardingGuard);
 
-// =====================================================
-// MOUNT AUTH ROUTES (managers login FIRST)
-// =====================================================
-app.use("/manager", managerAuth);
+// -------------------------------------------------------
+// 5. TENANT RESOLUTION
+// -------------------------------------------------------
+app.use(tenantFromLink()); // FIX: remove "()"
+
+// -------------------------------------------------------
+// 6. RESTORE MANAGER BEFORE ADMIN ROUTES
+// -------------------------------------------------------
+app.use(restoreManagerSession);
+
+// -------------------------------------------------------
+// 7. ADMIN ROUTES
+// -------------------------------------------------------
+app.use("/manager/admin", adminRouter);
 
 // =====================================================
-// Stylist Portal (token-based, no login)
+// Stylist Portal (no auth)
 // =====================================================
 app.use("/stylist", stylistPortal);
 
 // =====================================================
-// Analytics API
+// Analytics API (public JSON endpoints for dashboard)
 // =====================================================
 app.use("/api", analyticsRoute);
 
 // =====================================================
-// Inbound routes (Telegram/Twilio)
+// INBOUND TELEGRAM / TWILIO
 // =====================================================
 const drafts = new Map();
 
-app.use("/inbound/telegram",
+app.use(
+  "/inbound/telegram",
   telegramRoute(drafts, lookupStylist, ({ imageUrl, notes, stylist, salon }) =>
     generateCaption({
       imageDataUrl: imageUrl,
@@ -182,7 +233,8 @@ app.use("/inbound/telegram",
   )
 );
 
-app.use("/inbound/twilio",
+app.use(
+  "/inbound/twilio",
   twilioRoute(drafts, lookupStylist, ({ imageUrl, notes, stylist, salon }) =>
     generateCaption({
       imageDataUrl: imageUrl,
@@ -195,20 +247,27 @@ app.use("/inbound/twilio",
 );
 
 // =====================================================
-// Manager UI Routes (dashboard, admin, posts, etc.)
-// AUTO-INJECT salon context if missing
+// DASHBOARD / POSTS / ANALYTICS UI ROUTES
+// =====================================================
+app.use("/dashboard", dashboardRoute);
+app.use("/posts", postsRoute);
+app.use("/analytics", analyticsRoute);
+app.use("/analytics/scheduler", analyticsSchedulerRoute);
+app.use("/auth/facebook", facebookAuthRoutes);
+
+// =====================================================
+// AUTO-INJECT SALON QUERY PARAM IF MISSING
 // =====================================================
 app.use((req, res, next) => {
   const path = req.path;
 
-  // Only enforce salon context on dashboard/admin-style routes
   const needsSalon = [
     "/dashboard",
     "/posts",
     "/analytics",
     "/analytics/scheduler",
     "/manager/admin",
-    "/manager/settings"
+    "/manager/settings",
   ];
 
   const hit = needsSalon.some((p) => path.startsWith(p));
@@ -223,21 +282,14 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use("/dashboard", dashboardRoute);
-app.use("/posts", postsRoute);
-app.use("/analytics", analyticsRoute);
-app.use("/analytics/scheduler", analyticsSchedulerRoute);
-app.use("/auth/facebook", facebookAuthRoutes);
-app.use("/manager", managerRoute);
-
-
 // =====================================================
-// JOIN Onboarding endpoints
+// JOIN FLOW (SMS-based onboarding)
 // =====================================================
 app.post("/inbound/join", async (req, res) => {
   const from = req.body.From || req.body.chat_id;
   const text = (req.body.Body || req.body.text || "").trim();
-  const sendMessage = async (to, msg) => console.log(`📩 JOIN MSG → ${to}: ${msg}`);
+  const sendMessage = async (to, msg) =>
+    console.log(`📩 JOIN MSG → ${to}: ${msg}`);
 
   if (/^JOIN\b/i.test(text)) {
     await handleJoinCommand(from, lookupStylist, text, sendMessage);
@@ -246,25 +298,30 @@ app.post("/inbound/join", async (req, res) => {
 
   if (joinSessions.has(from)) {
     const result = await continueJoinConversation(from, text, sendMessage);
-    return res.json({ ok: true, action: result.done ? "complete" : "continue" });
+    return res.json({
+      ok: true,
+      action: result.done ? "complete" : "continue",
+    });
   }
 
   res.json({ ok: false, message: "No active join session." });
 });
 
 // =====================================================
-// Basic Health Routes
+// BASIC HEALTH ENDPOINTS
 // =====================================================
 app.get("/", (_req, res) =>
-  res.send("✅ MostlyPostly is running! Use /dashboard or /status to check health.")
+  res.send("✅ MostlyPostly is running! Use /dashboard or /status.")
 );
 
-app.get("/status", (_req, res) => res.json({ ok: true, version: "3.4.3" }));
+app.get("/status", (_req, res) =>
+  res.json({ ok: true, version: "3.4.3" })
+);
 
 app.get("/healthz", (_req, res) => res.status(200).send("ok"));
 
 // =====================================================
-// Scheduler Bootstrapping
+// SCHEDULER INIT
 // =====================================================
 console.log("WEB MODE: Scheduler enabled.");
 startScheduler();
@@ -278,7 +335,9 @@ app.set("io", io);
 
 io.on("connection", (socket) => {
   console.log("🟢 Dashboard connected:", socket.id);
-  socket.on("disconnect", () => console.log("🔴 Dashboard disconnected:", socket.id));
+  socket.on("disconnect", () =>
+    console.log("🔴 Dashboard disconnected:", socket.id)
+  );
 });
 
 // =====================================================

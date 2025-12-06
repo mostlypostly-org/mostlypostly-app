@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 import chokidar from "chokidar";
+import { db } from "../../db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,38 +13,58 @@ let lastLoadedAt = null;
 let reloadTimer = null;
 let watcherStarted = false;
 
-export function getSalonById(salonId) {
-  if (!salonId) return null;
-  const id = String(salonId).trim().toLowerCase();
+/**
+ * getSalonById(salonSlug)
+ * DB → salons.slug
+ * Falls back to JSON file-based lookup.
+ */
+export function getSalonById(salonSlug) {
+  if (!salonSlug) return null;
+  const slug = String(salonSlug).trim().toLowerCase();
+
+  // 1️⃣ DB lookup (correct source of truth)
+  const row = db
+    .prepare("SELECT * FROM salons WHERE slug = ?")
+    .get(slug);
+
+  if (row) return row;
+
+  // 2️⃣ Fallback → JSON salons loader (legacy support)
   return cachedSalons.find(
-    (s) => String(s.salon_id).trim().toLowerCase() === id
+    (s) =>
+      String(s.salon_id).trim().toLowerCase() === slug ||
+      String(s.salon_info?.slug).trim().toLowerCase() === slug
   ) || null;
 }
 
-// Return a human-friendly salon name for a given salonId or salon object
-export function getSalonName(salonOrId) {
-  if (!salonOrId) return "Salon";
+/**
+ * getSalonName(salonSlugOrSalonObj)
+ * Always prefer: DB.name
+ * Falls back to JSON salon_info.name
+ */
+export function getSalonName(salon) {
+  if (!salon) return "Salon";
 
-  // Support both a salon object and a plain ID
-  const salon =
-    typeof salonOrId === "object" && salonOrId.salon_info
-      ? salonOrId
-      : getSalonById(salonOrId);
-
-  if (!salon) {
-    // fall back to whatever ID we were given
-    return String(salonOrId);
+  // If salon object passed
+  if (typeof salon === "object" && salon.name) {
+    return salon.name;
   }
 
-  const info = salon.salon_info || {};
+  const slug = typeof salon === "string" ? salon : salon.salon_id;
 
-  // Prefer explicit name fields, then fall back to ID
+  // 1️⃣ DB name (correct)
+  const row = db
+    .prepare("SELECT name FROM salons WHERE slug = ?")
+    .get(slug);
+
+  if (row?.name) return row.name;
+
+  // 2️⃣ fallback to JSON loaders (old)
+  const jsonSalon = getSalonById(slug);
   return (
-    info.name ||
-    info.salon_name ||
-    salon.salon_name ||
-    salon.salon_id ||
-    String(salonOrId)
+    jsonSalon?.salon_info?.name ||
+    jsonSalon?.salon_info?.salon_name ||
+    slug
   );
 }
 

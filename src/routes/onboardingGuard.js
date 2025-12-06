@@ -1,55 +1,71 @@
 // src/routes/onboardingGuard.js
+import db from "../../db.js";   // <-- REQUIRED
 
-import db from "../../db.js";
+export default function onboardingGuard(req, res, next) {
+  const url = req.originalUrl || req.url;
 
-/**
- * Blocks access to manager pages if onboarding is not complete.
- * Applies only when:
- *  - manager is logged in
- *  - manager has a salon assigned
- *  - salon.status !== 'active'
- *
- * Allows:
- *  - onboarding routes
- *  - login routes
- *  - existing salons (status === 'active')
- */
+  // Always allow health checks
+  if (url.startsWith("/healthz")) return next();
 
-export function onboardingGuard(req, res, next) {
-  try {
-    // No session → skip guard
-    if (!req.session.manager) return next();
-
-    const manager = req.session.manager;
-    const salon_id = manager.salon_id;
-
-    // If no salon_id → skip guard
-    if (!salon_id) return next();
-
-    // Read salon info
-    const salon = db
-      .prepare("SELECT status, status_step FROM salons WHERE salon_id = ?")
-      .get(salon_id);
-
-    if (!salon) return next();
-
-    const { status, status_step } = salon;
-
-    // If already active → allow
-    if (status === "active") return next();
-
-    // Always allow onboarding routes
-    if (req.path.startsWith("/onboarding")) return next();
-
-    // Always allow login routes
-    if (req.path.startsWith("/manager/login")) return next();
-    if (req.path.startsWith("/manager/signup")) return next();
-
-    // Redirect to correct onboarding step
-    return res.redirect(`/onboarding/${status_step || "salon"}`);
-
-  } catch (err) {
-    console.error("[onboardingGuard] ERROR:", err);
-    return next(); // fail-open
+  // Allow static/marketing/legal
+  if (
+    url.startsWith("/legal") ||
+    url.startsWith("/assets") ||
+    url.startsWith("/public")
+  ) {
+    return next();
   }
+
+  // Allow login/signup and token login
+  if (
+    url.startsWith("/manager/login") ||
+    url.startsWith("/manager/signup") ||
+    url.startsWith("/manager/login-with-token")
+  ) {
+    return next();
+  }
+
+  // Allow logout
+  if (url.startsWith("/manager/logout")) return next();
+
+  // Allow onboarding routes
+  if (url.startsWith("/onboarding")) return next();
+
+  const manager_id = req.session?.manager_id;
+  const salon_id = req.session?.salon_id;
+
+  // Not logged in → force login
+  if (!manager_id || !salon_id) {
+    return res.redirect("/manager/login");
+  }
+
+  // Look up current onboarding step using DB IMPORT, not req.db
+  const row = db
+    .prepare("SELECT status, status_step FROM salons WHERE slug = ?")
+    .get(salon_id);
+
+  if (!row) {
+    return res.redirect("/manager/login");
+  }
+
+  const { status, status_step } = row;
+
+  // Onboarding complete → let them in
+  if (status === "active" && status_step === "complete") {
+    return next();
+  }
+
+  const stepRedirect = {
+    salon: "/onboarding/salon",
+    rules: "/onboarding/rules",
+    manager: "/onboarding/manager",
+    stylists: "/onboarding/stylists",
+    review: "/onboarding/review",
+  }[status_step];
+
+  if (stepRedirect && !url.startsWith(stepRedirect)) {
+    return res.redirect(stepRedirect);
+  }
+
+  return next();
 }

@@ -110,5 +110,33 @@
     "original_notes": "Balayage",
     "instagram_handle": "irontman72",
     "booking_url": "https://booking.rejuvesalonandspa.com/webstoreNew/services?utm_source=rejuvesalonandspa.com&utm_medium=website&utm_campaign=newToRejuve_page"
+  },
+  {
+    "id": "9db81000-8c2f-465f-aac1-9a804cf1d6cd",
+    "salon": "Rejuve Salon Spa",
+    "stylist_name": "Troy",
+    "stylist_phone": "8483384005",
+    "service_type": "balayage",
+    "base_caption": "Transform your look with a stunning balayage that enhances your natural beauty! This effortless style is perfect for any season, bringing dimension and vibrancy to your hair. ✨\n\nStyled by @rejuvesalonspa\n\n#balayage #hairgoals #hairtransformation #MostlyPostly #RejuveSalonSpa #CarmelIndiana\n\nEmbrace the change!\n\nBook: https://booking.rejuvesalonandspa.com/webstoreNew/services?utm_source=rejuvesalonandspa.com&utm_medium=website&utm_campaign=newToRejuve_page",
+    "final_caption": "Transform your look with a stunning balayage that enhances your natural beauty! This effortless style is perfect for any season, bringing dimension and vibrancy to your hair. ✨\n​\nStyled by Troy\nIG: https://instagram.com/irontman72\n​\n#balayage #hairgoals #hairtransformation #MostlyPostly #RejuveSalonSpa #CarmelIndiana\n​\nEmbrace the change!\n​\nBook: https://booking.rejuvesalonandspa.com/webstoreNew/services?utm_source=rejuvesalonandspa.com&utm_medium=website&utm_campaign=newToRejuve_page",
+    "hashtags": [
+      "#balayage",
+      "#hairgoals",
+      "#hairtransformation",
+      "#MostlyPostly"
+    ],
+    "cta": "Embrace the change!",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_28.jpg",
+    "status": "manager_pending",
+    "created_at": "2025-11-27T14:49:51.794Z",
+    "updated_at": "2025-11-27T14:49:51.800Z",
+    "caption": "Transform your look with a stunning balayage that enhances your natural beauty! This effortless style is perfect for any season, bringing dimension and vibrancy to your hair. ✨",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "balayage",
+    "instagram_handle": "irontman72",
+    "booking_url": "https://booking.rejuvesalonandspa.com/webstoreNew/services?utm_source=rejuvesalonandspa.com&utm_medium=website&utm_campaign=newToRejuve_page"
   }
 ]
