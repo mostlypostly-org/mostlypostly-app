@@ -1,9 +1,12 @@
-// src/core/salonLookup.js — Fully patched for consistent lookup and consent updates
+// src/core/salonLookup.js — DB-first, JSON only in local dev
 import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 import chokidar from "chokidar";
 import { db } from "../../db.js";
+
+const APP_ENV = process.env.APP_ENV || process.env.NODE_ENV || "local";
+const USING_JSON = APP_ENV === "local";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,50 +19,56 @@ let watcherStarted = false;
 /**
  * getSalonById(salonSlug)
  * DB → salons.slug
- * Falls back to JSON file-based lookup.
+ * Falls back to JSON file-based lookup (local only).
  */
 export function getSalonById(salonSlug) {
   if (!salonSlug) return null;
   const slug = String(salonSlug).trim().toLowerCase();
 
-  // 1️⃣ DB lookup (correct source of truth)
+  // DB lookup
   const row = db
     .prepare("SELECT * FROM salons WHERE slug = ?")
     .get(slug);
 
   if (row) return row;
 
-  // 2️⃣ Fallback → JSON salons loader (legacy support)
-  return cachedSalons.find(
-    (s) =>
-      String(s.salon_id).trim().toLowerCase() === slug ||
-      String(s.salon_info?.slug).trim().toLowerCase() === slug
-  ) || null;
+  if (!USING_JSON) return null;
+
+  // Fallback → JSON salons loader (legacy support, local only)
+  return (
+    cachedSalons.find(
+      (s) =>
+        String(s.salon_id || "").trim().toLowerCase() === slug ||
+        String(s.salon_info?.slug || "").trim().toLowerCase() === slug
+    ) || null
+  );
 }
 
 /**
  * getSalonName(salonSlugOrSalonObj)
  * Always prefer: DB.name
- * Falls back to JSON salon_info.name
+ * Falls back to JSON salon_info.name in local.
  */
 export function getSalonName(salon) {
   if (!salon) return "Salon";
 
-  // If salon object passed
+  // If salon object passed with name
   if (typeof salon === "object" && salon.name) {
     return salon.name;
   }
 
   const slug = typeof salon === "string" ? salon : salon.salon_id;
 
-  // 1️⃣ DB name (correct)
+  // DB name
   const row = db
     .prepare("SELECT name FROM salons WHERE slug = ?")
     .get(slug);
 
   if (row?.name) return row.name;
 
-  // 2️⃣ fallback to JSON loaders (old)
+  if (!USING_JSON) return slug;
+
+  // JSON fallback (local only)
   const jsonSalon = getSalonById(slug);
   return (
     jsonSalon?.salon_info?.name ||
@@ -67,6 +76,8 @@ export function getSalonName(salon) {
     slug
   );
 }
+
+// ---------- JSON loader (local dev only) ----------
 
 function resolveSalonsDir() {
   const candidates = [];
@@ -94,6 +105,12 @@ async function loadOne(filePath) {
 }
 
 export async function loadSalons() {
+  if (!USING_JSON) {
+    cachedSalons = [];
+    lastLoadedAt = new Date();
+    return cachedSalons;
+  }
+
   try {
     const dir = resolveSalonsDir();
     if (!fs.existsSync(dir)) {
@@ -103,8 +120,10 @@ export async function loadSalons() {
       return cachedSalons;
     }
 
-    const files = fs.readdirSync(dir).filter(f => f.endsWith(".json") || f.endsWith(".js"))
-      .map(f => path.join(dir, f));
+    const files = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith(".json") || f.endsWith(".js"))
+      .map((f) => path.join(dir, f));
 
     const salons = [];
     for (const filePath of files) {
@@ -131,6 +150,7 @@ export async function loadSalons() {
 }
 
 export function startSalonWatcher() {
+  if (!USING_JSON) return;
   if (watcherStarted) return;
   watcherStarted = true;
 
@@ -162,45 +182,32 @@ export function startSalonWatcher() {
 }
 
 export function getAllSalons() {
+  if (!USING_JSON) return [];
   return cachedSalons;
 }
 
-export function getSalonByStylist(identifier) {
-  if (!cachedSalons.length) return null;
-  const idStr = String(identifier).trim();
+// ---------- DB-first stylist / salon lookup ----------
 
-  for (const salon of cachedSalons) {
-    const stylists = salon.stylists || [];
-    const managers = salon.managers || [];
-    if (
-      stylists.some(
-        (s) =>
-          String(s.chat_id).trim() === idStr ||
-          normalizePhone(s.phone) === normalizePhone(idStr) ||
-          s.id === idStr
-      ) ||
-      managers.some(
-        (m) =>
-          String(m.chat_id).trim() === idStr ||
-          normalizePhone(m.phone) === normalizePhone(idStr) ||
-          m.id === idStr
-      )
-    ) {
-      return salon;
-    }
-  }
-  return null;
+// Normalize phone numbers consistently
+function normalizePhone(v = "") {
+  const digits = (v + "").replace(/\D+/g, "");
+  if (digits.startsWith("1") && digits.length === 11) return "+" + digits;
+  if (digits.length === 10) return "+1" + digits;
+  if (v.startsWith("+")) return v;
+  return "+" + digits;
 }
 
-// 🔍 Core stylist lookup — DB first, no JSON dependency for staging/prod
+// Core stylist lookup — DB first
 export function lookupStylist(identifier) {
   const idStr = String(identifier || "").trim();
   if (!idStr) return null;
 
   const phoneNorm = normalizePhone(idStr);
 
-  // 1️⃣ Try stylist by phone
-  let row = db.prepare(`
+  // Try stylist by phone
+  let row = db
+    .prepare(
+      `
     SELECT 
       s.id          AS stylist_id,
       s.name        AS stylist_name,
@@ -217,13 +224,17 @@ export function lookupStylist(identifier) {
     JOIN salons sl ON sl.slug = s.salon_id
     WHERE s.phone = ?
     LIMIT 1
-  `).get(phoneNorm);
+  `
+    )
+    .get(phoneNorm);
 
   let isManager = false;
 
-  // 2️⃣ If not found, try manager by phone
+  // If not found, try manager by phone
   if (!row) {
-    const mgr = db.prepare(`
+    const mgr = db
+      .prepare(
+        `
       SELECT 
         m.id         AS manager_id,
         m.name       AS stylist_name,
@@ -239,7 +250,9 @@ export function lookupStylist(identifier) {
       JOIN salons sl ON sl.slug = m.salon_id
       WHERE m.phone = ?
       LIMIT 1
-    `).get(phoneNorm);
+    `
+      )
+      .get(phoneNorm);
 
     if (mgr) {
       row = mgr;
@@ -288,19 +301,23 @@ export function getSalonByStylist(identifier) {
 }
 
 /**
- * 🔍 Guaranteed direct lookup — loads salon files on demand (bypasses cache)
+ * Guaranteed direct lookup — loads salon files on demand.
+ * Local-only JSON helper (returns null in staging/prod).
  */
 export function findStylistDirect(phone) {
+  if (!USING_JSON) return null;
   if (!phone) return null;
+
   const normalized = normalizePhone(phone);
   const salonsDir = resolveSalonsDir();
-  const files = fs.readdirSync(salonsDir).filter(f => f.endsWith(".json"));
+  if (!fs.existsSync(salonsDir)) return null;
+
+  const files = fs.readdirSync(salonsDir).filter((f) => f.endsWith(".json"));
 
   for (const file of files) {
     try {
       const salonPath = path.join(salonsDir, file);
       const salon = JSON.parse(fs.readFileSync(salonPath, "utf8"));
-      const salonInfo = salon.salon_info || {};
       const allPeople = [...(salon.managers || []), ...(salon.stylists || [])];
 
       for (const person of allPeople) {
@@ -315,24 +332,20 @@ export function findStylistDirect(phone) {
   return null;
 }
 
-// 🧩 Normalize phone numbers consistently
-function normalizePhone(v = "") {
-  const digits = (v + "").replace(/\D+/g, "");
-  if (digits.startsWith("1") && digits.length === 11) return "+" + digits;
-  if (digits.length === 10) return "+1" + digits;
-  if (v.startsWith("+")) return v;
-  return "+" + digits;
-}
-
 /**
  * updateStylistConsent(phoneOrChatId)
  * -----------------------------------
- * Finds the stylist by phone/chat ID and updates SMS consent.
+ * Local: updates JSON salons.
+ * Staging/Prod: no-op success (consent handled elsewhere).
  */
 export function updateStylistConsent(phoneOrChatId) {
   if (!phoneOrChatId) return { ok: false, error: "No identifier provided" };
   const idStr = String(phoneOrChatId).trim();
   const clean = normalizePhone(idStr);
+
+  if (!USING_JSON) {
+    return { ok: true, note: "Consent tracked server-side (DB/other)." };
+  }
 
   const salons = getAllSalons();
   if (!salons.length) return { ok: false, error: "No salons loaded" };
@@ -356,7 +369,9 @@ export function updateStylistConsent(phoneOrChatId) {
 
       try {
         fs.writeFileSync(salonFile, JSON.stringify(salon, null, 2));
-        console.log(`✅ Updated SMS consent for ${match.name || match.stylist_name} (${clean})`);
+        console.log(
+          `✅ Updated SMS consent for ${match.name || match.stylist_name} (${clean})`
+        );
         return {
           ok: true,
           stylist_name: match.name || match.stylist_name,
