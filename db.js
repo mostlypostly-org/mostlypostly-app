@@ -14,11 +14,15 @@ const APP_ENV = process.env.APP_ENV || process.env.NODE_ENV || "local";
 
 // Default DB path if DB_PATH is not explicitly set
 let defaultDbPath;
+
 if (APP_ENV === "production") {
-  // On Render (prod/staging), use the persistent disk
+  // PRODUCTION → persistent disk on Render
   defaultDbPath = "/data/postly.db";
+} else if (APP_ENV === "staging") {
+  // STAGING → ephemeral writable filesystem on Render
+  defaultDbPath = "/tmp/postly.db";
 } else {
-  // Local dev / other envs: keep DB in project root
+  // LOCAL DEV / other envs: keep DB in project root
   defaultDbPath = path.join(process.cwd(), "postly.db");
 }
 
