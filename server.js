@@ -72,6 +72,7 @@ import managerRoutes from "./src/routes/manager.js";
 import onboardingRoutes from "./src/routes/onboarding.js";
 import onboardingGuard from "./src/routes/onboardingGuard.js";
 import adminRouter from "./src/routes/admin.js";
+import { lookupStylist } from "./src/core/salonLookup.js";
 
 // Scheduler
 import { enqueuePost, runSchedulerOnce, startScheduler } from "./src/scheduler.js";
@@ -219,14 +220,17 @@ const drafts = new Map();
 
 app.use(
   "/inbound/telegram",
-  telegramRoute(drafts, lookupStylist, ({ imageUrl, notes, stylist, salon }) =>
-    generateCaption({
-      imageDataUrl: imageUrl,
-      notes,
-      salon,
-      stylist,
-      city: stylist?.city || "",
-    })
+  telegramRoute(
+    drafts,
+    lookupStylist,  // MUST be passed explicitly
+    ({ imageUrl, notes, stylist, salon }) =>
+      generateCaption({
+        imageDataUrl: imageUrl,
+        notes,
+        salon,
+        stylist,
+        city: stylist?.city || "",
+      })
   )
 );
 
