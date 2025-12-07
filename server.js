@@ -19,16 +19,13 @@ dotenv.config();
 // =====================================================
 // Load salons BEFORE routes (legacy JSON loader only)
 // =====================================================
-import {
-  loadSalons,
-  startSalonWatcher,
-  getAllSalons,
-  lookupStylist
-} from "./src/core/salonLookup.js";
-
-await loadSalons();
-startSalonWatcher();
-console.log("💇 Salons loaded and file watcher active.");
+if (process.env.APP_ENV === "local") {
+  await loadSalons();
+  startSalonWatcher();
+  console.log("💇 Local: salons.json loader active.");
+} else {
+  console.log("💇 Staging/Prod: DISABLED salons.json loader.");
+}
 
 // =====================================================
 // Schema + analytics bootstrap

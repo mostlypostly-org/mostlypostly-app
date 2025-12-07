@@ -192,61 +192,99 @@ export function getSalonByStylist(identifier) {
   return null;
 }
 
-// 🔍 Core stylist lookup (cached, safe)
+// 🔍 Core stylist lookup — DB first, no JSON dependency for staging/prod
 export function lookupStylist(identifier) {
   const idStr = String(identifier || "").trim();
   if (!idStr) return null;
 
-  // Auto-load cache if empty
-  if (!cachedSalons.length) {
-    console.warn("⚠️ Salon cache empty — loading salons now…");
-    try {
-      loadSalons();
-    } catch (e) {
-      console.error("🚫 Failed to auto-load salons:", e);
-      return null;
+  const phoneNorm = normalizePhone(idStr);
+
+  // 1️⃣ Try stylist by phone
+  let row = db.prepare(`
+    SELECT 
+      s.id          AS stylist_id,
+      s.name        AS stylist_name,
+      s.phone       AS stylist_phone,
+      s.instagram_handle,
+      sl.slug       AS salon_slug,
+      sl.name       AS salon_name,
+      sl.booking_link,
+      sl.facebook_page_id,
+      sl.instagram_handle AS salon_instagram_handle,
+      sl.default_cta,
+      sl.booking_url
+    FROM stylists s
+    JOIN salons sl ON sl.slug = s.salon_id
+    WHERE s.phone = ?
+    LIMIT 1
+  `).get(phoneNorm);
+
+  let isManager = false;
+
+  // 2️⃣ If not found, try manager by phone
+  if (!row) {
+    const mgr = db.prepare(`
+      SELECT 
+        m.id         AS manager_id,
+        m.name       AS stylist_name,
+        m.phone      AS stylist_phone,
+        sl.slug      AS salon_slug,
+        sl.name      AS salon_name,
+        sl.booking_link,
+        sl.facebook_page_id,
+        sl.instagram_handle AS salon_instagram_handle,
+        sl.default_cta,
+        sl.booking_url
+      FROM managers m
+      JOIN salons sl ON sl.slug = m.salon_id
+      WHERE m.phone = ?
+      LIMIT 1
+    `).get(phoneNorm);
+
+    if (mgr) {
+      row = mgr;
+      isManager = true;
     }
   }
 
-  const normalizedId = normalizePhone(idStr);
-
-  for (const salon of cachedSalons) {
-    const salonInfo = salon.salon_info || {};
-    const stylists = salon.stylists || [];
-    const managers = salon.managers || [];
-
-    // Match stylist
-    const stylist = stylists.find(
-      (s) =>
-        normalizePhone(s.phone) === normalizedId ||
-        String(s.chat_id).trim() === idStr ||
-        s.id === idStr
-    );
-    if (stylist) {
-      stylist.salon_info = salonInfo;
-      stylist.salon_name = salonInfo.name || salonInfo.salon_name || "Unknown Salon";
-      stylist.display_name = stylist.name || stylist.stylist_name;
-      return { stylist, salon };
-    }
-
-    // Match manager
-    const manager = managers.find(
-      (m) =>
-        normalizePhone(m.phone) === normalizedId ||
-        String(m.chat_id).trim() === idStr ||
-        m.id === idStr
-    );
-    if (manager) {
-      manager.salon_info = salonInfo;
-      manager.salon_name = salonInfo.name || salonInfo.salon_name || "Unknown Salon";
-      manager.display_name = manager.name || manager.stylist_name;
-      manager.role = "manager";
-      return { stylist: manager, salon };
-    }
+  if (!row) {
+    console.warn(`⚠️ No stylist or manager found in DB for ${idStr}`);
+    return null;
   }
 
-  console.warn(`⚠️ No stylist or manager found for ${idStr}`);
-  return null;
+  const salon_info = {
+    id: row.salon_slug,
+    slug: row.salon_slug,
+    name: row.salon_name,
+    salon_name: row.salon_name,
+    booking_url: row.booking_url || row.booking_link || null,
+    facebook_page_id: row.facebook_page_id || null,
+    instagram_handle: row.salon_instagram_handle || null,
+    default_cta: row.default_cta || "Book via link in bio.",
+  };
+
+  const stylist = {
+    id: row.stylist_id || row.manager_id,
+    stylist_name: row.stylist_name,
+    name: row.stylist_name,
+    phone: row.stylist_phone,
+    instagram_handle: row.instagram_handle || null,
+    salon_id: row.salon_slug,
+    salon_name: row.salon_name,
+    salon_info,
+    role: isManager ? "manager" : "stylist",
+  };
+
+  return {
+    stylist,
+    salon: { salon_id: row.salon_slug, salon_info },
+  };
+}
+
+// Used by messageRouter for consent path
+export function getSalonByStylist(identifier) {
+  const res = lookupStylist(identifier);
+  return res?.salon || null;
 }
 
 /**
