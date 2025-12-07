@@ -221,7 +221,7 @@ export function lookupStylist(identifier) {
       sl.default_cta,
       sl.booking_url
     FROM stylists s
-    JOIN salons sl ON sl.slug = s.salon_id
+    JOIN salons sl ON sl.id = s.salon_id
     WHERE s.phone = ?
     LIMIT 1
   `
@@ -247,7 +247,7 @@ export function lookupStylist(identifier) {
         sl.default_cta,
         sl.booking_url
       FROM managers m
-      JOIN salons sl ON sl.slug = m.salon_id
+      JOIN salons sl ON sl.id = m.salon_id
       WHERE m.phone = ?
       LIMIT 1
     `
