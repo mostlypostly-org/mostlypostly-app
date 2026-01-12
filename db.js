@@ -155,6 +155,24 @@ for (const [col, ddl] of visionPostColumns) {
   }
 }
 
+// =====================================================
+// Ensure error logging column exists on posts
+// =====================================================
+try {
+  db.prepare(`
+    ALTER TABLE posts
+    ADD COLUMN error_message TEXT
+  `).run();
+  console.log("🧱 (db.js) added posts.error_message");
+} catch (e) {
+  if (!e.message.includes("duplicate column name")) {
+    console.warn(
+      "⚠️ posts.error_message migration error:",
+      e.message
+    );
+  }
+}
+
 // Ensure salons.facebook_page_token exists
 try { db.prepare("SELECT facebook_page_token FROM salons LIMIT 1").get(); }
 catch (e) {
