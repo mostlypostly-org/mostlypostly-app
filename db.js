@@ -251,6 +251,18 @@ catch (e) {
   }
 }
 
+try {
+  db.prepare(`
+    ALTER TABLE posts
+    ADD COLUMN manual_caption TEXT
+  `).run();
+  console.log("🧱 (db.js) added posts.manual_caption");
+} catch (e) {
+  if (!e.message.includes("duplicate column name")) {
+    console.warn("⚠️ posts.manual_caption migration error:", e.message);
+  }
+}
+
 try { db.prepare("SELECT auto_approval FROM salons LIMIT 1").get(); }
 catch (e) {
   console.log("🧱 (db.js) added salons.auto_approval");
