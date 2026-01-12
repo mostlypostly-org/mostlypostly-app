@@ -221,6 +221,21 @@ try {
   console.warn("⚠️ Could not backfill salons.timezone:", err.message);
 }
 
+// =====================================================
+// Ensure salons.state exists (required for onboarding)
+// =====================================================
+try {
+  db.prepare("SELECT state FROM salons LIMIT 1").get();
+} catch (e) {
+  console.log("🧱 (db.js) added salons.state");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN state TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.state:", err.message);
+  }
+}
+
+
 try { db.prepare("SELECT instagram_handle FROM salons LIMIT 1").get(); }
 catch (e) {
   console.log("🧱 (db.js) added salons.instagram_handle");
