@@ -285,6 +285,25 @@ for (const [col, type] of postColumns) {
   }
 }
 
+// =====================================================
+// Ensure vision metadata for posts
+// =====================================================
+try {
+  db.prepare(`
+    ALTER TABLE posts
+    ADD COLUMN is_vision_generated INTEGER DEFAULT 0
+  `).run();
+  console.log("🧱 (db.js) added posts.is_vision_generated");
+} catch (e) {
+  if (!e.message.includes("duplicate column name")) {
+    console.warn(
+      "⚠️ posts.is_vision_generated migration error:",
+      e.message
+    );
+  }
+}
+
+
 
 try { db.prepare("SELECT auto_approval FROM salons LIMIT 1").get(); }
 catch (e) {
