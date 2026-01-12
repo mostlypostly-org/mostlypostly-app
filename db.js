@@ -249,6 +249,29 @@ try {
   }
 }
 
+// =====================================================
+// Ensure remaining onboarding config columns exist on salons
+// =====================================================
+const salonOnboardingColumns = [
+  ["auto_publish", "INTEGER DEFAULT 0"],
+  ["default_hashtags", "TEXT"],
+  ["tone", "TEXT"]
+];
+
+for (const [col, ddl] of salonOnboardingColumns) {
+  try {
+    db.prepare(`SELECT ${col} FROM salons LIMIT 1`).get();
+  } catch (e) {
+    console.log(`🧱 (db.js) added salons.${col}`);
+    try {
+      db.prepare(`ALTER TABLE salons ADD COLUMN ${col} ${ddl}`).run();
+    } catch (err) {
+      console.warn(`⚠️ Could not add salons.${col}:`, err.message);
+    }
+  }
+}
+
+
 
 try { db.prepare("SELECT instagram_handle FROM salons LIMIT 1").get(); }
 catch (e) {
