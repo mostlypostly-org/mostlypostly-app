@@ -263,6 +263,29 @@ try {
   }
 }
 
+// =====================================================
+// Ensure AI + workflow columns for posts
+// =====================================================
+const postColumns = [
+  ["ai_caption", "TEXT"],
+  ["ai_hashtags", "TEXT"],
+  ["ai_cta", "TEXT"],
+  ["platform", "TEXT"],
+  ["status", "TEXT"]
+];
+
+for (const [col, type] of postColumns) {
+  try {
+    db.prepare(`ALTER TABLE posts ADD COLUMN ${col} ${type}`).run();
+    console.log(`🧱 (db.js) added posts.${col}`);
+  } catch (e) {
+    if (!e.message.includes("duplicate column name")) {
+      console.warn(`⚠️ posts.${col} migration error:`, e.message);
+    }
+  }
+}
+
+
 try { db.prepare("SELECT auto_approval FROM salons LIMIT 1").get(); }
 catch (e) {
   console.log("🧱 (db.js) added salons.auto_approval");
