@@ -135,6 +135,26 @@ try {
   }
 }
 
+// =====================================================
+// Ensure vision pipeline columns exist on posts
+// =====================================================
+const visionPostColumns = [
+  ["is_vision_generated", "INTEGER DEFAULT 1"],
+  ["vision_tags", "TEXT"],
+  ["raw_ai_payload", "TEXT"]
+];
+
+for (const [col, ddl] of visionPostColumns) {
+  try {
+    db.prepare(`ALTER TABLE posts ADD COLUMN ${col} ${ddl}`).run();
+    console.log(`🧱 (db.js) added posts.${col}`);
+  } catch (e) {
+    if (!e.message.includes("duplicate column name")) {
+      console.warn(`⚠️ posts.${col} migration error:`, e.message);
+    }
+  }
+}
+
 // Ensure salons.facebook_page_token exists
 try { db.prepare("SELECT facebook_page_token FROM salons LIMIT 1").get(); }
 catch (e) {
