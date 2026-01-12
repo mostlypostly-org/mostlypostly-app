@@ -271,6 +271,20 @@ for (const [col, ddl] of salonOnboardingColumns) {
   }
 }
 
+// =====================================================
+// Ensure stylists.specialties exists (required for onboarding)
+// =====================================================
+try {
+  db.prepare("SELECT specialties FROM stylists LIMIT 1").get();
+} catch (e) {
+  console.log("🧱 (db.js) added stylists.specialties");
+  try {
+    db.prepare("ALTER TABLE stylists ADD COLUMN specialties TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add stylists.specialties:", err.message);
+  }
+}
+
 
 
 try { db.prepare("SELECT instagram_handle FROM salons LIMIT 1").get(); }
