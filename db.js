@@ -235,6 +235,20 @@ try {
   }
 }
 
+// =====================================================
+// Ensure salons.industry exists (required for onboarding)
+// =====================================================
+try {
+  db.prepare("SELECT industry FROM salons LIMIT 1").get();
+} catch (e) {
+  console.log("🧱 (db.js) added salons.industry");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN industry TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.industry:", err.message);
+  }
+}
+
 
 try { db.prepare("SELECT instagram_handle FROM salons LIMIT 1").get(); }
 catch (e) {
