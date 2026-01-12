@@ -10,6 +10,40 @@ const BRAND_TAG = process.env.MOSTLYPOSTLY_BRAND_TAG || "#MostlyPostly";
  * - Auto-adds clean spacing between caption, stylist, hashtags, CTA, and booking
  * - Enforces Instagram rule: no URLs + “Book via link in bio.”
  */
+
+function normalizeHashtags(input) {
+  if (!input) return [];
+
+  // If already an array
+  if (Array.isArray(input)) {
+    return input
+      .map(h => String(h).trim())
+      .filter(Boolean);
+  }
+
+  // If JSON string
+  if (typeof input === "string") {
+    try {
+      const parsed = JSON.parse(input);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map(h => String(h).trim())
+          .filter(Boolean);
+      }
+    } catch {
+      // Fall through
+    }
+
+    // Space or comma separated string
+    return input
+      .split(/[\s,]+/)
+      .map(h => h.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
 export function composeFinalCaption({
   caption,
   hashtags = [],
@@ -20,11 +54,18 @@ export function composeFinalCaption({
   salon,
   platform = "generic",
   asHtml = false
-}) {
+  }) {
   const parts = [];
 
   // --- Normalize inputs ---
   const text = (caption || "").trim();
+
+  // Strip hashtags from AI caption text (hashtags are appended separately)
+  const cleanedText = text
+    .replace(/#[\w-]+/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
   const ctaText = (cta || "").trim();
   const handle = ((instagramHandle || salon?.salon_info?.instagram_handle || "") + "")
     .replace(/^@+/, "")
@@ -33,7 +74,8 @@ export function composeFinalCaption({
   const booking = (bookingUrl || "").trim();
 
   // --- 1️⃣ Caption body ---
-  if (text) parts.push(text);
+  if (cleanedText) parts.push(cleanedText);
+
 
   // --- 2️⃣ "Styled by" credit ---
   let credit = "Styled by a stylist";
@@ -59,10 +101,12 @@ export function composeFinalCaption({
   parts.push(credit);
 
   // --- 3️⃣ Hashtags ---
-  const salonDefaults = Array.isArray(salon?.salon_info?.default_hashtags)
-    ? salon.salon_info.default_hashtags
-    : [];
-  const tags = _mergeHashtags(hashtags, salonDefaults, BRAND_TAG);
+  const aiTags = normalizeHashtags(hashtags);
+  const salonDefaults = normalizeHashtags(
+    salon?.default_hashtags || salon?.salon_info?.default_hashtags
+  );
+
+  const tags = _mergeHashtags(aiTags, salonDefaults, BRAND_TAG);
   if (tags.length) parts.push(tags.join(" "));
 
   // --- 4️⃣ CTA ---
@@ -118,11 +162,12 @@ export function _mergeHashtags(aiTags = [], salonDefaults = [], brandTag = BRAND
   const out = [];
   for (const raw of incoming) {
     const t = (raw || "").trim();
-    if (!t || !t.startsWith("#")) continue;
-    const key = t.toLowerCase();
+    if (!t) continue;
+    const normalized = t.startsWith("#") ? t : `#${t}`;
+    const key = normalized.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(t);
+    out.push(normalized);
   }
   return out;
 }

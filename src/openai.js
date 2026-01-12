@@ -74,13 +74,21 @@ export async function generateCaption({
   // ===========================
   // SYSTEM PROMPT
   // ===========================
+  const toneInstruction = salon?.tone
+  ? `Write the caption in a ${salon.tone} tone.
+Use word choice, energy, and phrasing that clearly reflects this style.`
+  : "";
+
+  console.log("🧠 [OpenAI] Tone applied:", salon?.tone || "default");
+
   const systemPrompt = `
 You are MostlyPostly, an AI assistant that writes social media captions for salons.
+
+${toneInstruction}
 
 Your reply MUST be a single JSON object. No comments. No code fences.
 
 ## PART 1 — Generate a caption:
-- Friendly, confident tone (salon industry appropriate)
 - Keep it concise: 2–3 sentences max
 - DO NOT mention stylist names or Instagram handles
 - DO NOT include any “Styled by” lines
@@ -111,12 +119,12 @@ Your reply MUST be a single JSON object. No comments. No code fences.
   // USER PROMPT
   // ===========================
   const userPrompt = `
-Salon: ${salonName} (${city || "unknown city"})
-Stylist: ${stylistName}
-Instagram: ${instagramHandle ? "@" + instagramHandle : "N/A"}
-Notes: ${notes || "None"}
-Image: ${imageDataUrl ? "Image provided" : "No image"}
-`;
+  Salon: ${salonName} (${city || "unknown city"})
+  Stylist: ${stylistName}
+  Instagram: ${instagramHandle ? "@" + instagramHandle : "N/A"}
+  Notes: ${notes || "None"}
+  Image: ${imageDataUrl ? "Image provided" : "No image"}
+  `;
 
   try {
     console.log("🧠 [OpenAI] Generating caption + classification…");

@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS posts (
   error_message      TEXT,                        -- NEW failure logging
 
   salon_post_number  INTEGER,
+  denial_reason      TEXT,                        -- NEW (manager's deny reason)
   created_at         TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
 

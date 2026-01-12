@@ -3,6 +3,9 @@
 // --- top of messageRouter.js ---
 import crypto from "crypto";
 import { db, verifyTokenRow } from "../../db.js";  // ✅ single import (no duplicates)
+import { enqueuePost } from "../scheduler.js";
+import { getSalonPolicy } from "../scheduler.js";
+
 
 // --- Ensure manager_tokens table exists (runs only once safely) ---
 db.prepare(`
@@ -77,14 +80,13 @@ function issueManagerToken(salonSlug, managerPhone) {
   }
 }
 
-
-
 import { publishToFacebook } from "../publishers/facebook.js";
 import { publishToInstagram } from "../publishers/instagram.js";
 import { handleJoinCommand, continueJoinConversation } from "./joinManager.js";
 import { isJoinInProgress } from "./joinSessionStore.js";
 import {
   lookupStylist,
+  lookupStylistByChatId,
   getSalonByStylist,
   loadSalons,
 } from "./salonLookup.js";
@@ -458,17 +460,23 @@ async function processNewImageFlow({
   chatId, text, imageUrl, drafts,
   generateCaption, moderateAIOutput, sendMessage,
   stylist, salon
-}) {
+  }) {
   console.log("📸 [Router] New image received (consented):", imageUrl);
 
   // 1️⃣ Generate AI caption object
-    const aiJson = await generateCaption({
+  // Hydrate salon with DB-backed config (tone, hashtags, rules, etc.)
+  const fullSalon = getSalonPolicy(
+    salon?.slug || salon?.salon_id || salon?.id
+  );
+
+  const aiJson = await generateCaption({
     imageDataUrl: imageUrl,
     notes: text || "",
-    salon,
+    salon: fullSalon,
     stylist,
     city: stylist?.city || ""
   });
+
 
   aiJson.image_url = imageUrl;
   aiJson.original_notes = text;
@@ -498,7 +506,7 @@ async function processNewImageFlow({
     instagramHandle: null,
     stylistName,
     bookingUrl,
-    salon,
+    salon: fullSalon,
     asHtml: false,
   });
 
@@ -541,6 +549,7 @@ export async function handleIncomingMessage({
 
   // 🔍 Lookup stylist + salon in one pass
   const lookupResult = lookupStylist(chatId);
+
   const stylist = lookupResult?.stylist || {
     stylist_name: "Guest User",
     salon_name: "Unknown",
@@ -631,7 +640,7 @@ export async function handleIncomingMessage({
     // Continue with queued content if any
     const queued = getQueuedIfAny(chatId);
     await sendMessage.sendText(chatId, "✅ Thanks! Consent received. Continuing…");
-
+    
     if (queued?.imageUrl) {
       await processNewImageFlow({
         chatId,
@@ -691,23 +700,96 @@ export async function handleIncomingMessage({
       return;
     }
 
-    const requiresManager = !!salon?.settings?.require_manager_approval;
-    const manager = salon?.managers?.[0];
+      // 🔒 ALWAYS resolve manager approval from DB (never from cached salon object)
+      const salonSlug =
+        salon?.salon_info?.slug ||
+        salon?.slug ||
+        salon?.salon_id;
+
+      const salonRow = db.prepare(`
+        SELECT require_manager_approval
+        FROM salons
+        WHERE slug = ?
+        LIMIT 1
+      `).get(salonSlug);
+
+      const requiresManager = Number(salonRow?.require_manager_approval) === 1;
+
+      console.log("🔐 Manager approval resolved from DB:", {
+        salonSlug,
+        requiresManager
+      });
+
+      console.log("🧨 FORCE DEBUG requiresManager", {
+      salon_info_flag: salon?.salon_info?.require_manager_approval,
+      salon_flag: salon?.require_manager_approval,
+      typeof_salon_flag: typeof salon?.require_manager_approval,
+      requiresManager
+    });
+
+    const manager = db.prepare(`
+      SELECT id, name, phone, chat_id
+      FROM managers
+      WHERE salon_id = ?
+      LIMIT 1
+    `).get(salon?.salon_id || salon?.id || salon?.salon_info?.slug);
+
+    if (requiresManager && !manager) {
+      console.error(
+        "🚫 Manager approval required but no manager found for salon:",
+        salon?.salon_id
+      );
+
+      await sendMessage.sendText(
+        chatId,
+        "⚠️ Manager approval is required, but no manager is configured for your salon."
+      );
+
+      endTimer(start);
+      return;
+    }
+
+    // 🔧 HARDENING: Manager exists but has no delivery method (SMS or Telegram)
+    if (
+      requiresManager &&
+      manager &&
+      !manager.phone &&
+      !manager.chat_id
+    ) {
+      console.warn(
+        `⚠️ Manager exists but has no delivery method for salon ${salon?.salon_id}`
+      );
+
+      await sendMessage.sendText(
+        chatId,
+        "⚠️ Manager approval is required, but the manager does not have SMS or Telegram configured. Please contact support."
+      );
+
+      endTimer(start);
+      return;
+    }
+
     const bookingUrl = salon?.salon_info?.booking_url || "";
     const stylistName = getStylistName(stylist);
     const stylistHandle = getStylistHandle(stylist);
 
-    // Base caption (single source of truth)
-    let baseCaption = composeFinalCaption({
-      caption: draft.caption || "Beautiful new style!",
-      hashtags: draft.hashtags || [],
-      cta: draft.cta || "Book your next visit today!",
-      instagramHandle: null,
-      stylistName,
-      bookingUrl,
-      salon,
-      asHtml: false
-    });
+    // ✅ Always use DB-hydrated salon when composing captions
+    const fullSalon = getSalonPolicy(
+      salon?.slug || salon?.salon_id || salon?.id || salon?.salon_info?.id
+    );
+
+      // Base caption (single source of truth)
+      let baseCaption = composeFinalCaption({
+        caption: draft.caption || "Beautiful new style!",
+        hashtags: draft.hashtags || [],              
+        cta: draft.cta || "Book your next visit today!",
+        instagramHandle: null,
+        stylistName,
+        bookingUrl: fullSalon?.booking_url || bookingUrl,
+        salon: fullSalon,                           
+        asHtml: false,
+      });
+
       if (requiresManager) {
         console.log(`🕓 [Router] Manager approval required for ${stylistName}`);
         console.log("👔 Manager loaded for approval:", manager?.name, manager?.phone, manager?.chat_id);
@@ -717,7 +799,7 @@ export async function handleIncomingMessage({
           manager_phone: manager?.phone || null,
           manager_chat_id: manager?.chat_id ?? null,
           image_url: draft.image_url || null,
-          final_caption: buildFacebookCaption(baseCaption, stylistName, stylistHandle),
+          final_caption: baseCaption,
           booking_url: bookingUrl,
           instagram_handle: stylistHandle
         };
@@ -818,7 +900,11 @@ export async function handleIncomingMessage({
         return;
       }
 
-    
+    const igSalonId =
+    salon?.salon_id ||
+    salon?.id ||
+    salon?.salon_info?.id;
+
     // --------------------------
     // Direct post path
     // --------------------------
@@ -830,25 +916,71 @@ export async function handleIncomingMessage({
       const fbCaption = buildFacebookCaption(baseCaption, stylistName, stylistHandle);
       const igCaption = buildInstagramCaption(baseCaption, stylistName, stylistHandle);
 
-      const pageId = salon?.salon_info?.facebook_page_id || process.env.FACEBOOK_PAGE_ID;
-
       // ✅ Always rehost Twilio media to ensure a public URL for Meta (FB + IG)
       let rehostedUrl = null;
       try {
         const draftImage = draft?.image_url || null;
-        if (draftImage && draftImage.includes("api.twilio.com")) {
-          rehostedUrl = await rehostTwilioMedia(draftImage, salon?.salon_id || "unknown");
-          console.log(`🌐 Rehosted image → ${rehostedUrl}`);
+
+        if (!draftImage) {
+          throw new Error("No image URL available for publishing");
+        }
+
+        // ALWAYS rehost unless already public HTTPS
+        // ALWAYS rehost unless already public HTTPS
+        if (!draftImage.startsWith("https://")) {
+          let tmpPath = await rehostTwilioMedia(
+            draftImage,
+            salon?.salon_id || "unknown"
+          );
+
+          const PUBLIC_BASE_URL =
+            process.env.PUBLIC_BASE_URL ||
+            process.env.BASE_URL;
+
+          if (!PUBLIC_BASE_URL) {
+            throw new Error("PUBLIC_BASE_URL is not defined");
+          }
+
+          // 🔑 FORCE absolute public HTTPS URL (Instagram requires this)
+          rehostedUrl = `${PUBLIC_BASE_URL.replace(/\/$/, "")}${tmpPath.startsWith("/") ? tmpPath : `/${tmpPath}`}`;
+
+          console.log(`🌐 Rehosted image (public) → ${rehostedUrl}`);
         } else {
           rehostedUrl = draftImage;
         }
+
       } catch (err) {
-        console.error("⚠️ Failed to rehost Twilio media:", err.message);
-        rehostedUrl = draft?.image_url || null; // fallback
+        console.error("❌ Image rehost failed:", err.message);
+        throw err; // STOP publish — IG requires public HTTPS
+      }
+
+
+      // 🔒 ALWAYS reload salon from DB to guarantee FB token exists
+      const salonRow = db.prepare(`
+        SELECT facebook_page_id, facebook_page_token, slug, id
+        FROM salons
+        WHERE id = ? OR slug = ?
+      `).get(
+        salon?.salon_id || salon?.id,
+        salon?.salon_id || salon?.id
+      );
+
+      if (!salonRow?.facebook_page_token) {
+        throw new Error("Missing Facebook access token in DB for salon");
       }
 
       // ✅ Publish to Facebook first
-      fbResult = await publishToFacebook(pageId, fbCaption, rehostedUrl);
+      fbResult = await publishToFacebook(
+        {
+          facebook_page_id: salonRow.facebook_page_id,
+          facebook_page_token: salonRow.facebook_page_token,
+          slug: salonRow.slug,
+          id: salonRow.id
+        },
+        fbCaption,
+        rehostedUrl
+      );
+
 
       // Define fbLink *before* logging or sending messages
       const fbLink =
@@ -864,41 +996,16 @@ export async function handleIncomingMessage({
         `✅ *Approved and posted!*\n\n${fbCaption}\n\n${fbLink}`
       );
 
-      // ✅ Optional IG Publish (if enabled)
-      const IG_ENABLED = (process.env.PUBLISH_TO_INSTAGRAM || "false").toLowerCase() === "true";
-      if (IG_ENABLED) {
-        try {
-          let imageForIg = rehostedUrl || resolveImageUrl(null, draft);
+      const imageForIg = rehostedUrl;
 
-          if (imageForIg && imageForIg.includes("api.twilio.com")) {
-            console.log(`📸 Rehosted image for Instagram → ${imageForIg}`);
-            imageForIg = await rehostTwilioMedia(imageForIg, salon_id);
-          }
+      // ✅ Instagram MUST use the SAME public HTTPS image as Facebook
+      console.log("📷 IG FINAL IMAGE URL:", rehostedUrl);
 
-          if (imageForIg) {
-            const igResult = await publishToInstagram({
-              imageUrl: imageForIg,
-              caption: igCaption,
-              postId: fbResult?.id || undefined,
-            });
-
-            await sendMessage.sendText(
-              chatId,
-              igResult?.media_id
-                ? `📸 Instagram post (id: ${igResult.media_id})`
-                : "📸 Instagram post created."
-            );
-          } else {
-            console.warn("⚠️ No imageUrl found for IG in direct-post path; skipping Instagram.");
-          }
-        } catch (igErr) {
-          console.error("🚫 Instagram publish failed:", igErr);
-          await sendMessage.sendText(
-            chatId,
-            "⚠️ Instagram publish failed (check server logs)."
-          );
-        }
-      }
+      await publishToInstagram({
+        salon_id: igSalonId,
+        caption: igCaption,
+        imageUrl: rehostedUrl
+      });
 
       drafts.delete(chatId);
     } catch (err) {
@@ -944,10 +1051,15 @@ export async function handleIncomingMessage({
 
     await sendMessage.sendText(chatId, "🔄 Regenerating a fresh caption...");
     try {
+      // ✅ Hydrate salon exactly like initial flow
+      const fullSalon = getSalonPolicy(
+        salon?.slug || salon?.salon_id || salon?.id
+      );
+
       const aiJson = await generateCaption({
         imageDataUrl: draft.image_url,
         notes: draft.original_notes || "",
-        salon,
+        salon: fullSalon,
         stylist,
         city: stylist?.city || ""
       });
@@ -964,7 +1076,7 @@ export async function handleIncomingMessage({
         instagramHandle: null,
         stylistName: getStylistName(stylist),
         bookingUrl: bookingUrlR,
-        salon,
+        salon: fullSalon,
         asHtml: false
       });
 
@@ -972,12 +1084,12 @@ export async function handleIncomingMessage({
       const regenPreview = buildFacebookCaption(regenBase, getStylistName(stylist), getStylistHandle(stylist));
 
       const preview = `
-💇‍♀️ *MostlyPostly Preview (Regenerated)*
+      💇‍♀️ *MostlyPostly Preview (Regenerated)*
 
-${regenPreview}
+      ${regenPreview}
 
-Reply *APPROVE* to continue, *REGENERATE*, or *CANCEL* to start over.
-`.trim();
+      Reply *APPROVE* to continue, *REGENERATE*, or *CANCEL* to start over.
+      `.trim();
 
       await sendMessage.sendText(chatId, preview);
     } catch (err) {
@@ -1056,12 +1168,13 @@ async function handleManagerApproval(managerIdentifier, pendingPost, sendText) {
     db.prepare(`
       UPDATE posts
       SET status='manager_approved',
-          scheduled_for=datetime('now'),
           approved_by=?,
           approved_at=datetime('now')
       WHERE id=?`).run(managerIdentifier, pendingPost.id);
 
-    await sendText(managerIdentifier, "✅ Approved — your post will be auto-published in the next available slot.");
+    enqueuePost(pendingPost);
+
+    await sendText(managerIdentifier, "✅ Approved — your post will be scheduled automatically using your businesses posting rules.");
     await sendText(pendingPost.stylist_phone, "✅ Manager approved your post! It’s queued for publishing soon.");
 
     console.log(`🕓 Manager SMS approval queued post ${pendingPost.id} for scheduler.`);
@@ -1070,3 +1183,4 @@ async function handleManagerApproval(managerIdentifier, pendingPost, sendText) {
     await sendText(managerIdentifier, "⚠️ Could not schedule this post. Try again later.");
   }
 }
+export { handleManagerApproval };

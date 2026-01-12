@@ -138,5 +138,343 @@
     "original_notes": "balayage",
     "instagram_handle": "irontman72",
     "booking_url": "https://booking.rejuvesalonandspa.com/webstoreNew/services?utm_source=rejuvesalonandspa.com&utm_medium=website&utm_campaign=newToRejuve_page"
+  },
+  {
+    "id": "d7175932-d21c-4b1b-9860-0b699d5ae6ca",
+    "salon": "Studio 500 Salon",
+    "stylist_name": "Troy (Test Stylist)",
+    "stylist_phone": "8483384005",
+    "service_type": "balayage",
+    "base_caption": "Illuminate your locks with a stunning balayage that brings out all the right tones. This effortless look is perfect for adding dimension and a sun-kissed vibe to your style!\n\nStyled by @studio500salonllc\n\n#balayage #hairgoals #sunshine #MostlyPostly\n\nTransform your look today!\n\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "final_caption": "Illuminate your locks with a stunning balayage that brings out all the right tones. This effortless look is perfect for adding dimension and a sun-kissed vibe to your style!\n​\nStyled by Troy (Test Stylist)\n​\n#balayage #hairgoals #sunshine #MostlyPostly\n​\nTransform your look today!\n​\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "hashtags": [
+      "#balayage",
+      "#hairgoals",
+      "#sunshine",
+      "#MostlyPostly"
+    ],
+    "cta": "Transform your look today!",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_32.jpg",
+    "status": "manager_pending",
+    "created_at": "2025-12-24T15:31:48.675Z",
+    "updated_at": "2025-12-24T15:31:48.680Z",
+    "caption": "Illuminate your locks with a stunning balayage that brings out all the right tones. This effortless look is perfect for adding dimension and a sun-kissed vibe to your style!",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "balayage",
+    "instagram_handle": null,
+    "booking_url": "https://www.vagaro.com/studio500salon/book-now"
+  },
+  {
+    "id": "a622fd6c-ba03-4874-88d0-275e87a4a7db",
+    "salon": "Studio 500 Salon",
+    "stylist_name": "Troy (Test Stylist)",
+    "stylist_phone": "8483384005",
+    "service_type": "balayage and haircut",
+    "base_caption": "Elevate your look with a stunning balayage that adds depth and dimension to your style! Pair that with a fresh haircut for the ultimate vibe. ✨\n\nStyled by @studio500salonllc\n\n#balayage #haircut #hairgoals #SalonLife #MostlyPostly\n\nBook your next visit today!\n\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "final_caption": "Elevate your look with a stunning balayage that adds depth and dimension to your style! Pair that with a fresh haircut for the ultimate vibe. ✨\n​\nStyled by Troy (Test Stylist)\n​\n#balayage #haircut #hairgoals #SalonLife #MostlyPostly\n​\nBook your next visit today!\n​\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "hashtags": [
+      "#balayage",
+      "#haircut",
+      "#hairgoals",
+      "#SalonLife",
+      "#MostlyPostly"
+    ],
+    "cta": "Book your next visit today!",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_32.jpg",
+    "status": "manager_pending",
+    "created_at": "2025-12-24T18:20:45.545Z",
+    "updated_at": "2025-12-24T18:20:45.549Z",
+    "caption": "Elevate your look with a stunning balayage that adds depth and dimension to your style! Pair that with a fresh haircut for the ultimate vibe. ✨",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "beautiful balayage and haircut",
+    "instagram_handle": null,
+    "booking_url": "https://www.vagaro.com/studio500salon/book-now"
+  },
+  {
+    "id": "4ac45c79-9da9-4a29-a882-02d6f9325f48",
+    "salon": "Studio 500 Salon",
+    "stylist_name": "Troy (Test Stylist)",
+    "stylist_phone": "8483384005",
+    "service_type": "balayage",
+    "base_caption": "Elevate your look with a stunning green balayage that's sure to turn heads! Embrace the vibrant shades and let your hair express your unique style. 🌿✨\n\nStyled by @studio500salonllc\n\n#Balayage #GreenHair #HairGoals #MostlyPostly\n\nBook your transformation today!\n\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "final_caption": "Elevate your look with a stunning green balayage that's sure to turn heads! Embrace the vibrant shades and let your hair express your unique style. 🌿✨\n​\nStyled by Troy (Test Stylist)\n​\n#Balayage #GreenHair #HairGoals #MostlyPostly\n​\nBook your transformation today!\n​\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "hashtags": [
+      "#Balayage",
+      "#GreenHair",
+      "#HairGoals",
+      "#MostlyPostly"
+    ],
+    "cta": "Book your transformation today!",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_32.jpg",
+    "status": "manager_pending",
+    "created_at": "2025-12-24T18:26:53.217Z",
+    "updated_at": "2025-12-24T18:26:53.220Z",
+    "caption": "Elevate your look with a stunning green balayage that's sure to turn heads! Embrace the vibrant shades and let your hair express your unique style. 🌿✨",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "green balayage",
+    "instagram_handle": null,
+    "booking_url": "https://www.vagaro.com/studio500salon/book-now"
+  },
+  {
+    "id": "611005e2-6398-4794-b1a1-d73806fb87c7",
+    "salon": "Studio 500 Salon",
+    "stylist_name": "Troy (Test Stylist)",
+    "stylist_phone": "8483384005",
+    "service_type": "balayage",
+    "base_caption": "Transform your look with a stunning balayage that adds depth and dimension! Perfect for a sun-kissed vibe all year round. ✨\n\nStyled by @studio500salonllc\n\n#balayage #hairgoals #hairinspo #MostlyPostly\n\nReady to elevate your style?\n\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "final_caption": "Transform your look with a stunning balayage that adds depth and dimension! Perfect for a sun-kissed vibe all year round. ✨\n​\nStyled by Troy (Test Stylist)\n​\n#balayage #hairgoals #hairinspo #MostlyPostly\n​\nReady to elevate your style?\n​\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "hashtags": [
+      "#balayage",
+      "#hairgoals",
+      "#hairinspo",
+      "#MostlyPostly"
+    ],
+    "cta": "Ready to elevate your style?",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_32.jpg",
+    "status": "manager_pending",
+    "created_at": "2025-12-24T18:44:20.676Z",
+    "updated_at": "2025-12-24T18:44:20.680Z",
+    "caption": "Transform your look with a stunning balayage that adds depth and dimension! Perfect for a sun-kissed vibe all year round. ✨",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "balayage",
+    "instagram_handle": null,
+    "booking_url": "https://www.vagaro.com/studio500salon/book-now"
+  },
+  {
+    "id": "1fa596d6-721f-4573-9dab-328631242d8d",
+    "salon": "Studio 500 Salon",
+    "stylist_name": "Troy (Test Stylist)",
+    "stylist_phone": "8483384005",
+    "service_type": "balayage",
+    "base_caption": "Elevate your hair game with a stunning balayage! This effortless blend of shades creates a beautiful, sun-kissed look that’s perfect for any season. Shine bright and let your hair do the talking! 🌟\n\nStyled by @studio500salonllc\n\n#Balayage #HairGoals #SunKissed #MostlyPostly\n\nEmbrace the glow!\n\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "final_caption": "Elevate your hair game with a stunning balayage! This effortless blend of shades creates a beautiful, sun-kissed look that’s perfect for any season. Shine bright and let your hair do the talking! 🌟\n​\nStyled by Troy (Test Stylist)\n​\n#Balayage #HairGoals #SunKissed #MostlyPostly\n​\nEmbrace the glow!\n​\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "hashtags": [
+      "#Balayage",
+      "#HairGoals",
+      "#SunKissed",
+      "#MostlyPostly"
+    ],
+    "cta": "Embrace the glow!",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_32.jpg",
+    "status": "manager_pending",
+    "created_at": "2025-12-24T18:45:07.145Z",
+    "updated_at": "2025-12-24T18:45:07.148Z",
+    "caption": "Elevate your hair game with a stunning balayage! This effortless blend of shades creates a beautiful, sun-kissed look that’s perfect for any season. Shine bright and let your hair do the talking! 🌟",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "balayage 2",
+    "instagram_handle": null,
+    "booking_url": "https://www.vagaro.com/studio500salon/book-now"
+  },
+  {
+    "id": "b0a0274a-662c-4b65-b85a-eab7345590f6",
+    "salon": "Studio 500 Salon",
+    "stylist_name": "Troy (Test Stylist)",
+    "stylist_phone": "8483384005",
+    "service_type": "blonde balayage",
+    "base_caption": "Illuminate your look with a stunning blonde balayage! This effortless blend of light and dimension brings out your inner glow and elevates your style to new heights. ✨\n\nStyled by @studio500salonllc\n\n#blondebalayage #hairgoals #glowup #MostlyPostly\n\nVisit us to achieve your dream hair!\n\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "final_caption": "Illuminate your look with a stunning blonde balayage! This effortless blend of light and dimension brings out your inner glow and elevates your style to new heights. ✨\n​\nStyled by Troy (Test Stylist)\n​\n#blondebalayage #hairgoals #glowup #MostlyPostly\n​\nVisit us to achieve your dream hair!\n​\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "hashtags": [
+      "#blondebalayage",
+      "#hairgoals",
+      "#glowup",
+      "#MostlyPostly"
+    ],
+    "cta": "Visit us to achieve your dream hair!",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_33.jpg",
+    "status": "manager_pending",
+    "created_at": "2026-01-11T20:04:46.686Z",
+    "updated_at": "2026-01-11T20:04:46.691Z",
+    "caption": "Illuminate your look with a stunning blonde balayage! This effortless blend of light and dimension brings out your inner glow and elevates your style to new heights. ✨",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "blonde balayage",
+    "instagram_handle": null,
+    "booking_url": "https://www.vagaro.com/studio500salon/book-now"
+  },
+  {
+    "id": "bdc47c34-b043-4868-9f9c-c8b94940e0ad",
+    "salon": "Studio 500 Salon",
+    "stylist_name": "Troy (Test Stylist)",
+    "stylist_phone": "8483384005",
+    "service_type": "Blonde Highlights",
+    "base_caption": "Brighten up your look with stunning blonde highlights that add dimension and a sun-kissed glow. Embrace the season with a fresh new vibe!\n\nStyled by @studio500salonllc\n\n#BlondeHighlights #HairGoals #SalonVibes #MostlyPostly\n\nCome in and elevate your hair game!\n\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "final_caption": "Brighten up your look with stunning blonde highlights that add dimension and a sun-kissed glow. Embrace the season with a fresh new vibe!\n​\nStyled by Troy (Test Stylist)\n​\n#BlondeHighlights #HairGoals #SalonVibes #MostlyPostly\n​\nCome in and elevate your hair game!\n​\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "hashtags": [
+      "#BlondeHighlights",
+      "#HairGoals",
+      "#SalonVibes",
+      "#MostlyPostly"
+    ],
+    "cta": "Come in and elevate your hair game!",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_33.jpg",
+    "status": "manager_pending",
+    "created_at": "2026-01-11T20:21:16.384Z",
+    "updated_at": "2026-01-11T20:21:16.386Z",
+    "caption": "Brighten up your look with stunning blonde highlights that add dimension and a sun-kissed glow. Embrace the season with a fresh new vibe!",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "Blonde highlights",
+    "instagram_handle": null,
+    "booking_url": "https://www.vagaro.com/studio500salon/book-now"
+  },
+  {
+    "id": "1aad7281-5f1b-4856-a9a9-168aac93cd3e",
+    "salon": "Studio 500 Salon",
+    "stylist_name": "Troy (Test Stylist)",
+    "stylist_phone": "8483384005",
+    "service_type": "balayage",
+    "base_caption": "Illuminate your look with a beautiful balayage! This effortless blend of color adds dimension and radiance to your hair, creating a sun-kissed vibe that's perfect for any season. ✨\n\nStyled by @studio500salonllc\n\n#balayage #hairgoals #hairtransformation #MostlyPostly\n\nReady to shine? Let us create your perfect look!\n\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "final_caption": "Illuminate your look with a beautiful balayage! This effortless blend of color adds dimension and radiance to your hair, creating a sun-kissed vibe that's perfect for any season. ✨\n​\nStyled by Troy (Test Stylist)\n​\n#balayage #hairgoals #hairtransformation #MostlyPostly\n​\nReady to shine? Let us create your perfect look!\n​\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "hashtags": [
+      "#balayage",
+      "#hairgoals",
+      "#hairtransformation",
+      "#MostlyPostly"
+    ],
+    "cta": "Ready to shine? Let us create your perfect look!",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_33.jpg",
+    "status": "manager_pending",
+    "created_at": "2026-01-11T20:39:30.745Z",
+    "updated_at": "2026-01-11T20:39:30.749Z",
+    "caption": "Illuminate your look with a beautiful balayage! This effortless blend of color adds dimension and radiance to your hair, creating a sun-kissed vibe that's perfect for any season. ✨",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "balayage",
+    "instagram_handle": null,
+    "booking_url": "https://www.vagaro.com/studio500salon/book-now"
+  },
+  {
+    "id": "e1dab206-efbf-4b58-ad7a-aeb9c1af1204",
+    "salon": "Studio 500 Salon",
+    "stylist_name": "Troy (Test Stylist)",
+    "stylist_phone": "8483384005",
+    "service_type": "balayage",
+    "base_caption": "Brighten up your look with a stunning blonde balayage! This effortless style adds dimension and radiance to your hair, making every day feel like a sun-kissed moment. ✨\n\nStyled by @studio500salonllc\n\n#BlondeBalayage #HairGoals #SalonLife #MostlyPostly\n\nTransform your locks today!\n\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "final_caption": "Brighten up your look with a stunning blonde balayage! This effortless style adds dimension and radiance to your hair, making every day feel like a sun-kissed moment. ✨\n​\nStyled by Troy (Test Stylist)\n​\n#BlondeBalayage #HairGoals #SalonLife #MostlyPostly\n​\nTransform your locks today!\n​\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "hashtags": [
+      "#BlondeBalayage",
+      "#HairGoals",
+      "#SalonLife",
+      "#MostlyPostly"
+    ],
+    "cta": "Transform your locks today!",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_33.jpg",
+    "status": "manager_pending",
+    "created_at": "2026-01-11T20:40:27.545Z",
+    "updated_at": "2026-01-11T20:40:27.548Z",
+    "caption": "Brighten up your look with a stunning blonde balayage! This effortless style adds dimension and radiance to your hair, making every day feel like a sun-kissed moment. ✨",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "bright blonde balayage",
+    "instagram_handle": null,
+    "booking_url": "https://www.vagaro.com/studio500salon/book-now"
+  },
+  {
+    "id": "5aa3710e-e477-4fa4-b752-fd6120ba681f",
+    "salon": "Studio 500 Salon",
+    "stylist_name": "Troy (Test Stylist)",
+    "stylist_phone": "8483384005",
+    "service_type": "balayage",
+    "base_caption": "Sun-kissed vibes and effortless radiance! 🌞✨ Elevate your look with a stunning balayage that dances with light. Are you ready to shine? ",
+    "final_caption": "Sun-kissed vibes and effortless radiance! 🌞✨ Elevate your look with a stunning balayage that dances with light. Are you ready to shine?\n​\nStyled by Troy (Test Stylist)\n​\n#Balayage #HairGoals #SunKissed #HairVibes #MostlyPostly\n​\nBook your transformation today!\n​\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "hashtags": [
+      "#Balayage",
+      "#HairGoals",
+      "#SunKissed",
+      "#HairVibes",
+      "#MostlyPostly"
+    ],
+    "cta": "Book your transformation today!",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_33.jpg",
+    "status": "manager_pending",
+    "created_at": "2026-01-12T02:10:42.051Z",
+    "updated_at": "2026-01-12T02:10:42.056Z",
+    "caption": "Sun-kissed vibes and effortless radiance! 🌞✨ Elevate your look with a stunning balayage that dances with light. Are you ready to shine? ",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "balayage",
+    "instagram_handle": null,
+    "booking_url": "https://www.vagaro.com/studio500salon/book-now"
+  },
+  {
+    "id": "19478065-4cb7-4cd9-a1b0-0b7d999b9a12",
+    "salon": "Studio 500 Salon",
+    "stylist_name": "Troy (Test Stylist)",
+    "stylist_phone": "8483384005",
+    "service_type": "balayage",
+    "base_caption": "Sun-kissed strands and effortless vibes! Let your hair shine with a radiant balayage that brings out your inner glow. ✨",
+    "final_caption": "Sun-kissed strands and effortless vibes! Let your hair shine with a radiant balayage that brings out your inner glow. ✨\n​\nStyled by Troy (Test Stylist)\n​\n#balayage #hairgoals #glowup #MostlyPostly\n​\nElevate your look today!\n​\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "hashtags": [
+      "#balayage",
+      "#hairgoals",
+      "#glowup",
+      "#MostlyPostly"
+    ],
+    "cta": "Elevate your look today!",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_33.jpg",
+    "status": "manager_pending",
+    "created_at": "2026-01-12T02:18:58.398Z",
+    "updated_at": "2026-01-12T02:18:58.402Z",
+    "caption": "Sun-kissed strands and effortless vibes! Let your hair shine with a radiant balayage that brings out your inner glow. ✨",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "balayage",
+    "instagram_handle": null,
+    "booking_url": "https://www.vagaro.com/studio500salon/book-now"
+  },
+  {
+    "id": "7dd2ae77-bfcb-4705-9aff-11d1123964fe",
+    "salon": "Studio 500 Salon",
+    "stylist_name": "Troy (Test Stylist)",
+    "stylist_phone": "8483384005",
+    "service_type": "balayage",
+    "base_caption": "Sun-kissed, effortlessly chic, and oh-so-bomb! Balayage is the ultimate way to brighten up your look while keeping that natural vibe. Ready to glow? 🌟\n\nStyled by @studio500salonllc\n\n#Balayage #HairGoals #GlowUp #MostlyPostly #Testing #AvedaSalon #CarmelSalon\n\nBook your balayage transformation today!\n\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "final_caption": "Sun-kissed, effortlessly chic, and oh-so-bomb! Balayage is the ultimate way to brighten up your look while keeping that natural vibe. Ready to glow? 🌟\n​\nStyled by Troy (Test Stylist)\n​\n#Balayage #HairGoals #GlowUp #MostlyPostly #Testing #AvedaSalon #CarmelSalon\n​\nBook your balayage transformation today!\n​\nBook: https://www.vagaro.com/studio500salon/book-now",
+    "hashtags": [
+      "#Balayage",
+      "#HairGoals",
+      "#GlowUp",
+      "#MostlyPostly"
+    ],
+    "cta": "Book your balayage transformation today!",
+    "image_url": "https://api.telegram.org/file/bot8240184548:AAHjIJHuT7GbEoNU_boCwQxJ6j8zTGY2bUI/photos/file_33.jpg",
+    "status": "manager_pending",
+    "created_at": "2026-01-12T02:24:16.457Z",
+    "updated_at": "2026-01-12T02:24:16.462Z",
+    "caption": "Sun-kissed, effortlessly chic, and oh-so-bomb! Balayage is the ultimate way to brighten up your look while keeping that natural vibe. Ready to glow? 🌟",
+    "_classification": {
+      "content_type": "feed_photo",
+      "confidence": 0.85
+    },
+    "original_notes": "balayage",
+    "instagram_handle": null,
+    "booking_url": "https://www.vagaro.com/studio500salon/book-now"
   }
 ]

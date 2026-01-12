@@ -16,7 +16,7 @@ fs.mkdirSync(PUBLIC_DIR, { recursive: true });
  */
 export async function rehostTwilioMedia(twilioUrl, salon_id = "") {
   if (!/^https:\/\/api\.twilio\.com/i.test(twilioUrl)) {
-    console.log(`✅ [${solon_id || "global"}] Already public:`, twilioUrl);
+    console.log(`✅ [${salon_id || "global"}] Already public:`, twilioUrl);
     return twilioUrl;
   }
 

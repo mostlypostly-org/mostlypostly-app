@@ -4,6 +4,7 @@ import { db } from "../../db.js";
 import pageShell from "../ui/pageShell.js";
 import { DateTime } from "luxon";
 import { getSalonName } from "../core/salonLookup.js";
+import { handleManagerApproval } from "../core/messageRouter.js";
 
 const router = express.Router();
 
@@ -49,18 +50,19 @@ router.get("/", requireAuth, (req, res) => {
     .prepare(
       `SELECT *
        FROM posts
-       WHERE salon_id = ? AND status = 'pending'
+       WHERE salon_id = ? AND status = 'manager_pending'
        ORDER BY created_at DESC`
     )
     .all(salon_id);
 
-  // Fetch recent (all except pending)
+  // Fetch recent (all except manager_pending)
   const recent = db
     .prepare(
       `SELECT *
-       FROM posts
-       WHERE salon_id = ?
-       ORDER BY created_at DESC
+        FROM posts
+        WHERE salon_id = ?
+          AND status NOT IN ('manager_pending')
+        ORDER BY created_at DESC
        LIMIT 25`
     )
     .all(salon_id);
@@ -123,11 +125,6 @@ router.get("/", requireAuth, (req, res) => {
                     Edit
                   </a>
 
-                  <a href="/manager/cancel?post=${p.id}"
-                     class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-white">
-                    Cancel
-                  </a>
-
                   <a href="/manager/deny?post=${p.id}"
                      class="px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded text-xs text-white">
                     Deny
@@ -145,37 +142,50 @@ router.get("/", requireAuth, (req, res) => {
      RECENT CARDS — exact old simple list
   ------------------------------------------------------------- */
   const recentCards =
-    recent.length === 0
-      ? `<p class="text-slate-300 text-sm">No recent activity.</p>`
-      : recent
-          .map((p) => {
-            const caption = (p.final_caption || p.caption || "")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")
-              .replace(/\n/g, "<br/>");
+  recent.length === 0
+    ? `<div class="text-slate-500 text-sm italic">No recent posts.</div>`
+    : recent.map((p) => {
+        const caption = (p.final_caption || p.caption || "")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\n/g, "<br/>");
 
-            return `
-        <div class="rounded-xl bg-slate-900 border border-slate-800 p-4 mb-4">
-          <div class="flex gap-4">
-            <img
-              src="${p.image_url}"
-              class="w-24 h-24 rounded-lg object-cover border border-slate-700"
-            />
+          return `
+          <div class="recent-card rounded-xl bg-slate-900 border border-slate-800 p-4 mb-4">
 
-            <div class="flex-1">
-              <p class="text-xs text-slate-400">
-                Status: ${p.status || "—"} • Post #${p.salon_post_number || "—"}
-              </p>
-              <p class="text-xs text-slate-500 mb-2">${fmt(p.created_at)}</p>
+            <div class="flex gap-4">
+              <img
+                src="${p.image_url}"
+                class="w-24 h-24 rounded-lg object-cover border border-slate-700"
+              />
 
-              <p class="text-sm text-slate-200 whitespace-pre-line leading-relaxed">
-                ${caption}
-              </p>
+              <div class="flex-1">
+
+                <p class="text-xs text-slate-400">
+                  Status: <span class="font-semibold">${p.status}</span> • Post #${p.salon_post_number || "—"}
+                </p>
+                <p class="text-xs text-slate-500 mb-2">${fmt(p.created_at)}</p>
+
+                <!-- Collapsed Caption -->
+                <p class="text-sm text-slate-300 leading-relaxed line-clamp-2">
+                  ${caption.replace(/<br\/>/g, " ")}
+                </p>
+
+                <a href="#" class="text-xs text-blue-400 hover:underline"
+                  onclick="this.closest('.recent-card').querySelector('.full-caption').classList.toggle('hidden'); return false;">
+                  Show more
+                </a>
+
+                <!-- Expanded Caption -->
+                <div class="full-caption hidden mt-2 text-sm text-slate-200 whitespace-pre-line leading-relaxed">
+                  ${caption}
+                </div>
+
+              </div>
             </div>
           </div>
-        </div>`;
-          })
-          .join("");
+                `;
+              }).join("");
 
   /* -------------------------------------------------------------
      PAGE BODY (old layout)
@@ -208,16 +218,35 @@ router.get("/", requireAuth, (req, res) => {
 /* -------------------------------------------------------------
    APPROVE
 ------------------------------------------------------------- */
-router.get("/approve", requireAuth, (req, res) => {
+router.get("/approve", requireAuth, async (req, res) => {
   const id = req.query.post;
-  if (id) {
-    db.prepare(
-      `UPDATE posts
-       SET status='approved',
-           updated_at=datetime('now')
-       WHERE id=?`
-    ).run(id);
+  if (!id) return res.redirect("/manager");
+
+  const pendingPost = db.prepare(`
+    SELECT *
+    FROM posts
+    WHERE id = ?
+      AND status = 'manager_pending'
+  `).get(id);
+
+  if (!pendingPost) {
+    console.warn("⚠️ Dashboard approve: post not found or not pending", id);
+    return res.redirect("/manager");
   }
+
+  // 🔑 This does EVERYTHING:s
+  // - status = manager_approved
+  // - scheduled_for = now
+  // - stylist notification
+  // - scheduler eligibility
+  await handleManagerApproval(
+    req.manager.phone || "dashboard",
+    pendingPost,
+    (to, msg) => {
+      console.log("📤 Dashboard approval notify:", to);
+    }
+  );
+
   return res.redirect("/manager");
 });
 
@@ -226,14 +255,18 @@ router.get("/approve", requireAuth, (req, res) => {
 ------------------------------------------------------------- */
 router.get("/post-now", requireAuth, (req, res) => {
   const id = req.query.post;
+
   if (id) {
-    db.prepare(
-      `UPDATE posts
-       SET status='publish_now',
-           updated_at=datetime('now')
-       WHERE id=?`
-    ).run(id);
+    db.prepare(`
+      UPDATE posts
+      SET
+        status = 'manager_approved',
+        scheduled_for = datetime('now'),
+        approved_at = datetime('now','utc')
+      WHERE id = ?
+    `).run(id);
   }
+
   return res.redirect("/manager");
 });
 
@@ -332,6 +365,10 @@ router.get("/edit/:id", requireAuth, (req, res) => {
           Save Changes
         </button>
       </form>
+        <a href="/manager?salon=${req.manager.salon_id}"
+          class="w-full block text-center bg-slate-700 hover:bg-slate-600 p-3 rounded-lg text-sm font-semibold text-white">
+          Cancel
+        </a>
     </div>
   `;
 
@@ -352,13 +389,22 @@ router.post("/edit/:id", requireAuth, (req, res) => {
   const id = req.params.id;
   const { caption } = req.body;
 
+  // Normalize caption to prevent spacing expansion issues
+  const cleaned = (caption || "")
+    .replace(/\r\n/g, "\n")     // Normalize Windows-style newlines
+    .replace(/\n{3,}/g, "\n\n") // Collapse 3+ blank lines into 1 blank line
+    .trim();
+
+  // Save cleaned caption
   db.prepare(
     `UPDATE posts
      SET final_caption = ?, updated_at=datetime('now')
      WHERE id = ?`
-  ).run(caption.trim(), id);
+  ).run(cleaned, id);
 
-  return res.redirect("/manager");
+  // Redirect back to manager for the appropriate salon
+  const salonSlug = req.manager?.salon_id || "";
+  return res.redirect(`/manager?salon=${salonSlug}`);
 });
 
 export default router;

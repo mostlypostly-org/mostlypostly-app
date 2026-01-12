@@ -1,6 +1,8 @@
 // =====================================================
 // Core imports
 // =====================================================
+import "./src/env.js";
+
 import fs from "fs";
 import bodyParser from "body-parser";
 import twilio from "twilio";
@@ -13,8 +15,6 @@ import express from "express";
 import session from "express-session";
 import path from "path";
 import { fileURLToPath } from "url";
-import dotenv from "dotenv";
-dotenv.config();
 
 // =====================================================
 // Load salons BEFORE routes (legacy JSON loader only)

@@ -28,8 +28,14 @@
     "auto_post_if_no_response_hours": 24,
     "notify_stylist_on_approval": true,
     "notify_stylist_on_denial": true,
-    "posting_window": { "start": "01:00", "end": "23:00" },
-    "random_delay_minutes": { "min": 20, "max": 45 }
+    "posting_window": {
+      "start": "01:00",
+      "end": "23:00"
+    },
+    "random_delay_minutes": {
+      "min": 20,
+      "max": 45
+    }
   },
   "managers": [
     {
@@ -47,10 +53,10 @@
       ],
       "consent": {
         "sms_opt_in": true,
-        "timestamp": "2025-10-29T15:00:00Z"
+        "timestamp": "2025-12-21T03:55:13.773Z"
       },
       "compliance_opt_in": true,
-      "compliance_timestamp": "2025-10-29T15:00:00Z"
+      "compliance_timestamp": "2025-12-21T03:55:13.773Z"
     }
   ],
   "stylists": [

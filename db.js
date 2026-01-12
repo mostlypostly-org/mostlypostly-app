@@ -123,6 +123,40 @@ try {
   }
 }
 
+// Ensure posts.denial_reason exists
+try { 
+  db.prepare("SELECT denial_reason FROM posts LIMIT 1").get(); 
+} catch (e) {
+  console.log("🧱 (db.js) added posts.denial_reason");
+  try {
+    db.prepare("ALTER TABLE posts ADD COLUMN denial_reason TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add posts.denial_reason:", err.message);
+  }
+}
+
+// Ensure salons.facebook_page_token exists
+try { db.prepare("SELECT facebook_page_token FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.facebook_page_token");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN facebook_page_token TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.facebook_page_token:", err.message);
+  }
+}
+
+// Ensure salons.instagram_business_id exists
+try { db.prepare("SELECT instagram_business_id FROM salons LIMIT 1").get(); }
+catch (e) {
+  console.log("🧱 (db.js) added salons.instagram_business_id");
+  try {
+    db.prepare("ALTER TABLE salons ADD COLUMN instagram_business_id TEXT").run();
+  } catch (err) {
+    console.warn("⚠️ Could not add salons.instagram_business_id:", err.message);
+  }
+}
+
 // =====================================================
 // Ensure remaining onboarding columns for salons
 // =====================================================

@@ -205,28 +205,30 @@ export function lookupStylist(identifier) {
   const phoneNorm = normalizePhone(idStr);
 
   // Try stylist by phone
+  // Try stylist by phone OR chat_id
   let row = db
     .prepare(
       `
-    SELECT 
-      s.id          AS stylist_id,
-      s.name        AS stylist_name,
-      s.phone       AS stylist_phone,
-      s.instagram_handle,
-      sl.slug       AS salon_slug,
-      sl.name       AS salon_name,
-      sl.booking_link,
-      sl.facebook_page_id,
-      sl.instagram_handle AS salon_instagram_handle,
-      sl.default_cta,
-      sl.booking_url
-    FROM stylists s
-    JOIN salons sl ON sl.id = s.salon_id
-    WHERE s.phone = ?
-    LIMIT 1
-  `
-    )
-    .get(phoneNorm);
+      SELECT 
+        s.id          AS stylist_id,
+        s.name        AS stylist_name,
+        s.phone       AS stylist_phone,
+        s.instagram_handle,
+        sl.slug       AS salon_slug,
+        sl.name       AS salon_name,
+        sl.booking_link,
+        sl.facebook_page_id,
+        sl.instagram_handle AS salon_instagram_handle,
+        sl.default_cta,
+        sl.booking_url
+      FROM stylists s
+      JOIN salons sl ON sl.slug = s.salon_id
+      WHERE s.phone = ?
+        OR CAST(s.chat_id AS TEXT) = ?
+      LIMIT 1
+    `
+    ).get(phoneNorm, idStr);
+
 
   let isManager = false;
 
@@ -247,12 +249,11 @@ export function lookupStylist(identifier) {
         sl.default_cta,
         sl.booking_url
       FROM managers m
-      JOIN salons sl ON sl.id = m.salon_id
-      WHERE m.phone = ?
+      JOIN salons sl ON sl.slug = m.salon_id
+      WHERE m.phone = ? OR CAST(m.chat_id AS TEXT) = ?
       LIMIT 1
     `
-      )
-      .get(phoneNorm);
+      ).get(phoneNorm, idStr);
 
     if (mgr) {
       row = mgr;
@@ -293,6 +294,65 @@ export function lookupStylist(identifier) {
     salon: { salon_id: row.salon_slug, salon_info },
   };
 }
+
+export function lookupStylistByChatId(chatId) {
+  const row = db
+    .prepare(
+      `
+      SELECT 
+        s.id          AS stylist_id,
+        s.name        AS stylist_name,
+        s.phone       AS stylist_phone,
+        s.instagram_handle,
+        sl.slug       AS salon_slug,
+        sl.name       AS salon_name,
+        sl.booking_link,
+        sl.facebook_page_id,
+        sl.instagram_handle AS salon_instagram_handle,
+        sl.default_cta,
+        sl.booking_url
+      FROM stylists s
+      JOIN salons sl ON sl.slug = s.salon_id
+      WHERE CAST(s.chat_id AS TEXT) = ?
+      LIMIT 1
+      `
+    )
+    .get(String(chatId));
+
+  if (!row) {
+    console.warn(`⚠️ No stylist found by chat_id ${chatId}`);
+    return null;
+  }
+
+  const salon_info = {
+    id: row.salon_slug,
+    slug: row.salon_slug,
+    name: row.salon_name,
+    salon_name: row.salon_name,
+    booking_url: row.booking_url || row.booking_link || null,
+    facebook_page_id: row.facebook_page_id || null,
+    instagram_handle: row.salon_instagram_handle || null,
+    default_cta: row.default_cta || "Book via link in bio.",
+  };
+
+  const stylist = {
+    id: row.stylist_id,
+    stylist_name: row.stylist_name,
+    name: row.stylist_name,
+    phone: row.stylist_phone,
+    instagram_handle: row.instagram_handle || null,
+    salon_id: row.salon_slug,
+    salon_name: row.salon_name,
+    salon_info,
+    role: "stylist",
+  };
+
+  return {
+    stylist,
+    salon: { salon_id: row.salon_slug, salon_info },
+  };
+}
+
 
 // Used by messageRouter for consent path
 export function getSalonByStylist(identifier) {

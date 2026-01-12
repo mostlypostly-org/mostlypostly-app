@@ -24,12 +24,16 @@ export default function onboardingGuard(req, res, next) {
   ) {
     return next();
   }
-  
+
   // Allow Twilio webhooks (PUBLIC)
   if (url.startsWith("/inbound/twilio")) {
     return next();
   }
 
+  // Allow Telegram webhooks (PUBLIC)
+if (url.startsWith("/inbound/telegram")) {
+  return next();
+}
 
   // Allow logout
   if (url.startsWith("/manager/logout")) return next();

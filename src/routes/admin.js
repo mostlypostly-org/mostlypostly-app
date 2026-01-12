@@ -211,6 +211,15 @@ dbStylists.forEach((s) => {
                 : "Not configured"
             }</dd>
           </div>
+          <div class="flex justify-between">
+            <dt class="text-zinc-400">Facebook Page Token</dt>
+            <dd>${salonRow.facebook_page_token ? "Stored ✓" : "Not configured"}</dd>
+          </div>
+
+          <div class="flex justify-between">
+            <dt class="text-zinc-400">Instagram Business ID</dt>
+            <dd>${salonRow.instagram_business_id || "Not configured"}</dd>
+          </div>
         </dl>
 
         <div class="mt-4">
@@ -433,6 +442,7 @@ dbStylists.forEach((s) => {
           data-city="${info.city}"
           data-state="${info.state}"
           data-website="${info.website}"
+          data-industry="${salonRow.industry || ""}"
           data-booking-url="${info.booking_url}"
           data-timezone="${info.timezone}"
           data-tone="${info.tone_profile}"

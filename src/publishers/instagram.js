@@ -1,11 +1,14 @@
 // src/publishers/instagram.js — multi-tenant + safe enhancements
+import "../env.js";
 import fetch from "node-fetch";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { rehostTwilioMedia } from "../utils/rehostTwilioMedia.js";
-import { getSalonPolicy } from "../scheduler.js";
 import { logEvent } from "../core/analyticsDb.js";
+import { db } from "../../db.js";
+
+console.log("🌍 PUBLIC_BASE_URL =", process.env.PUBLIC_BASE_URL);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,15 +16,20 @@ const __dirname = path.dirname(__filename);
 const DEFAULT_GRAPH_VER = process.env.FB_GRAPH_VERSION || "v24.0";
 const DEFAULT_IG_USER_ID = process.env.INSTAGRAM_USER_ID;
 const DEFAULT_FB_TOKEN = process.env.FACEBOOK_GRAPH_TOKEN;
+
 const IG_MEDIA_MAX_WAIT_MS = Number(process.env.IG_MEDIA_MAX_WAIT_MS || 30000);
 const IG_MEDIA_POLL_INTERVAL_MS = Number(
   process.env.IG_MEDIA_POLL_INTERVAL_MS || 1500
 );
 
-const HOST_BASE =
-  process.env.PUBLIC_BASE_URL ||
-  process.env.HOST ||
-  `http://localhost:${process.env.PORT || 3000}`;
+const HOST_BASE = process.env.PUBLIC_BASE_URL;
+
+if (!HOST_BASE) {
+  throw new Error(
+    "PUBLIC_BASE_URL is required for Instagram publishing (ngrok or production URL)"
+  );
+}
+
 const PUBLIC_DIR =
   process.env.PUBLIC_DIR || path.resolve(process.cwd(), "public");
 
@@ -33,35 +41,24 @@ async function saveToPublic(jpgBuffer, filenameBase = Date.now().toString()) {
   return `${HOST_BASE}/public/${fileName}`;
 }
 
-/**
- * Ensure we have a publicly accessible image URL.
- * - Twilio MMS → rehost via rehostTwilioMedia (per-salon)
- * - Telegram files → mirror into /public
- * - Already public URLs → pass through
- */
 async function ensurePublicImage(imageUrl, nameHint, salonId) {
   if (!imageUrl) throw new Error("Missing imageUrl");
 
-  // Twilio-hosted MMS: rehost to our public CDN
   if (/^https:\/\/api\.twilio\.com\//i.test(imageUrl)) {
     console.log("🔄 [Instagram] Rehosting Twilio image…");
     return await rehostTwilioMedia(imageUrl, salonId || null);
   }
 
-  // Telegram direct file: fetch and mirror into /public
   if (/^https:\/\/api\.telegram\.org\/file\//i.test(imageUrl)) {
     const resp = await fetch(imageUrl);
     if (!resp.ok)
       throw new Error(`Telegram file fetch failed (${resp.status})`);
-    const arr = await resp.arrayBuffer();
-    const buf = Buffer.from(arr);
+    const buf = Buffer.from(await resp.arrayBuffer());
     if (buf.length < 1000)
       throw new Error("Downloaded image appears empty (size < 1KB).");
-    const publicUrl = await saveToPublic(buf, nameHint);
-    return publicUrl;
+    return await saveToPublic(buf, nameHint);
   }
 
-  // Already public
   return imageUrl;
 }
 
@@ -74,10 +71,11 @@ async function createIgMedia({ userId, imageUrl, caption, token, graphVer }) {
   });
   const resp = await fetch(url, { method: "POST", body: params });
   const data = await resp.json();
-  if (!resp.ok || !data?.id)
+  if (!resp.ok || !data?.id) {
     throw new Error(
       `IG media create failed: ${resp.status} ${JSON.stringify(data)}`
     );
+  }
   return data.id;
 }
 
@@ -89,12 +87,12 @@ async function waitForContainer(creationId, token, graphVer) {
     )}`;
     const resp = await fetch(url);
     const data = await resp.json();
-    const status = data?.status_code || "UNKNOWN";
-    if (status === "FINISHED") return true;
-    if (status === "ERROR") throw new Error("IG container ERROR status");
+    if (data?.status_code === "FINISHED") return;
+    if (data?.status_code === "ERROR")
+      throw new Error("IG container ERROR status");
     await new Promise((r) => setTimeout(r, IG_MEDIA_POLL_INTERVAL_MS));
   }
-  throw new Error("Timed out waiting for IG container to finish.");
+  throw new Error("Timed out waiting for IG container.");
 }
 
 async function publishContainer(creationId, userId, token, graphVer) {
@@ -105,14 +103,14 @@ async function publishContainer(creationId, userId, token, graphVer) {
   });
   const resp = await fetch(url, { method: "POST", body: params });
   const data = await resp.json();
-  if (!resp.ok || !data?.id)
+  if (!resp.ok || !data?.id) {
     throw new Error(
       `IG media publish failed: ${resp.status} ${JSON.stringify(data)}`
     );
+  }
   return data;
 }
 
-// tiny retry wrapper (non-breaking)
 async function retryIg(fn, label, retries = 2, delayMs = 1500) {
   let lastErr;
   for (let i = 0; i <= retries; i++) {
@@ -133,66 +131,51 @@ async function retryIg(fn, label, retries = 2, delayMs = 1500) {
 
 /**
  * publishToInstagram({ salon_id, caption, imageUrl })
- * - Uses salon-specific credentials when available; falls back to env.
  */
 export async function publishToInstagram(input) {
   const { salon_id, caption, imageUrl } = input;
-  console.log(
-    `📷 [Instagram] Start publish for salon_id=${salon_id || "global"}`
+
+  if (!salon_id || salon_id === "global") {
+    throw new Error("Instagram publish called without a valid salon_id");
+  }
+
+  console.log(`📷 [Instagram] Start publish for salon_id=${salon_id}`);
+
+  // -------------------------------------------------------
+  // Caption normalization (UNCHANGED)
+  // -------------------------------------------------------
+  let igCaption = (caption || "").trim();
+
+  igCaption = igCaption.replace(
+    /<a[^>]*href="https?:\/\/instagram\.com\/([^"]+)"[^>]*>@[^<]+<\/a>/gi,
+    "@$1"
   );
 
-    // -------------------------------------------------------
-    // Instagram Caption Rules
-    // -------------------------------------------------------
-    // - Convert HTML IG handle links → @handle
-    // - Always include "Book via link in bio."
-    let igCaption = (caption || "").trim();
+  igCaption = igCaption.replace(/https?:\/\/\S+/gi, "").trim();
 
-    // Convert any HTML Instagram profile link to plain @handle
-    igCaption = igCaption.replace(
-      /<a[^>]*href="https?:\/\/instagram\.com\/([^"]+)"[^>]*>@[^<]+<\/a>/gi,
-      "@$1"
-    );
+  if (!/book via link in bio/i.test(igCaption)) {
+    igCaption += (igCaption ? "\n\n" : "") + "Book via link in bio.";
+  }
 
-    // Strip ALL URLs (after fixing IG handle)
-    igCaption = igCaption.replace(/https?:\/\/\S+/gi, "").trim();
+  // -------------------------------------------------------
+  // DB-based credential resolution (FIXED)
+  // -------------------------------------------------------
+  const salonRow = db
+    .prepare(
+      `
+    SELECT
+      instagram_business_id,
+      facebook_page_token
+    FROM salons
+    WHERE id = ? OR slug = ?
+    LIMIT 1
+  `
+    )
+    .get(salon_id, salon_id);
 
-    // Ensure CTA exists
-    if (!/book via link in bio/i.test(igCaption)) {
-      igCaption += (igCaption ? "\n\n" : "") + "Book via link in bio.";
-    }
-
-
-  // Resolve salon config (JSON from /salons via getSalonPolicy)
-  const salonConfig = salon_id ? getSalonPolicy(salon_id) : {};
-  const salonInfo = salonConfig?.salon_info || {};
-
-  // Graph version: salon override → salon_info override → default
-  const graphVer =
-    salonConfig?.graph_version ||
-    salonInfo.graph_version ||
-    DEFAULT_GRAPH_VER;
-
-  // Instagram "user id" for Graph API:
-  // - Prefer salon-specific instagram_user_id
-  // - Then salon_info.instagram_business_id / instagram_biz_id
-  // - Then global env INSTAGRAM_USER_ID
-  const userId =
-    salonConfig?.instagram_user_id ||
-    salonInfo.instagram_user_id ||
-    salonInfo.instagram_business_id ||
-    salonInfo.instagram_biz_id ||
-    DEFAULT_IG_USER_ID;
-
-  // Access token:
-  // - Prefer salon-specific facebook_graph_token
-  // - Then salon_info.facebook_page_token
-  // - Then global env FACEBOOK_GRAPH_TOKEN
-  const token =
-    salonConfig?.facebook_graph_token ||
-    salonInfo.facebook_graph_token ||
-    salonInfo.facebook_page_token ||
-    DEFAULT_FB_TOKEN;
+  const userId = salonRow?.instagram_business_id || DEFAULT_IG_USER_ID;
+  const token = salonRow?.facebook_page_token || DEFAULT_FB_TOKEN;
+  const graphVer = DEFAULT_GRAPH_VER;
 
   if (!token || !userId) {
     console.warn("[Instagram] Missing IG creds", {
@@ -203,13 +186,11 @@ export async function publishToInstagram(input) {
     throw new Error("Missing Instagram credentials (token or userId).");
   }
 
-  // Ensure image is public (Twilio/Telegram safe)
   const publicImageUrl = await ensurePublicImage(
     imageUrl,
     Date.now().toString(),
     salon_id
   );
-  console.log("🌐 [Instagram] Public image URL:", publicImageUrl);
 
   try {
     const creationId = await retryIg(
@@ -223,7 +204,6 @@ export async function publishToInstagram(input) {
         }),
       "media create"
     );
-    console.log("✅ [Instagram] creation_id:", creationId);
 
     await waitForContainer(creationId, token, graphVer);
 
@@ -231,24 +211,14 @@ export async function publishToInstagram(input) {
       () => publishContainer(creationId, userId, token, graphVer),
       "media publish"
     );
-    console.log("✅ [Instagram] published:", publishRes);
 
-    if (publishRes?.id) {
-      logEvent({
-        event: "instagram_publish_success",
-        salon_id,
-        data: { media_id: publishRes.id, image_url: publicImageUrl },
-      });
-      return { id: publishRes.id, status: "success" };
-    }
-
-    console.warn("⚠️ [Instagram] No post ID returned:", publishRes);
     logEvent({
-      event: "instagram_publish_unknown",
+      event: "instagram_publish_success",
       salon_id,
-      data: { publishRes },
+      data: { media_id: publishRes.id, image_url: publicImageUrl },
     });
-    return { id: null, status: "unknown" };
+
+    return { id: publishRes.id, status: "success" };
   } catch (err) {
     console.error("❌ [Instagram] Publish failed:", err.message);
     logEvent({

@@ -1,7 +1,5 @@
-// src/scheduler.js — Final Web-Only Scheduler (no worker needed)
+// src/scheduler.js — DB-Only Scheduler (Final, with getSalonPolicy export)
 
-import fs from "fs";
-import path from "path";
 import { DateTime } from "luxon";
 import { db } from "../db.js";
 import { createLogger } from "./utils/logHelper.js";
@@ -11,7 +9,6 @@ import { publishToInstagram } from "./publishers/instagram.js";
 import { logEvent } from "./core/analyticsDb.js";
 
 const log = createLogger("scheduler");
-const ROOT = process.cwd();
 
 // ENV flags
 const FORCE_POST_NOW = process.env.FORCE_POST_NOW === "1";
@@ -23,48 +20,67 @@ function toSqliteTimestamp(dt) {
   return dt.toFormat("yyyy-LL-dd HH:mm:ss");
 }
 
-function withinPostingWindow(now, window) {
-  const [sH, sM] = window.start.split(":").map(Number);
-  const [eH, eM] = window.end.split(":").map(Number);
-  const start = now.set({ hour: sH, minute: sM });
-  const end = now.set({ hour: eH, minute: eM });
-  return now >= start && now <= end;
+function withinPostingWindow(now, start, end) {
+  const [sH, sM] = start.split(":").map(Number);
+  const [eH, eM] = end.split(":").map(Number);
+  const windowStart = now.set({ hour: sH, minute: sM });
+  const windowEnd = now.set({ hour: eH, minute: eM });
+  return now >= windowStart && now <= windowEnd;
 }
 
 function randomDelay(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function loadGlobalPolicy() {
-  try {
-    const file = path.join(ROOT, "data", "schedulerPolicy.json");
-    const json = JSON.parse(fs.readFileSync(file, "utf8"));
-    console.log("🪵 [GlobalPolicy] Loaded:", json);
-    return json;
-  } catch {
-    const fallback = {
-      posting_window: { start: "09:00", end: "19:00" },
-      random_delay_minutes: { min: 20, max: 45 },
-      timezone: "America/Indiana/Indianapolis",
-    };
-    console.log("🪵 [GlobalPolicy] Fallback:", fallback);
-    return fallback;
-  }
-}
+/**
+ * DB-only salon policy lookup.
+ * Kept for backward compatibility (some publishers import this).
+ * Returns BOTH flattened keys and legacy salon_info shape.
+ */
+function getSalonPolicy(salonSlug) {
+  if (!salonSlug) return {};
 
-function getSalonPolicy(salonId) {
-  try {
-    if (!salonId) return {};
-    const salonsDir = path.join(ROOT, "salons");
-    const normalized = String(salonId).toLowerCase();
-    const files = fs.readdirSync(salonsDir);
-    const file = files.find((f) => f.toLowerCase().includes(normalized));
-    if (!file) return {};
+  const row = db
+    .prepare(`
+      SELECT
+        slug,
+        name,
+        phone,
+        city,
+        state,
+        timezone,
+        posting_start_time,
+        posting_end_time,
+        spacing_min,
+        spacing_max,
+        facebook_page_id,
+        facebook_page_token,
+        instagram_business_id,
+        instagram_handle,
+        booking_url,
+        default_cta,
+        default_hashtags,
+        tone
+      FROM salons
+      WHERE slug = ?
+    `)
+    .get(salonSlug);
 
-    return JSON.parse(fs.readFileSync(path.join(salonsDir, file), "utf8"));
-  } catch {
-    return {};
-  }
+  if (!row) return {};
+
+  const posting_window = {
+    start: row.posting_start_time || "09:00",
+    end: row.posting_end_time || "19:00",
+  };
+
+  return {
+    ...row,
+    posting_window,
+    salon_info: {
+      ...row,
+      posting_window,
+    },
+  };
 }
 
 // ===================== Recovery =====================
@@ -73,9 +89,9 @@ async function recoverMissedPosts() {
   try {
     const missed = db
       .prepare(`
-        SELECT id, salon_id, scheduled_for, status, retry_count
+        SELECT id, salon_id, scheduled_for, retry_count
         FROM posts
-        WHERE (status='queued' OR status='failed')
+        WHERE (status='manager_approved' OR status='failed')
           AND scheduled_for IS NOT NULL
           AND datetime(scheduled_for) < datetime('now')
           AND (retry_count IS NULL OR retry_count < 3)
@@ -88,14 +104,17 @@ async function recoverMissedPosts() {
 
     const now = DateTime.utc();
     for (const post of missed) {
-      const policy = loadGlobalPolicy();
-      const range = policy.random_delay_minutes || { min: 20, max: 45 };
-      const delay = randomDelay(range.min, range.max);
+      const salon = getSalonPolicy(post.salon_id);
+      const min = salon?.spacing_min ?? salon?.salon_info?.spacing_min ?? 20;
+      const max = salon?.spacing_max ?? salon?.salon_info?.spacing_max ?? 45;
+
+      const delay = randomDelay(min, max);
       const newTime = toSqliteTimestamp(now.plus({ minutes: delay }));
 
       db.prepare(
         `UPDATE posts
-         SET scheduled_for=?, status='queued',
+         SET scheduled_for=?,
+             status='manager_approved',
              retry_count = COALESCE(retry_count,0)+1
          WHERE id=?`
       ).run(newTime, post.id);
@@ -120,9 +139,8 @@ export async function runSchedulerOnce() {
       .prepare(`
         SELECT DISTINCT salon_id
         FROM posts
-        WHERE status='queued'
+        WHERE status='manager_approved'
           AND scheduled_for IS NOT NULL
-          AND datetime(scheduled_for) <= datetime('now')
       `)
       .all()
       .map((r) => r.salon_id);
@@ -133,14 +151,23 @@ export async function runSchedulerOnce() {
     }
 
     const nowUtc = DateTime.utc();
+
     for (const salonId of tenants) {
+      const salon = getSalonPolicy(salonId);
+
+      if (!salon?.slug) {
+        console.error(`❌ [Scheduler] Salon not found: ${salonId}`);
+        continue;
+      }
+
       const due = db
         .prepare(`
-          SELECT * FROM posts
-          WHERE status='queued'
+          SELECT *
+          FROM posts
+          WHERE status='manager_approved'
             AND scheduled_for IS NOT NULL
             AND datetime(scheduled_for) <= datetime('now')
-            AND salon_id = ?
+            AND salon_id=?
           ORDER BY datetime(scheduled_for) ASC
         `)
         .all(salonId);
@@ -149,49 +176,41 @@ export async function runSchedulerOnce() {
 
       console.log(`⚡ [Scheduler] ${due.length} due for ${salonId}`);
 
+      const tz = salon.timezone || "America/Indiana/Indianapolis";
+      const windowStart = salon.posting_start_time || "09:00";
+      const windowEnd = salon.posting_end_time || "19:00";
+
       for (const post of due) {
-        const salonPolicy = getSalonPolicy(post.salon_id);
-        const globalPolicy = loadGlobalPolicy();
-
-        const window =
-          salonPolicy?.posting_window ||
-          salonPolicy?.salon_info?.posting_window ||
-          globalPolicy.posting_window;
-
-        const tz =
-          salonPolicy?.timezone ||
-          salonPolicy?.salon_info?.timezone ||
-          globalPolicy.timezone;
-
         const localNow = nowUtc.setZone(tz);
 
         if (!IGNORE_WINDOW && !FORCE_POST_NOW) {
-          if (!withinPostingWindow(localNow, window)) {
+          if (!withinPostingWindow(localNow, windowStart, windowEnd)) {
             const retry = toSqliteTimestamp(nowUtc.plus({ hours: 1 }));
             console.log(`⏸️ [${post.id}] Outside window → ${retry}`);
 
             db.prepare(
-              `UPDATE posts SET scheduled_for=?, status='queued' WHERE id=?`
+              `UPDATE posts
+               SET scheduled_for=?, status='manager_approved'
+               WHERE id=?`
             ).run(retry, post.id);
             continue;
           }
         }
 
-        if (IGNORE_WINDOW) {
-          console.log("🟢 [Scheduler] Posting window bypassed");
-        }
-
         try {
+          const fbPageId =
+            salon.facebook_page_id || salon?.salon_info?.facebook_page_id;
+          const fbToken =
+            salon.facebook_page_token || salon?.salon_info?.facebook_page_token;
+
+          if (!fbPageId || !fbToken) {
+            throw new Error("Missing Facebook credentials in salons table");
+          }
+
           const image =
             post.image_url?.includes("api.twilio.com")
               ? await rehostTwilioMedia(post.image_url, post.salon_id)
               : post.image_url;
-
-          const salonCfg = getSalonPolicy(post.salon_id);
-          const fbPageId =
-            salonCfg?.salon_info?.facebook_page_id ||
-            process.env.FACEBOOK_PAGE_ID;
-          const fbToken = salonCfg?.salon_info?.facebook_page_token;
 
           const fbResp = await publishToFacebook(
             fbPageId,
@@ -201,15 +220,18 @@ export async function runSchedulerOnce() {
           );
 
           const igResp = await publishToInstagram({
-            salon_id: post.salon_id,
+            salon_id: salon.slug,
             imageUrl: image,
             caption: post.final_caption,
+            instagram_business_id:
+              salon.instagram_business_id || salon?.salon_info?.instagram_business_id,
           });
 
           db.prepare(
             `UPDATE posts
              SET status='published',
-                 fb_post_id=?, ig_media_id=?,
+                 fb_post_id=?,
+                 ig_media_id=?,
                  published_at=datetime('now','utc')
              WHERE id=?`
           ).run(fbResp?.post_id, igResp?.id, post.id);
@@ -217,9 +239,18 @@ export async function runSchedulerOnce() {
           console.log(`✅ [${post.id}] Published`);
         } catch (err) {
           console.error(`❌ [${post.id}] Failed:`, err.message);
-          const retry = toSqliteTimestamp(nowUtc.plus({ minutes: 30 }));
+
+          const min = salon.spacing_min ?? 20;
+          const max = salon.spacing_max ?? 45;
+          const retry = toSqliteTimestamp(
+            nowUtc.plus({ minutes: randomDelay(min, max) })
+          );
+
           db.prepare(
-            `UPDATE posts SET status='queued', scheduled_for=? WHERE id=?`
+            `UPDATE posts
+             SET status='manager_approved',
+                 scheduled_for=?
+             WHERE id=?`
           ).run(retry, post.id);
         }
       }
@@ -232,41 +263,39 @@ export async function runSchedulerOnce() {
 // ===================== Enqueue =====================
 
 export function enqueuePost(post) {
-  const policy = loadGlobalPolicy();
-  const range = policy.random_delay_minutes || { min: 20, max: 45 };
-  const delay = randomDelay(range.min, range.max);
+  const salon = getSalonPolicy(post.salon_id);
+
+  const min = salon?.spacing_min ?? 20;
+  const max = salon?.spacing_max ?? 45;
+  const delay = randomDelay(min, max);
+
   const scheduled = toSqliteTimestamp(DateTime.utc().plus({ minutes: delay }));
 
   db.prepare(
-    `UPDATE posts SET status='queued', scheduled_for=? WHERE id=?`
+    `UPDATE posts
+     SET status='manager_approved',
+         scheduled_for=?
+     WHERE id=?`
   ).run(scheduled, post.id);
 
   console.log(`🪵 [Enqueue] ${post.id} → ${scheduled}`);
-  return { ...post, status: "queued", scheduled_for: scheduled };
+  return { ...post, status: "manager_approved", scheduled_for: scheduled };
 }
 
 // ===================== Boot =====================
 
 export function startScheduler() {
-  const policy = loadGlobalPolicy();
-
-  log("SCHEDULER_START", {
-    window: policy.posting_window,
-    timezone: policy.timezone,
-  });
+  log("SCHEDULER_START", { mode: "db-only" });
 
   recoverMissedPosts();
 
-  const DEFAULT_INTERVAL = 900;
   const intervalSeconds =
-    Number(process.env.SCHEDULER_INTERVAL_SECONDS) || DEFAULT_INTERVAL;
+    Number(process.env.SCHEDULER_INTERVAL_SECONDS) || 60;
 
   console.log(`🕓 [Scheduler] Interval active: every ${intervalSeconds}s`);
 
-  setInterval(async () => {
-    await runSchedulerOnce();
-  }, intervalSeconds * 1000);
+  setInterval(runSchedulerOnce, intervalSeconds * 1000);
 }
 
-// Required by instagram publisher
+// ✅ Required by instagram publisher (and any legacy imports)
 export { getSalonPolicy };

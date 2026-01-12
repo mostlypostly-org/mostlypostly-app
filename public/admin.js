@@ -585,6 +585,7 @@ document.addEventListener("DOMContentLoaded", () => {
     city: root.dataset.city || "",
     state: root.dataset.state || "",
     website: root.dataset.website || "",
+    industry: root.dataset.industry || "",
     booking_url: root.dataset.bookingUrl || "",
     timezone: root.dataset.timezone || "",
     tone_profile: root.dataset.tone || "",
