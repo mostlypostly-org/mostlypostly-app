@@ -286,6 +286,39 @@ try {
 }
 
 
+// =====================================================
+// COMPLIANCE + CONSENT MIGRATIONS (stylists + managers)
+// =====================================================
+
+function ensureColumns(table, columns) {
+  const existing = db.prepare(`PRAGMA table_info(${table})`).all();
+  const names = new Set(existing.map(c => c.name));
+
+  for (const col of columns) {
+    if (!names.has(col.name)) {
+      try {
+        db.prepare(
+          `ALTER TABLE ${table} ADD COLUMN ${col.name} ${col.type}`
+        ).run();
+        console.log(`🧱 (db.js) added ${table}.${col.name}`);
+      } catch (e) {
+        console.warn(`⚠️ Failed adding ${table}.${col.name}:`, e.message);
+      }
+    }
+  }
+}
+
+const COMPLIANCE_COLUMNS = [
+  { name: "phone", type: "TEXT" },
+  { name: "compliance_opt_in", type: "INTEGER DEFAULT 0" },
+  { name: "compliance_timestamp", type: "TEXT" },
+  { name: "consent", type: "TEXT" } // JSON stored as TEXT
+];
+
+// Apply to both tables
+ensureColumns("stylists", COMPLIANCE_COLUMNS);
+ensureColumns("managers", COMPLIANCE_COLUMNS);
+
 
 try { db.prepare("SELECT instagram_handle FROM salons LIMIT 1").get(); }
 catch (e) {
