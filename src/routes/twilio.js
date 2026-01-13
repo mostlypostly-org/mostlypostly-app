@@ -2,18 +2,13 @@
 import express from "express";
 import bodyParser from "body-parser";
 import twilio from "twilio";
-import { db } from "../../db.js";
 
 import {
   handleJoinCommand,
   continueJoinConversation,
 } from "../core/joinManager.js";
 import { joinSessions } from "../core/joinSessionStore.js";
-import {
-  lookupStylist,
-  findStylistDirect,
-  updateStylistConsent, // ✅ use the helper your codebase actually exports
-} from "../core/salonLookup.js";
+
 import { handleIncomingMessage } from "../core/messageRouter.js";
 import moderateAIOutput from "../utils/moderation.js";
 
@@ -97,18 +92,6 @@ export default function twilioRoute(drafts, _lookupStylist, generateCaption) {
       if (joinSessions.has(from)) {
         await continueJoinConversation(from, text, (msg) => sendViaTwilio(from, msg));
         return;
-      }
-
-      const salon_id =
-        match?.salon_id ||
-        match?.salon?.salon_id ||
-        match?.salon_info?.id ||
-        match?.salon_info?.salon_id ||
-        match?.stylist?.salon_id ||
-        null;
-
-      if (!salon_id) {
-        console.warn("⚠️ No salon_id on stylist record — pipeline will continue but analytics may be limited.");
       }
 
       // --- MAIN PIPELINE (photo-first: allow image-only) ---
