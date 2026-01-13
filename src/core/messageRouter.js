@@ -327,12 +327,6 @@ function buildInstagramCaption(baseCaption, stylistName, igHandle) {
   return prettifyBody(c);
 }
 
-console.log("📜 Consent status:", {
-  compliance_opt_in: stylist?.compliance_opt_in,
-  sms_opt_in: stylist?.consent?.sms_opt_in,
-  role: stylist?.role
-});
-
 // --------------------------------------
 // Consent session (in-memory)
 const consentSessions = new Map(); // chatId -> { status: 'pending' | 'granted', queued?: { imageUrl, text } }
