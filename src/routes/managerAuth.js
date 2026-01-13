@@ -4,6 +4,7 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import { db } from "../../db.js";
 import crypto from "crypto";
+import { sendViaTwilio } from "../routes/twilio.js";
 
 // Generate lowercase hex string for IDs
 const lowerHex = () =>
@@ -715,6 +716,171 @@ router.post("/login", (req, res) => {
   return res.redirect("/manager");
 
 });
+
+/* ============================================================
+   PASSWORD RESET FLOW (Manager Accounts)
+   ============================================================ */
+
+/* -------------------------------
+   GET /manager/forgot-password
+   - Show password reset request form
+---------------------------------*/
+router.get("/forgot-password", (req, res) => {
+  res.type("html").send(`
+    <h2>Reset your password</h2>
+    <p>Enter your email and we’ll send you a reset link.</p>
+
+    <form method="POST" action="/manager/forgot-password">
+      <input
+        type="email"
+        name="email"
+        required
+        placeholder="you@business.com"
+        style="display:block;margin-bottom:12px;"
+      />
+      <button type="submit">Send reset link</button>
+    </form>
+  `);
+});
+
+/* -------------------------------
+   POST /manager/forgot-password
+   - Generate reset token (non-enumerating)
+---------------------------------*/
+router.post("/forgot-password", async (req, res) => {
+  const { email } = req.body || {};
+
+  if (!email) {
+    return res.send("If the email exists, a reset link was sent.");
+  }
+
+  const manager = db
+    .prepare(`SELECT id FROM managers WHERE email = ?`)
+    .get(email);
+
+  // Always respond success (prevents email enumeration)
+  if (!manager) {
+    return res.send("If the email exists, a reset link was sent.");
+  }
+
+  const token = lowerHex();
+  const expiresAt = new Date(
+    Date.now() + 1000 * 60 * 45 // 45 minutes
+  ).toISOString();
+
+  db.prepare(`
+    INSERT INTO password_reset_tokens (
+      token, manager_id, expires_at
+    )
+    VALUES (?, ?, ?)
+  `).run(token, manager.id, expiresAt);
+
+  // TODO: replace with email or SMS delivery
+  console.log(`
+🔐 PASSWORD RESET LINK
+https://yourdomain.com/manager/reset-password?token=${token}
+  `);
+
+  const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
+  const resetLink = `${BASE_URL}/manager/reset-password?token=${token}`;
+
+  const smsBody = `🔐 MostlyPostly Password Reset
+
+  Tap to reset your password:
+  ${resetLink}
+
+  This link expires in 45 minutes.`;
+
+  await sendViaTwilio(manager.phone, smsBody);
+
+  return res.send("If the email exists, a reset link was sent.");
+});
+
+/* -------------------------------
+   GET /manager/reset-password
+   - Validate token & show reset form
+---------------------------------*/
+router.get("/reset-password", (req, res) => {
+  const { token } = req.query || {};
+
+  if (!token) {
+    return res.status(400).send("Missing reset token.");
+  }
+
+  const row = db.prepare(`
+    SELECT *
+    FROM password_reset_tokens
+    WHERE token = ?
+      AND used_at IS NULL
+      AND datetime(expires_at) > datetime('now')
+    LIMIT 1
+  `).get(token);
+
+  if (!row) {
+    return res.status(400).send("Invalid or expired reset link.");
+  }
+
+  res.type("html").send(`
+    <h2>Set a new password</h2>
+
+    <form method="POST" action="/manager/reset-password">
+      <input type="hidden" name="token" value="${token}" />
+
+      <input
+        type="password"
+        name="password"
+        required
+        minlength="8"
+        placeholder="New password"
+        style="display:block;margin-bottom:12px;"
+      />
+
+      <button type="submit">Update password</button>
+    </form>
+  `);
+});
+
+/* -------------------------------
+   POST /manager/reset-password
+   - Finalize password reset
+---------------------------------*/
+router.post("/reset-password", async (req, res) => {
+  const { token, password } = req.body || {};
+
+  if (!token || !password) {
+    return res.status(400).send("Invalid request.");
+  }
+
+  const row = db.prepare(`
+    SELECT *
+    FROM password_reset_tokens
+    WHERE token = ?
+      AND used_at IS NULL
+      AND datetime(expires_at) > datetime('now')
+    LIMIT 1
+  `).get(token);
+
+  if (!row) {
+    return res.status(400).send("Invalid or expired reset link.");
+  }
+
+  const password_hash = await bcrypt.hash(password, 10);
+
+  db.prepare(`
+    UPDATE managers
+    SET password_hash = ?
+    WHERE id = ?
+  `).run(password_hash, row.manager_id);
+
+  db.prepare(`
+    UPDATE password_reset_tokens
+    SET used_at = datetime('now')
+    WHERE token = ?
+  `).run(token);
+
+  return res.redirect("/manager/login?reset=success");
+});
+
 
 /* -------------------------------
    Magic link helper:

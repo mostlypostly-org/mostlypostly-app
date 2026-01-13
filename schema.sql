@@ -87,6 +87,17 @@ CREATE TABLE IF NOT EXISTS manager_tokens (
 );
 
 /* ------------------------------------------------------------
+   User Login TOKENS — magic login links for password reset
+   ------------------------------------------------------------ */
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  token TEXT PRIMARY KEY,
+  manager_id TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at TEXT
+);
+
+
+/* ------------------------------------------------------------
    STYLISTS — optional, but supported
    ------------------------------------------------------------ */
 CREATE TABLE IF NOT EXISTS stylists (
