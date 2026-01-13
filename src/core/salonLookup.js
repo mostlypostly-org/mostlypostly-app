@@ -213,6 +213,7 @@ export function lookupStylist(identifier) {
         s.id          AS stylist_id,
         s.name        AS stylist_name,
         s.phone       AS stylist_phone,
+        s.chat_id     AS stylist_chat_id,
         s.instagram_handle,
         sl.slug       AS salon_slug,
         sl.name       AS salon_name,
@@ -224,10 +225,12 @@ export function lookupStylist(identifier) {
       FROM stylists s
       JOIN salons sl ON sl.slug = s.salon_id
       WHERE s.phone = ?
-        OR CAST(s.chat_id AS TEXT) = ?
+        OR s.chat_id = ?
       LIMIT 1
     `
-    ).get(phoneNorm, idStr);
+    )
+    .get(phoneNorm, idStr);
+
 
 
   let isManager = false;
