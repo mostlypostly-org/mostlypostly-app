@@ -105,19 +105,17 @@ export default function twilioRoute(drafts, _lookupStylist, generateCaption) {
       await handleIncomingMessage({
         source: "twilio",
         chatId: from,
-        toNumber,
         text,
         imageUrl,
         drafts,
-        lookupStylist,
         generateCaption,
         moderateAIOutput,
-        tenant: { salon_id },
         sendMessage: {
           sendText: async (target, msg) => sendViaTwilio(target || from, msg),
         },
         io: null,
       });
+
 
       console.log("✅ [Twilio] handleIncomingMessage finished:", from);
     } catch (err) {
