@@ -25,6 +25,24 @@ const client = twilio(
   process.env.TWILIO_AUTH_TOKEN
 );
 
+function hasSmsConsent(phone) {
+  const row =
+    db.prepare(`
+      SELECT compliance_opt_in
+      FROM managers
+      WHERE phone = ?
+    `).get(phone)
+    ||
+    db.prepare(`
+      SELECT compliance_opt_in
+      FROM stylists
+      WHERE phone = ?
+    `).get(phone);
+
+  return row?.compliance_opt_in === 1;
+}
+
+
 export async function sendViaTwilio(to, body) {
   try {
     const opts = process.env.TWILIO_MESSAGING_SERVICE_SID
@@ -163,6 +181,18 @@ export default function twilioRoute(drafts, _lookupStylist, generateCaption) {
         await sendViaTwilio(from, "🚫 You’re not registered with any salon. Ask your manager to add you.");
         return;
       }
+
+      // --- SMS CONSENT GATE (DB-backed) ---
+      if (!hasSmsConsent(from)) {
+        await sendViaTwilio(
+          from,
+          "MostlyPostly: Please review our SMS Consent, Privacy, and Terms:\n" +
+          "https://mostlypostly.com/legal/sms-consent.html/\n" +
+          "Reply *AGREE* to opt in"
+        );
+        return;
+      }
+
 
       const salon_id =
         match?.salon_id ||
