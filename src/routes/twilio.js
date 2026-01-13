@@ -101,13 +101,61 @@ export default function twilioRoute(drafts, _lookupStylist, generateCaption) {
 
       // --- CONSENT FLOW ---
       if (upperInit === "AGREE") {
-        const consent = updateStylistConsent(from, { consent: { sms_opt_in: true } });
-        const reply = consent?.ok
-          ? `✅ Thanks! Your SMS consent has been recorded.`
-          : "⚠️ Couldn’t find your salon record. Please contact your manager.";
-        await sendViaTwilio(from, reply);
+        const now = new Date().toISOString();
+
+        // 1️⃣ Try MANAGER first
+        let result = db.prepare(`
+          UPDATE managers
+          SET
+            compliance_opt_in = 1,
+            compliance_timestamp = ?,
+            consent = json_set(
+              COALESCE(consent, '{}'),
+              '$.sms_opt_in', true,
+              '$.timestamp', ?
+            )
+          WHERE phone = ?
+        `).run(now, now, from);
+
+        let role = "manager";
+
+        // 2️⃣ If no manager row updated, try STYLIST
+        if (result.changes === 0) {
+          result = db.prepare(`
+            UPDATE stylists
+            SET
+              compliance_opt_in = 1,
+              compliance_timestamp = ?,
+              consent = json_set(
+                COALESCE(consent, '{}'),
+                '$.sms_opt_in', true,
+                '$.timestamp', ?
+              )
+            WHERE phone = ?
+          `).run(now, now, from);
+
+          role = "stylist";
+        }
+
+        // 3️⃣ If neither updated → error
+        if (result.changes === 0) {
+          await sendViaTwilio(
+            from,
+            "⚠️ Couldn’t find your account. Please contact your salon manager."
+          );
+          return;
+        }
+
+        console.log(`✅ SMS consent persisted to DB for ${role}:`, from);
+
+        await sendViaTwilio(
+          from,
+          "✅ Thanks! Your SMS consent has been recorded."
+        );
+
         return;
       }
+
 
       // --- STYLIST & SALON CONTEXT ---
       const match = findStylistDirect(from) || lookupStylist(from);
