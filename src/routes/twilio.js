@@ -99,18 +99,6 @@ export default function twilioRoute(drafts, _lookupStylist, generateCaption) {
         return;
       }
 
-      // --- SMS CONSENT GATE (DB-backed) ---
-      if (!hasSmsConsent(from)) {
-        await sendViaTwilio(
-          from,
-          "MostlyPostly: Please review our SMS Consent, Privacy, and Terms:\n" +
-          "https://mostlypostly.com/legal/sms-consent.html/\n" +
-          "Reply *AGREE* to opt in"
-        );
-        return;
-      }
-
-
       const salon_id =
         match?.salon_id ||
         match?.salon?.salon_id ||
