@@ -857,10 +857,6 @@ https://yourdomain.com/manager/reset-password?token=${token}
    GET /manager/reset-password
    - Validate token & show reset form (centered card)
 ---------------------------------*/
-/* -------------------------------
-   GET /manager/reset-password
-   - Validates token & shows styled reset form
----------------------------------*/
 router.get("/reset-password", (req, res) => {
   const token = String(req.query?.token || "").trim();
 
@@ -891,100 +887,102 @@ router.get("/reset-password", (req, res) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Set New Password — MostlyPostly</title>
+  <title>Reset Password — MostlyPostly</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Tailwind CDN (same as index) -->
+  <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            mpPrimary: "#6366F1",
-            mpPrimaryDark: "#4F46E5",
-            mpAccent: "#F97316"
-          }
-        }
-      }
+  <style>
+    /* HARD RESET — overrides all inherited styles */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #020617 !important;
+      color: #E5E7EB !important;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     }
-  </script>
+
+    /* Force readable inputs */
+    input {
+      background-color: #FFFFFF !important;
+      color: #020617 !important;
+      caret-color: #020617 !important;
+    }
+
+    input::placeholder {
+      color: #64748B !important;
+    }
+  </style>
 </head>
 
-<body class="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4">
+<body>
+  <div class="min-h-screen flex items-center justify-center px-4">
 
-  <!-- Subtle glow background -->
-  <div class="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.12)_0,_transparent_55%),radial-gradient(circle_at_bottom,_rgba(249,115,22,0.08)_0,_transparent_55%)]"></div>
+    <div class="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-xl">
 
-  <div class="relative w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/80 p-8 shadow-xl shadow-black/60 backdrop-blur">
-
-    <!-- Logo -->
-    <div class="flex justify-center mb-6">
-      <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-mpPrimary to-mpAccent text-sm font-semibold text-white">
-        MP
+      <div class="flex justify-center mb-6">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-sm font-semibold text-white">
+          MP
+        </div>
       </div>
+
+      <h1 class="text-2xl font-bold text-center text-white mb-2">
+        Set a new password
+      </h1>
+
+      <p class="text-sm text-center text-slate-400 mb-6">
+        Choose a secure password for your MostlyPostly account.
+      </p>
+
+      <form method="POST" action="/manager/reset-password" class="space-y-4">
+        <input type="hidden" name="token" value="${safeToken}" />
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            New password
+          </label>
+          <input
+            type="password"
+            name="password"
+            required
+            minlength="8"
+            placeholder="At least 8 characters"
+            class="w-full rounded-xl border border-slate-700 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Confirm new password
+          </label>
+          <input
+            type="password"
+            name="password_confirm"
+            required
+            minlength="8"
+            placeholder="Re-enter password"
+            class="w-full rounded-xl border border-slate-700 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <button
+          type="submit"
+          class="mt-2 w-full rounded-full bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+        >
+          Update password
+        </button>
+      </form>
+
+      <div class="mt-6 text-center">
+        <a href="/manager/login" class="text-xs text-slate-400 hover:text-white">
+          ← Back to login
+        </a>
+      </div>
+
     </div>
-
-    <h1 class="text-2xl font-bold text-center text-white mb-2">
-      Set a new password
-    </h1>
-
-    <p class="text-sm text-center text-slate-400 mb-6">
-      Choose a secure password for your MostlyPostly account.
-    </p>
-
-    <form method="POST" action="/manager/reset-password" class="space-y-4">
-      <input type="hidden" name="token" value="${safeToken}" />
-
-      <div>
-        <label class="block text-xs font-medium text-slate-300 mb-1">
-          New password
-        </label>
-        <input
-          type="password"
-          name="password"
-          required
-          minlength="8"
-          placeholder="At least 8 characters"
-          class="w-full rounded-xl border border-slate-700 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-mpPrimary focus:outline-none focus:ring-2 focus:ring-mpPrimary/30"
-        />
-      </div>
-
-      <div>
-        <label class="block text-xs font-medium text-slate-300 mb-1">
-          Confirm new password
-        </label>
-        <input
-          type="password"
-          name="password_confirm"
-          required
-          minlength="8"
-          placeholder="Re-enter password"
-          class="w-full rounded-xl border border-slate-700 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-mpPrimary focus:outline-none focus:ring-2 focus:ring-mpPrimary/30"
-        />
-      </div>
-
-      <button
-        type="submit"
-        class="mt-2 w-full rounded-full bg-mpPrimary py-2.5 text-sm font-semibold text-white shadow-lg shadow-mpPrimary/40 hover:bg-mpPrimaryDark transition"
-      >
-        Update password
-      </button>
-    </form>
-
-    <div class="mt-6 text-center">
-      <a href="/manager/login" class="text-xs text-slate-400 hover:text-white">
-        ← Back to login
-      </a>
-    </div>
-
-    <p class="mt-4 text-center text-[11px] text-slate-500">
-      This reset link expires automatically for your security.
-    </p>
-
   </div>
-
 </body>
 </html>
   `);
