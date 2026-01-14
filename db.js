@@ -617,16 +617,6 @@ try {
 // =====================================================
 // Helper: verify token
 // =====================================================
-function ensureColumn(table, col, ddl) {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
-  const exists = cols.some((c) => c.name === col);
-  if (exists) return;
-
-  console.log(`🧱 migrating: add ${table}.${col}`);
-  db.prepare(`ALTER TABLE ${table} ADD COLUMN ${ddl}`).run();
-}
-
-
 export function verifyTokenRow(token) {
   try {
     const row = db
