@@ -727,19 +727,68 @@ router.post("/login", (req, res) => {
 ---------------------------------*/
 router.get("/forgot-password", (req, res) => {
   res.type("html").send(`
-    <h2>Reset your password</h2>
-    <p>Enter your email and we’ll send you a reset link.</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reset Password — MostlyPostly</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <form method="POST" action="/manager/forgot-password">
-      <input
-        type="email"
-        name="email"
-        required
-        placeholder="you@business.com"
-        style="display:block;margin-bottom:12px;"
-      />
-      <button type="submit">Send reset link</button>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      margin: 0;
+      background: #0F172A;
+      color: #F8FAFC;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center px-4">
+
+  <div class="w-full max-w-md bg-white text-slate-800 rounded-2xl shadow-xl p-8 border border-slate-200">
+
+    <h1 class="text-2xl font-semibold text-center mb-2">
+      Reset your password
+    </h1>
+
+    <p class="text-sm text-center text-slate-500 mb-6">
+      Enter your email and we’ll text you a secure reset link.
+    </p>
+
+    <form method="POST" action="/manager/forgot-password" class="space-y-5">
+
+      <div>
+        <label class="text-xs font-medium text-slate-600">Email address</label>
+        <input
+          type="email"
+          name="email"
+          required
+          placeholder="you@business.com"
+          class="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+
+      <button
+        type="submit"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-full transition shadow-md"
+      >
+        Send reset link
+      </button>
     </form>
+
+    <div class="mt-6 text-center">
+      <a href="/manager/login" class="text-sm text-blue-600 hover:underline">
+        ← Back to login
+      </a>
+    </div>
+
+  </div>
+
+</body>
+</html>
   `);
 });
 
@@ -755,8 +804,14 @@ router.post("/forgot-password", async (req, res) => {
   }
 
   const manager = db
-    .prepare(`SELECT id FROM managers WHERE email = ?`)
-    .get(email);
+  .prepare(`SELECT id, phone FROM managers WHERE email = ?`)
+  .get(email);
+
+  if (!manager?.phone) {
+    console.warn("⚠️ Password reset requested but manager has no phone:", email);
+    return res.send("If the email exists, a reset link was sent.");
+  }
+
 
   // Always respond success (prevents email enumeration)
   if (!manager) {
@@ -791,24 +846,26 @@ https://yourdomain.com/manager/reset-password?token=${token}
 
   This link expires in 45 minutes.`;
 
+  console.log("📤 Sending password reset SMS to:", manager.phone);
   await sendViaTwilio(manager.phone, smsBody);
+
 
   return res.send("If the email exists, a reset link was sent.");
 });
 
 /* -------------------------------
    GET /manager/reset-password
-   - Validate token & show reset form
+   - Validate token & show reset form (centered card)
 ---------------------------------*/
 router.get("/reset-password", (req, res) => {
-  const { token } = req.query || {};
+  const token = String(req.query?.token || "").trim();
 
   if (!token) {
-    return res.status(400).send("Missing reset token.");
+    return res.status(400).type("html").send("Missing reset token.");
   }
 
   const row = db.prepare(`
-    SELECT *
+    SELECT token
     FROM password_reset_tokens
     WHERE token = ?
       AND used_at IS NULL
@@ -817,26 +874,87 @@ router.get("/reset-password", (req, res) => {
   `).get(token);
 
   if (!row) {
-    return res.status(400).send("Invalid or expired reset link.");
+    return res.status(400).type("html").send("Invalid or expired reset link.");
   }
 
-  res.type("html").send(`
-    <h2>Set a new password</h2>
+  // Basic HTML escaping for safety
+  const safeToken = token.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
-    <form method="POST" action="/manager/reset-password">
-      <input type="hidden" name="token" value="${token}" />
+  return res.type("html").send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Set New Password — MostlyPostly</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
 
-      <input
-        type="password"
-        name="password"
-        required
-        minlength="8"
-        placeholder="New password"
-        style="display:block;margin-bottom:12px;"
-      />
+  <style>
+    body {
+      margin: 0;
+      background: #0F172A;
+      color: #F8FAFC;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+  </style>
+</head>
 
-      <button type="submit">Update password</button>
+<body class="min-h-screen flex items-center justify-center px-4">
+
+  <div class="w-full max-w-md bg-white text-slate-800 rounded-2xl shadow-xl p-8 border border-slate-200">
+
+    <h1 class="text-2xl font-semibold text-center mb-2">Set a new password</h1>
+    <p class="text-sm text-center text-slate-500 mb-6">
+      Choose a strong password for your MostlyPostly account.
+    </p>
+
+    <form method="POST" action="/manager/reset-password" class="space-y-4">
+      <input type="hidden" name="token" value="${safeToken}" />
+
+      <div>
+        <label class="text-xs font-medium text-slate-600">New password</label>
+        <input
+          type="password"
+          name="password"
+          required
+          minlength="8"
+          placeholder="At least 8 characters"
+          class="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
+
+      <div>
+        <label class="text-xs font-medium text-slate-600">Confirm new password</label>
+        <input
+          type="password"
+          name="password_confirm"
+          required
+          minlength="8"
+          placeholder="Re-enter password"
+          class="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
+
+      <button
+        type="submit"
+        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-full transition shadow-md"
+      >
+        Update password
+      </button>
     </form>
+
+    <div class="mt-6 text-center">
+      <a href="/manager/login" class="text-sm text-blue-600 hover:underline">← Back to login</a>
+    </div>
+
+    <p class="mt-4 text-[11px] text-slate-500 text-center">
+      This link expires automatically for your security.
+    </p>
+
+  </div>
+
+</body>
+</html>
   `);
 });
 
@@ -845,10 +963,17 @@ router.get("/reset-password", (req, res) => {
    - Finalize password reset
 ---------------------------------*/
 router.post("/reset-password", async (req, res) => {
-  const { token, password } = req.body || {};
+  const { token, password, password_confirm } = req.body || {};
 
   if (!token || !password) {
     return res.status(400).send("Invalid request.");
+  }
+
+  if (password !== password_confirm) {
+    return res
+      .status(400)
+      .type("html")
+      .send("Passwords do not match.");
   }
 
   const row = db.prepare(`
