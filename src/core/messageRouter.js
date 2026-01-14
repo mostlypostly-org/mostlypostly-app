@@ -688,6 +688,21 @@ export async function handleIncomingMessage({
   if (/^APPROVE\b/i.test(command)) {
     const draft = drafts.get(chatId);
 
+    // ✅ Always rehost Twilio media so dashboards can render the image
+    let imageUrl = null;
+
+    if (draft?.image_url) {
+      imageUrl = await rehostTwilioMedia(
+        draft.image_url,
+        salon?.salon_id || salon?.id || salon?.salon_info?.id || "unknown"
+      );
+
+      if (imageUrl.includes("api.twilio.com")) {
+        throw new Error("❌ Twilio URL leaked — rehosting failed");
+      }
+    }
+
+
     if (!draft) {
       const pending = findPendingPostByManager(chatId);
       if (pending) {
@@ -839,7 +854,7 @@ export async function handleIncomingMessage({
           stylist_name: stylistName,
           instagram_handle: stylistHandle,
           booking_url: bookingUrl,
-          image_url: draft.image_url || null,
+          image_url: imageUrl || null,
           status: "manager_pending"
         };
         await updatePostStatus(pendingPost.id, "manager_pending", persistPayload);
@@ -885,7 +900,7 @@ export async function handleIncomingMessage({
             await sendMessage.sendText(manager.phone, notifyBody);
           } else if (manager?.chat_id) {
           console.log("📤 No phone found — using Telegram fallback");
-          await sendManagerPreviewPhoto(manager.chat_id, draft.image_url, {
+          await sendManagerPreviewPhoto(manager.chat_id, imageUrl || draft.image_url, {
             draft,
             stylist,
             salon,
