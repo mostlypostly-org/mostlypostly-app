@@ -798,7 +798,7 @@ export async function handleIncomingMessage({
           ...stylist,
           manager_phone: manager?.phone || null,
           manager_chat_id: manager?.chat_id ?? null,
-          image_url: draft.image_url || null,
+          image_url: imageUrl,
           final_caption: baseCaption,
           booking_url: bookingUrl,
           instagram_handle: stylistHandle
@@ -910,7 +910,16 @@ export async function handleIncomingMessage({
     // --------------------------
     let fbResult = null; // ensure it's visible across try/catch
     try {
-      const image = draft.image_url || null;
+      let image = null;
+
+      if (draft?.image_url) {
+        image = await rehostTwilioMedia(draft.image_url, draft.salon_id);
+
+        // SAFETY CHECK — NEVER allow Twilio URLs downstream
+        if (image.includes("api.twilio.com")) {
+          throw new Error("❌ Twilio URL leaked — rehosting failed");
+        }
+      }
 
       // Build per-network captions
       const fbCaption = buildFacebookCaption(baseCaption, stylistName, stylistHandle);
