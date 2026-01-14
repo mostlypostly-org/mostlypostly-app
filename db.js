@@ -614,7 +614,7 @@ try {
   console.error("⚠️ Failed ensuring manager_tokens schema:", e.message);
 }
 
-import { seedStaging } from "./db/seedStaging.js";
+import { seedStaging } from "./src/db/seedStaging.js";
 
 if (process.env.APP_ENV === "staging") {
   seedStaging();
