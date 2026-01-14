@@ -69,6 +69,9 @@ CREATE TABLE IF NOT EXISTS managers (
   password_hash  TEXT,
   email          TEXT UNIQUE,
   FOREIGN KEY (salon_id) REFERENCES salons(slug)
+  compliance_opt_in      INTEGER DEFAULT 0,
+  compliance_timestamp   TEXT,
+  consent               TEXT,
 );
 
 /* ------------------------------------------------------------
@@ -110,6 +113,11 @@ CREATE TABLE IF NOT EXISTS stylists (
   created_at         TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (salon_id) REFERENCES salons(slug)
+
+  chat_id                TEXT,
+  compliance_opt_in      INTEGER DEFAULT 0,
+  compliance_timestamp   TEXT,
+  consent                TEXT,
 );
 
 /* ------------------------------------------------------------

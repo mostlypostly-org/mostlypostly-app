@@ -210,6 +210,28 @@ catch (e) {
   }
 }
 
+function ensureColumn(table, col, ddl) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  const exists = cols.some((c) => c.name === col);
+  if (exists) return;
+
+  console.log(`🧱 migrating: add ${table}.${col}`);
+  db.prepare(`ALTER TABLE ${table} ADD COLUMN ${ddl}`).run();
+}
+
+// ---- stylists columns ----
+ensureColumn("stylists", "chat_id", "chat_id TEXT");
+ensureColumn("stylists", "compliance_opt_in", "compliance_opt_in INTEGER DEFAULT 0");
+ensureColumn("stylists", "compliance_timestamp", "compliance_timestamp TEXT");
+ensureColumn("stylists", "consent", "consent TEXT");
+
+// ---- managers columns ----
+ensureColumn("managers", "chat_id", "chat_id TEXT"); // safe even if schema already has it
+ensureColumn("managers", "compliance_opt_in", "compliance_opt_in INTEGER DEFAULT 0");
+ensureColumn("managers", "compliance_timestamp", "compliance_timestamp TEXT");
+ensureColumn("managers", "consent", "consent TEXT");
+
+
 // Ensure timezone has a default even if column existed before migration
 try {
   db.prepare(`
@@ -220,6 +242,7 @@ try {
 } catch (err) {
   console.warn("⚠️ Could not backfill salons.timezone:", err.message);
 }
+
 
 // =====================================================
 // Ensure salons.state exists (required for onboarding)
@@ -594,6 +617,16 @@ try {
 // =====================================================
 // Helper: verify token
 // =====================================================
+function ensureColumn(table, col, ddl) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  const exists = cols.some((c) => c.name === col);
+  if (exists) return;
+
+  console.log(`🧱 migrating: add ${table}.${col}`);
+  db.prepare(`ALTER TABLE ${table} ADD COLUMN ${ddl}`).run();
+}
+
+
 export function verifyTokenRow(token) {
   try {
     const row = db
