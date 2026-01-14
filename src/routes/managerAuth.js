@@ -727,70 +727,96 @@ router.post("/login", (req, res) => {
 ---------------------------------*/
 router.get("/forgot-password", (req, res) => {
   res.type("html").send(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Reset Password — MostlyPostly</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Reset Password — MostlyPostly</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
-  <style>
-    body {
-      margin: 0;
-      background: #0F172A;
-      color: #F8FAFC;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-  </style>
-</head>
+    <style>
+      /* HARD RESET — overrides inherited app styles */
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background-color: #020617 !important;
+        color: #E5E7EB !important;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      }
 
-<body class="min-h-screen flex items-center justify-center px-4">
+      /* Force readable inputs */
+      input {
+        background-color: #FFFFFF !important;
+        color: #020617 !important;
+        caret-color: #020617 !important;
+      }
 
-  <div class="w-full max-w-md bg-white text-slate-800 rounded-2xl shadow-xl p-8 border border-slate-200">
+      input::placeholder {
+        color: #64748B !important;
+      }
+    </style>
+  </head>
 
-    <h1 class="text-2xl font-semibold text-center mb-2">
-      Reset your password
-    </h1>
+  <body>
+    <div class="min-h-screen flex items-center justify-center px-4">
 
-    <p class="text-sm text-center text-slate-500 mb-6">
-      Enter your email and we’ll text you a secure reset link.
-    </p>
+      <div class="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-xl">
 
-    <form method="POST" action="/manager/forgot-password" class="space-y-5">
+        <!-- Logo -->
+        <div class="flex justify-center mb-6">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-sm font-semibold text-white">
+            MP
+          </div>
+        </div>
 
-      <div>
-        <label class="text-xs font-medium text-slate-600">Email address</label>
-        <input
-          type="email"
-          name="email"
-          required
-          placeholder="you@business.com"
-          class="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <h1 class="text-2xl font-bold text-center text-white mb-2">
+          Reset your password
+        </h1>
+
+        <p class="text-sm text-center text-slate-400 mb-6">
+          Enter your email and we’ll text you a secure reset link.
+        </p>
+
+        <form method="POST" action="/manager/forgot-password" class="space-y-4">
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">
+              Email address
+            </label>
+            <input
+              type="email"
+              name="email"
+              required
+              placeholder="you@business.com"
+              class="w-full rounded-xl border border-slate-700 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <button
+            type="submit"
+            class="mt-2 w-full rounded-full bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+          >
+            Send reset link
+          </button>
+        </form>
+
+        <div class="mt-6 text-center">
+          <a href="/manager/login" class="text-xs text-slate-400 hover:text-white">
+            ← Back to login
+          </a>
+        </div>
+
       </div>
-
-      <button
-        type="submit"
-        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-full transition shadow-md"
-      >
-        Send reset link
-      </button>
-    </form>
-
-    <div class="mt-6 text-center">
-      <a href="/manager/login" class="text-sm text-blue-600 hover:underline">
-        ← Back to login
-      </a>
     </div>
+  </body>
+  </html>
+    `);
+  });
 
-  </div>
-
-</body>
-</html>
-  `);
-});
 
 /* -------------------------------
    POST /manager/forgot-password
