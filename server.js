@@ -15,7 +15,8 @@ import express from "express";
 import session from "express-session";
 import path from "path";
 import { fileURLToPath } from "url";
-import teamsRoute from "./src/routes/teams.js";
+// teamsRoute disabled until botbuilder dependency is added to package.json
+// import teamsRoute from "./src/routes/teams.js";
 
 
 // =====================================================
@@ -161,21 +162,8 @@ app.use(
   )
 );
 
-app.use(
-  "/inbound/teams",
-  teamsRoute(
-    drafts,
-    lookupStylist,
-    ({ imageUrl, notes, stylist, salon }) =>
-      generateCaption({
-        imageDataUrl: imageUrl,
-        notes,
-        salon,
-        stylist,
-        city: stylist?.city || "",
-      })
-  )
-);
+// Teams route disabled until botbuilder dependency is added to package.json
+// app.use("/inbound/teams", teamsRoute(...));
 
 // Public uploads
 app.use(
