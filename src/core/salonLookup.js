@@ -209,17 +209,20 @@ export function lookupStylist(identifier) {
   let row = db
     .prepare(
       `
-      SELECT 
-        s.id          AS stylist_id,
-        s.name        AS stylist_name,
-        s.phone       AS stylist_phone,
-        s.chat_id     AS stylist_chat_id,
+      SELECT
+        s.id                   AS stylist_id,
+        s.name                 AS stylist_name,
+        s.phone                AS stylist_phone,
+        s.chat_id              AS stylist_chat_id,
         s.instagram_handle,
-        sl.slug       AS salon_slug,
-        sl.name       AS salon_name,
+        s.compliance_opt_in,
+        s.compliance_timestamp,
+        s.consent              AS consent_json,
+        sl.slug                AS salon_slug,
+        sl.name                AS salon_name,
         sl.booking_link,
         sl.facebook_page_id,
-        sl.instagram_handle AS salon_instagram_handle,
+        sl.instagram_handle    AS salon_instagram_handle,
         sl.default_cta,
         sl.booking_url
       FROM stylists s
@@ -240,15 +243,18 @@ export function lookupStylist(identifier) {
     const mgr = db
       .prepare(
         `
-      SELECT 
-        m.id         AS manager_id,
-        m.name       AS stylist_name,
-        m.phone      AS stylist_phone,
-        sl.slug      AS salon_slug,
-        sl.name      AS salon_name,
+      SELECT
+        m.id                   AS manager_id,
+        m.name                 AS stylist_name,
+        m.phone                AS stylist_phone,
+        m.compliance_opt_in,
+        m.compliance_timestamp,
+        m.consent              AS consent_json,
+        sl.slug                AS salon_slug,
+        sl.name                AS salon_name,
         sl.booking_link,
         sl.facebook_page_id,
-        sl.instagram_handle AS salon_instagram_handle,
+        sl.instagram_handle    AS salon_instagram_handle,
         sl.default_cta,
         sl.booking_url
       FROM managers m
@@ -280,6 +286,9 @@ export function lookupStylist(identifier) {
     default_cta: row.default_cta || "Book via link in bio.",
   };
 
+  let consentObj = null;
+  try { consentObj = row.consent_json ? JSON.parse(row.consent_json) : null; } catch { }
+
   const stylist = {
     id: row.stylist_id || row.manager_id,
     stylist_name: row.stylist_name,
@@ -290,6 +299,9 @@ export function lookupStylist(identifier) {
     salon_name: row.salon_name,
     salon_info,
     role: isManager ? "manager" : "stylist",
+    compliance_opt_in: !!row.compliance_opt_in,
+    compliance_timestamp: row.compliance_timestamp || null,
+    consent: consentObj,
   };
 
   return {
@@ -448,6 +460,52 @@ export function updateStylistConsent(phoneOrChatId) {
   }
 
   return { ok: false, error: "Stylist not found" };
+}
+
+/**
+ * saveConsentToDb(identifier, payload)
+ * Persists compliance consent to the DB (stylists or managers table).
+ * Works in all environments. Safe to call on every AGREE.
+ */
+export function saveConsentToDb(identifier, payload = {}) {
+  if (!identifier) return { ok: false, error: "No identifier" };
+  const idStr = String(identifier).trim();
+  const phoneNorm = normalizePhone(idStr);
+  const now = payload.compliance_timestamp || new Date().toISOString();
+  const consentJson = JSON.stringify(payload.consent || { sms_opt_in: true, timestamp: now });
+
+  // Try stylists first
+  const stylistResult = db.prepare(`
+    UPDATE stylists
+    SET compliance_opt_in = 1,
+        compliance_timestamp = ?,
+        consent = ?,
+        updated_at = ?
+    WHERE phone = ? OR chat_id = ?
+  `).run(now, consentJson, now, phoneNorm, idStr);
+
+  if (stylistResult.changes > 0) {
+    console.log(`✅ Consent saved to DB (stylist) for ${idStr}`);
+    return { ok: true, table: "stylists" };
+  }
+
+  // Try managers
+  const mgrResult = db.prepare(`
+    UPDATE managers
+    SET compliance_opt_in = 1,
+        compliance_timestamp = ?,
+        consent = ?,
+        updated_at = ?
+    WHERE phone = ? OR CAST(chat_id AS TEXT) = ?
+  `).run(now, consentJson, now, phoneNorm, idStr);
+
+  if (mgrResult.changes > 0) {
+    console.log(`✅ Consent saved to DB (manager) for ${idStr}`);
+    return { ok: true, table: "managers" };
+  }
+
+  console.warn(`⚠️ saveConsentToDb: no record found for ${idStr} (tried ${phoneNorm} and ${idStr})`);
+  return { ok: false, error: "Not found in stylists or managers" };
 }
 
 export function reloadSalonsNow() {

@@ -89,6 +89,7 @@ import {
   lookupStylistByChatId,
   getSalonByStylist,
   loadSalons,
+  saveConsentToDb,
 } from "./salonLookup.js";
 import {
   savePost,
@@ -96,7 +97,6 @@ import {
   findPendingPostByManager,
   findPostAwaitingReason,
   findLatestDraft,
-  saveStylistConsent,
 } from "../core/storage.js";
 import { composeFinalCaption } from "./composeFinalCaption.js";
 // 🧠 Import moderation utility directly
@@ -333,9 +333,7 @@ function buildInstagramCaption(baseCaption, stylistName, igHandle) {
 const consentSessions = new Map(); // chatId -> { status: 'pending' | 'granted', queued?: { imageUrl, text } }
 
 function hasConsent(stylist) {
-  const legacy = stylist?.compliance_opt_in === true;
-  const modern = stylist?.consent?.sms_opt_in === true;
-  return legacy && modern;
+  return !!(stylist?.compliance_opt_in) || !!(stylist?.consent?.sms_opt_in);
 }
 function isAgreementMessage(text) {
   return /^\s*(AGREE|I AGREE|YES|YES I AGREE)\s*$/i.test(text || "");
@@ -635,8 +633,8 @@ export async function handleIncomingMessage({
   // 🧾 Enforce salon-level consent policy
   const salonRequiresConsent = !!salon?.salon_info?.compliance?.stylist_sms_consent_required;
   const stylistOptedIn =
-    stylist?.compliance_opt_in === true ||
-    stylist?.consent?.sms_opt_in === true;
+    !!(stylist?.compliance_opt_in) ||
+    !!(stylist?.consent?.sms_opt_in);
 
   // If salon requires consent but stylist hasn't agreed yet → block
   if (salonRequiresConsent && !stylistOptedIn) {
@@ -660,21 +658,16 @@ export async function handleIncomingMessage({
   if (isAgreementMessage(cleanText) && consentSessions.get(chatId)?.status === "pending") {
     markConsentGranted(chatId);
 
-    // Persist consent to salons/<file>.json
+    // Persist consent to DB (primary) — survives server restarts
     const now = new Date().toISOString();
-    const persist = saveStylistConsent(chatId, {
+    const persist = saveConsentToDb(chatId, {
       compliance_opt_in: true,
       compliance_timestamp: now,
       consent: { sms_opt_in: true, timestamp: now }
     });
     if (!persist.ok) {
-      console.error("⚠️ Failed to persist consent:", persist.error);
-    } else {
-      console.log("✅ Consent persisted:", persist.file);
+      console.error("⚠️ Failed to persist consent to DB:", persist.error);
     }
-
-    // Reload salons so live cache reflects the change
-    await loadSalons();
 
     // Continue with queued content if any
     const queued = getQueuedIfAny(chatId);
