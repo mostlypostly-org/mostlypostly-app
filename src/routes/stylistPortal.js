@@ -1,11 +1,11 @@
 // src/routes/stylistPortal.js — Stylist caption editing portal
 import express from "express";
-import crypto from "crypto";
 import { db } from "../../db.js";
 import { generateCaption } from "../openai.js";
 import { getSalonPolicy } from "../scheduler.js";
 import { composeFinalCaption } from "../core/composeFinalCaption.js";
 import moderateAIOutput from "../utils/moderation.js";
+import { rehostTwilioMedia } from "../utils/rehostTwilioMedia.js";
 
 const router = express.Router();
 
@@ -29,7 +29,7 @@ function validateToken(req, res, next) {
 }
 
 // -------------------------------------------------------
-// HTML helpers
+// Helpers
 // -------------------------------------------------------
 function esc(str) {
   return String(str ?? "")
@@ -40,149 +40,161 @@ function esc(str) {
 
 function shell(title, body) {
   return `<!DOCTYPE html>
-<html lang="en" class="bg-slate-950 text-slate-50">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${esc(title)} – MostlyPostly</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f172a; color: #f1f5f9; font-family: system-ui, sans-serif; }
+  </style>
 </head>
-<body class="max-w-xl mx-auto p-5 pb-16">
-  <div class="flex items-center gap-2 mb-6">
-    <span class="text-mpPrimary font-bold text-lg">MostlyPostly</span>
-  </div>
+<body class="max-w-xl mx-auto px-4 py-6 pb-20">
+  <p class="text-xs font-bold tracking-widest text-blue-400 uppercase mb-6">MostlyPostly</p>
   ${body}
 </body>
 </html>`;
 }
 
 function errorPage(msg) {
-  return shell("Error", `<div class="bg-red-900/30 border border-red-700 rounded-xl p-6 text-red-300">${esc(msg)}</div>`);
+  return shell("Error", `
+    <div class="bg-red-950 border border-red-700 rounded-2xl p-6 text-red-300 text-sm">${esc(msg)}</div>
+  `);
 }
 
-function imageStrip(post) {
+// Rehost all Twilio URLs so browser can display them
+async function resolveDisplayUrls(post) {
   let urls = [];
   try { urls = JSON.parse(post.image_urls || "[]"); } catch { }
   if (!urls.length && post.image_url) urls = [post.image_url];
-  if (!urls.length) return "";
+  return Promise.all(urls.map(u => rehostTwilioMedia(u, post.salon_id).catch(() => u)));
+}
 
-  if (urls.length === 1) {
-    return `<img src="${esc(urls[0])}" class="rounded-xl w-full mb-5 max-h-72 object-cover" />`;
+function renderImages(displayUrls) {
+  if (!displayUrls.length) return "";
+  if (displayUrls.length === 1) {
+    return `<img src="${esc(displayUrls[0])}" class="rounded-2xl w-full max-h-72 object-cover mb-5 border border-slate-800" />`;
   }
   return `
-    <div class="flex gap-2 mb-2 overflow-x-auto pb-1">
-      ${urls.map(u => `<img src="${esc(u)}" class="w-36 h-36 rounded-xl object-cover border border-slate-700 flex-shrink-0" />`).join("")}
+    <div class="flex gap-2 overflow-x-auto mb-2 pb-1">
+      ${displayUrls.map(u => `<img src="${esc(u)}" class="w-36 h-36 rounded-2xl object-cover border border-slate-800 flex-shrink-0" />`).join("")}
     </div>
-    <p class="text-xs text-slate-400 mb-5">${urls.length} photos · caption applies to all</p>
+    <p class="text-xs text-slate-500 mb-5">${displayUrls.length} photos · caption applies to all</p>
   `;
 }
 
 // -------------------------------------------------------
-// GET /:id  — show edit form
+// GET /:id  — show preview + regenerate form
 // -------------------------------------------------------
-router.get("/:id", validateToken, (req, res) => {
+router.get("/:id", validateToken, async (req, res) => {
   const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(req.params.id);
   if (!post) return res.status(404).send(errorPage("Post not found."));
 
-  if (post.status === "manager_pending" || post.status === "manager_approved" || post.status === "published") {
+  if (["manager_pending", "manager_approved", "published"].includes(post.status)) {
     return res.send(shell("Already Submitted", `
-      <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 text-center">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-8 text-center">
         <p class="text-green-400 font-semibold text-lg mb-2">Already submitted!</p>
-        <p class="text-slate-400 text-sm">Your post is ${esc(post.status.replace("_", " "))}. No further action needed.</p>
+        <p class="text-slate-400 text-sm">Your post is ${esc(post.status.replace("_", " "))}. Nothing left to do.</p>
       </div>
     `));
   }
 
   const token = req.query.token;
+  const justRegenerated = req.query.regen === "1";
+  const displayUrls = await resolveDisplayUrls(post);
 
-  // Parse hashtags for locked preview
+  // Build the locked full-post preview
   let hashtags = [];
   try { hashtags = JSON.parse(post.hashtags || "[]"); } catch { }
-  const hashtagLine = hashtags.length ? "\n\n" + hashtags.map(h => `#${h.replace(/^#/, "")}`).join(" ") : "";
-  const lockedPreview = `${post.base_caption || ""}${hashtagLine}\n\n${post.cta || "Book via link in bio."}`;
+  const hashtagLine = hashtags.length ? hashtags.map(h => `#${h.replace(/^#/, "")}`).join(" ") : "";
 
   res.send(shell("Review Your Caption", `
     <h1 class="text-xl font-bold mb-1">Your Post Preview</h1>
-    <p class="text-sm text-slate-400 mb-5">Edit your caption below. Hashtags and booking details are managed by your salon.</p>
+    <p class="text-sm text-slate-400 mb-5">Review your caption below. Add your own notes and regenerate before submitting.</p>
 
-    ${imageStrip(post)}
+    ${renderImages(displayUrls)}
 
-    <form method="POST" action="/stylist/${esc(post.id)}/submit?token=${esc(token)}">
+    ${justRegenerated ? `<div class="bg-green-900/40 border border-green-700 rounded-xl px-4 py-2 text-green-300 text-sm mb-4">Caption regenerated with your input!</div>` : ""}
 
-      <label class="block text-sm font-medium text-slate-300 mb-1">Your Caption</label>
+    <!-- Current caption preview (locked) -->
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-6">
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Current Caption Preview</p>
+      <p class="text-sm text-slate-100 leading-relaxed whitespace-pre-line">${esc(post.base_caption || "")}</p>
+      ${hashtagLine ? `<p class="text-sm text-blue-400 mt-3">${esc(hashtagLine)}</p>` : ""}
+      <p class="text-xs text-slate-500 mt-3">By ${esc(post.stylist_name || "")}</p>
+    </div>
+
+    <!-- Regenerate with notes -->
+    <form method="POST" action="/stylist/${esc(post.id)}/regenerate?token=${esc(token)}">
+      <label class="block text-sm font-medium text-slate-300 mb-1">
+        Add your input <span class="text-slate-500 font-normal">(optional — helps AI write a better caption)</span>
+      </label>
       <textarea
         name="notes"
-        rows="6"
-        placeholder="Describe the service, style, or any personal touch you'd like..."
-        class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-slate-100 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >${esc(post.base_caption || "")}</textarea>
-      <p class="text-xs text-slate-500 mb-5">AI will refine your text using your salon's tone and brand voice.</p>
+        rows="3"
+        placeholder="e.g. Warm balayage, client wanted natural beach waves…"
+        class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-slate-100 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      ></textarea>
+      <button type="submit"
+        class="w-full bg-slate-700 hover:bg-slate-600 text-white font-medium py-2.5 rounded-xl text-sm mb-6 transition-colors">
+        Regenerate with AI
+      </button>
+    </form>
 
-      <div class="bg-slate-900 border border-slate-700 rounded-xl p-4 mb-6">
-        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Full Post Preview (locked)</p>
-        <p class="text-sm text-slate-300 whitespace-pre-line leading-relaxed">${esc(lockedPreview)}</p>
-        <p class="text-xs text-slate-500 mt-2">By ${esc(post.stylist_name || "")}</p>
-      </div>
-
+    <!-- Submit -->
+    <form method="POST" action="/stylist/${esc(post.id)}/submit?token=${esc(token)}">
       <button type="submit"
         class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm transition-colors">
-        Submit for Review
+        Submit for Manager Review
       </button>
     </form>
   `));
 });
 
 // -------------------------------------------------------
-// POST /:id/submit  — AI regenerate → moderation → manager
+// POST /:id/regenerate  — AI regen with stylist notes, redirect back
 // -------------------------------------------------------
-router.post("/:id/submit", validateToken, async (req, res) => {
+router.post("/:id/regenerate", validateToken, async (req, res) => {
   const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(req.params.id);
   if (!post) return res.status(404).send(errorPage("Post not found."));
 
-  const stylistNotes = (req.body.notes || "").trim();
+  const notes = (req.body.notes || "").trim();
   const token = req.query.token;
 
-  // Prevent double-submit
-  if (post.status !== "draft") {
-    return res.send(shell("Already Submitted", `
-      <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 text-center">
-        <p class="text-green-400 font-semibold mb-2">Already submitted!</p>
-        <p class="text-slate-400 text-sm">Your post is being reviewed.</p>
-      </div>
-    `));
-  }
-
   try {
-    // 1. AI regenerate using their notes + salon tone
     const fullSalon = getSalonPolicy(post.salon_id);
 
+    // Rehost image so OpenAI can access it
+    const publicImageUrl = await rehostTwilioMedia(post.image_url, post.salon_id).catch(() => post.image_url);
+
     const aiJson = await generateCaption({
-      imageDataUrl: post.image_url,
-      notes: stylistNotes,
+      imageDataUrl: publicImageUrl,
+      notes: notes || post.original_notes || "",
       salon: fullSalon,
       stylist: { stylist_name: post.stylist_name, name: post.stylist_name },
       city: fullSalon?.city || "",
     });
 
-    // 2. Moderation
+    // Moderation check
     const modResult = await moderateAIOutput(
       { caption: aiJson.caption || "", hashtags: aiJson.hashtags || [] },
-      stylistNotes,
+      notes,
       { post_id: post.id, salon_id: post.salon_id }
     );
 
     if (!modResult.safe) {
       return res.send(shell("Content Flagged", `
-        <div class="bg-red-900/30 border border-red-700 rounded-xl p-6">
-          <p class="text-red-300 font-semibold mb-2">Your caption was flagged</p>
-          <p class="text-slate-400 text-sm">Please revise your content and try again.</p>
-          <a href="/stylist/${esc(post.id)}?token=${esc(token)}"
-            class="inline-block mt-4 text-blue-400 text-sm underline">Go back and edit</a>
+        <div class="bg-red-950 border border-red-700 rounded-2xl p-6 mb-4">
+          <p class="text-red-300 font-semibold mb-2">Your notes were flagged</p>
+          <p class="text-slate-400 text-sm">Please revise your input and try again.</p>
         </div>
+        <a href="/stylist/${esc(post.id)}?token=${esc(token)}"
+          class="block text-center text-blue-400 text-sm underline">Go back</a>
       `));
     }
 
-    // 3. Recompose final caption
+    // Recompose with new caption
     let hashtags = [];
     try { hashtags = aiJson.hashtags || JSON.parse(post.hashtags || "[]"); } catch { }
 
@@ -197,7 +209,95 @@ router.post("/:id/submit", validateToken, async (req, res) => {
       asHtml: false,
     });
 
-    // 4. Save and mark pending
+    db.prepare(`
+      UPDATE posts
+      SET base_caption  = ?,
+          final_caption = ?,
+          hashtags      = ?,
+          updated_at    = datetime('now')
+      WHERE id = ?
+    `).run(aiJson.caption || notes, finalCaption, JSON.stringify(hashtags), post.id);
+
+    return res.redirect(`/stylist/${post.id}?token=${token}&regen=1`);
+
+  } catch (err) {
+    console.error("❌ [Portal] Regenerate error:", err.message);
+    return res.send(shell("Error", `
+      <div class="bg-red-950 border border-red-700 rounded-2xl p-6 mb-4">
+        <p class="text-red-300 font-semibold mb-2">Regeneration failed</p>
+        <p class="text-slate-400 text-sm">${esc(err.message)}</p>
+      </div>
+      <a href="/stylist/${esc(post.id)}?token=${esc(token)}"
+        class="block text-center text-blue-400 text-sm underline">Try again</a>
+    `));
+  }
+});
+
+// -------------------------------------------------------
+// POST /:id/submit  — submit current caption to manager
+// -------------------------------------------------------
+router.post("/:id/submit", validateToken, async (req, res) => {
+  const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(req.params.id);
+  if (!post) return res.status(404).send(errorPage("Post not found."));
+
+  const token = req.query.token;
+
+  if (post.status !== "draft") {
+    return res.send(shell("Already Submitted", `
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-8 text-center">
+        <p class="text-green-400 font-semibold mb-2">Already submitted!</p>
+        <p class="text-slate-400 text-sm">Your post is being reviewed.</p>
+      </div>
+    `));
+  }
+
+  try {
+    // Rehost image so OpenAI can access it
+    const publicImageUrl = await rehostTwilioMedia(post.image_url, post.salon_id).catch(() => post.image_url);
+
+    const fullSalon = getSalonPolicy(post.salon_id);
+
+    // Run AI one more time with the current base_caption as notes to keep tone consistent
+    const aiJson = await generateCaption({
+      imageDataUrl: publicImageUrl,
+      notes: post.base_caption || post.original_notes || "",
+      salon: fullSalon,
+      stylist: { stylist_name: post.stylist_name, name: post.stylist_name },
+      city: fullSalon?.city || "",
+    });
+
+    // Moderation
+    const modResult = await moderateAIOutput(
+      { caption: aiJson.caption || "", hashtags: aiJson.hashtags || [] },
+      post.base_caption || "",
+      { post_id: post.id, salon_id: post.salon_id }
+    );
+
+    if (!modResult.safe) {
+      return res.send(shell("Content Flagged", `
+        <div class="bg-red-950 border border-red-700 rounded-2xl p-6 mb-4">
+          <p class="text-red-300 font-semibold mb-2">Your caption was flagged</p>
+          <p class="text-slate-400 text-sm">Please go back and revise your content.</p>
+        </div>
+        <a href="/stylist/${esc(post.id)}?token=${esc(token)}"
+          class="block text-center text-blue-400 text-sm underline">Go back and edit</a>
+      `));
+    }
+
+    let hashtags = [];
+    try { hashtags = aiJson.hashtags || JSON.parse(post.hashtags || "[]"); } catch { }
+
+    const finalCaption = composeFinalCaption({
+      caption: aiJson.caption,
+      hashtags,
+      cta: aiJson.cta || post.cta || "Book via link in bio.",
+      instagramHandle: null,
+      stylistName: post.stylist_name || "",
+      bookingUrl: fullSalon?.booking_url || fullSalon?.booking_link || "",
+      salon: fullSalon,
+      asHtml: false,
+    });
+
     db.prepare(`
       UPDATE posts
       SET base_caption  = ?,
@@ -206,36 +306,30 @@ router.post("/:id/submit", validateToken, async (req, res) => {
           status        = 'manager_pending',
           updated_at    = datetime('now')
       WHERE id = ?
-    `).run(
-      aiJson.caption || stylistNotes,
-      finalCaption,
-      JSON.stringify(hashtags),
-      post.id
-    );
+    `).run(aiJson.caption || post.base_caption, finalCaption, JSON.stringify(hashtags), post.id);
 
-    // 5. Mark token used
     db.prepare(`UPDATE stylist_portal_tokens SET used_at = datetime('now') WHERE post_id = ? AND token = ?`)
       .run(post.id, token);
 
     console.log(`✅ [Portal] Post ${post.id} submitted by ${post.stylist_name} → manager_pending`);
 
     return res.send(shell("Submitted!", `
-      <div class="bg-slate-900 border border-slate-700 rounded-xl p-8 text-center mt-8">
-        <div class="text-4xl mb-4">✅</div>
-        <p class="text-white font-bold text-lg mb-2">Caption submitted!</p>
-        <p class="text-slate-400 text-sm">Your manager will review and approve it shortly. You'll be notified when it's posted.</p>
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-8 text-center mt-8">
+        <div class="text-5xl mb-4">✅</div>
+        <p class="text-white font-bold text-xl mb-2">Caption submitted!</p>
+        <p class="text-slate-400 text-sm">Your manager will review and approve it. You'll be notified when it's posted.</p>
       </div>
     `));
 
   } catch (err) {
     console.error("❌ [Portal] Submit error:", err.message);
     return res.send(shell("Error", `
-      <div class="bg-red-900/30 border border-red-700 rounded-xl p-6">
+      <div class="bg-red-950 border border-red-700 rounded-2xl p-6 mb-4">
         <p class="text-red-300 font-semibold mb-2">Something went wrong</p>
-        <p class="text-slate-400 text-sm mb-4">${esc(err.message)}</p>
-        <a href="/stylist/${esc(post.id)}?token=${esc(req.query.token)}"
-          class="inline-block text-blue-400 text-sm underline">Try again</a>
+        <p class="text-slate-400 text-sm">${esc(err.message)}</p>
       </div>
+      <a href="/stylist/${esc(post.id)}?token=${esc(token)}"
+        class="block text-center text-blue-400 text-sm underline">Try again</a>
     `));
   }
 });
