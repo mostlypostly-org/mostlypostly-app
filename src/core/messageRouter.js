@@ -95,6 +95,7 @@ import {
   updatePostStatus,
   findPendingPostByManager,
   findPostAwaitingReason,
+  findLatestDraft,
   saveStylistConsent,
 } from "../core/storage.js";
 import { composeFinalCaption } from "./composeFinalCaption.js";
@@ -513,8 +514,27 @@ async function processNewImageFlow({
   // Stylist preview remains FB-style (name + IG URL under it)
   const previewCaption = buildFacebookCaption(baseCaption, stylistName, stylistHandle);
 
-  // Save draft
-  drafts.set(chatId, { ...aiJson, final_caption: previewCaption, base_caption: baseCaption });
+  // Save draft to memory AND DB so it survives a server restart
+  const draftPayload = { ...aiJson, final_caption: previewCaption, base_caption: baseCaption };
+
+  try {
+    const savedDraft = savePost(
+      chatId,
+      { ...stylist, image_url: imageUrl, final_caption: previewCaption },
+      aiJson.caption,
+      aiJson.hashtags || [],
+      "draft",
+      null,
+      salon
+    );
+    if (savedDraft?.id) {
+      draftPayload._db_id = savedDraft.id;
+    }
+  } catch (err) {
+    console.warn("⚠️ [processNewImageFlow] Could not persist draft to DB:", err.message);
+  }
+
+  drafts.set(chatId, draftPayload);
 
   // 5️⃣ Send stylist preview
   const preview = `
@@ -526,6 +546,25 @@ async function processNewImageFlow({
   `.trim();
 
   await sendMessage.sendText(chatId, preview);
+}
+
+// --------------------------------------
+// Restore a DB draft row into the shape the APPROVE/REGENERATE handlers expect
+function restoreDraftFromDb(row) {
+  let hashtags = [];
+  try { hashtags = JSON.parse(row.hashtags || "[]"); } catch { /* leave empty */ }
+  return {
+    caption: row.base_caption || row.final_caption || "",
+    hashtags,
+    cta: row.cta || "",
+    image_url: row.image_url || null,
+    original_notes: row.original_notes || "",
+    final_caption: row.final_caption || "",
+    base_caption: row.base_caption || "",
+    service_type: row.service_type || "other",
+    _db_id: row.id,
+    _restored: true,
+  };
 }
 
 // --------------------------------------
@@ -666,6 +705,13 @@ export async function handleIncomingMessage({
 
   // CANCEL
   if (command === "CANCEL") {
+    const cancelDraft = drafts.get(chatId);
+    const dbId = cancelDraft?._db_id;
+    if (dbId) {
+      try { updatePostStatus(dbId, "cancelled"); } catch (err) {
+        console.warn("⚠️ Could not cancel DB draft:", err.message);
+      }
+    }
     drafts.delete(chatId);
     await sendMessage.sendText(chatId, "🛑 Cancelled. No action taken.");
     endTimer(start);
@@ -686,7 +732,17 @@ export async function handleIncomingMessage({
 
   // APPROVE
   if (/^APPROVE\b/i.test(command)) {
-    const draft = drafts.get(chatId);
+    let draft = drafts.get(chatId);
+
+    // If in-memory draft is gone (e.g. server restarted mid-flow), try DB
+    if (!draft) {
+      const dbDraft = findLatestDraft(chatId);
+      if (dbDraft) {
+        console.log(`[Router] Restored draft from DB for ${chatId} (server may have restarted)`);
+        draft = restoreDraftFromDb(dbDraft);
+        drafts.set(chatId, draft);
+      }
+    }
 
     // ✅ Always rehost Twilio media so dashboards can render the image
     let imageUrl = null;
@@ -1064,7 +1120,18 @@ export async function handleIncomingMessage({
 
   // REGENERATE
   if (command === "REGENERATE") {
-    const draft = drafts.get(chatId);
+    let draft = drafts.get(chatId);
+
+    // DB fallback for server restart recovery
+    if (!draft) {
+      const dbDraft = findLatestDraft(chatId);
+      if (dbDraft) {
+        console.log(`[Router] Restored draft from DB for REGENERATE (${chatId})`);
+        draft = restoreDraftFromDb(dbDraft);
+        drafts.set(chatId, draft);
+      }
+    }
+
     if (!draft?.image_url) {
       await sendMessage.sendText(chatId, "⚠️ No previous image found. Please send a new photo first.");
       endTimer(start);

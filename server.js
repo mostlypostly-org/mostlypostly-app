@@ -15,6 +15,8 @@ import express from "express";
 import session from "express-session";
 import path from "path";
 import { fileURLToPath } from "url";
+import teamsRoute from "./src/routes/teams.js";
+
 
 // =====================================================
 // Load salons BEFORE routes (legacy JSON loader only)
@@ -28,10 +30,8 @@ if (process.env.APP_ENV === "local") {
 }
 
 // =====================================================
-// Schema + analytics bootstrap
+// Analytics bootstrap
 // =====================================================
-import { initSchemaHealth } from "./src/core/initSchemaHealth.js";
-initSchemaHealth();
 import "./src/core/analyticsDb.js";
 
 // =====================================================
@@ -127,6 +127,56 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// =====================================================
+// INBOUND TELEGRAM / TWILIO / MICROSOFT TEAMS
+// =====================================================
+const drafts = new Map();
+
+app.use(
+  "/inbound/telegram",
+  telegramRoute(
+    drafts,
+    lookupStylist,  // MUST be passed explicitly
+    ({ imageUrl, notes, stylist, salon }) =>
+      generateCaption({
+        imageDataUrl: imageUrl,
+        notes,
+        salon,
+        stylist,
+        city: stylist?.city || "",
+      })
+  )
+);
+
+app.use(
+  "/inbound/twilio",
+  twilioRoute(drafts, lookupStylist, ({ imageUrl, notes, stylist, salon }) =>
+    generateCaption({
+      imageDataUrl: imageUrl,
+      notes,
+      salon,
+      stylist,
+      city: stylist?.city || "",
+    })
+  )
+);
+
+app.use(
+  "/inbound/teams",
+  teamsRoute(
+    drafts,
+    lookupStylist,
+    ({ imageUrl, notes, stylist, salon }) =>
+      generateCaption({
+        imageDataUrl: imageUrl,
+        notes,
+        salon,
+        stylist,
+        city: stylist?.city || "",
+      })
+  )
+);
+
 // Public uploads
 app.use(
   "/uploads",
@@ -212,40 +262,6 @@ app.use("/stylist", stylistPortal);
 // Analytics API (public JSON endpoints for dashboard)
 // =====================================================
 app.use("/api", analyticsRoute);
-
-// =====================================================
-// INBOUND TELEGRAM / TWILIO
-// =====================================================
-const drafts = new Map();
-
-app.use(
-  "/inbound/telegram",
-  telegramRoute(
-    drafts,
-    lookupStylist,  // MUST be passed explicitly
-    ({ imageUrl, notes, stylist, salon }) =>
-      generateCaption({
-        imageDataUrl: imageUrl,
-        notes,
-        salon,
-        stylist,
-        city: stylist?.city || "",
-      })
-  )
-);
-
-app.use(
-  "/inbound/twilio",
-  twilioRoute(drafts, lookupStylist, ({ imageUrl, notes, stylist, salon }) =>
-    generateCaption({
-      imageDataUrl: imageUrl,
-      notes,
-      salon,
-      stylist,
-      city: stylist?.city || "",
-    })
-  )
-);
 
 // =====================================================
 // DASHBOARD / POSTS / ANALYTICS UI ROUTES
