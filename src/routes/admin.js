@@ -3,11 +3,31 @@
 // ───────────────────────────────────────────────────────────
 
 import express from "express";
+import fs from "fs";
+import path from "path";
+import multer from "multer";
 import db from "../../db.js";
 import pageShell from "../ui/pageShell.js";
 import { DateTime } from "luxon";
 import crypto from "crypto";
 import { isContentSafe, sanitizeText } from "../../src/utils/moderation.js";
+
+const UPLOADS_DIR = path.resolve("public/uploads");
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const stockPhotoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+    filename:    (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || ".jpg";
+      cb(null, `stock-${Date.now()}${ext}`);
+    },
+  }),
+  fileFilter: (_req, file, cb) => {
+    cb(null, /image\/(jpeg|png|webp|gif)/.test(file.mimetype));
+  },
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 const router = express.Router();
 
@@ -71,7 +91,7 @@ router.get("/", requireAuth, (req, res) => {
   // Members
   const dbStylists = db
     .prepare(
-      `SELECT id, name, phone, instagram_handle, specialties
+      `SELECT id, name, phone, instagram_handle, specialties, photo_url
        FROM stylists
        WHERE salon_id = ?
        ORDER BY name ASC`
@@ -462,6 +482,74 @@ dbStylists.forEach((s) => {
           data-custom-hashtags='${JSON.stringify(info.default_hashtags.slice(1))}'
         ></div>
 
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STOCK PHOTOS                                           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  ${(() => {
+    const stockPhotos = db.prepare(
+      `SELECT sp.id, sp.label, sp.url, sp.stylist_id, s.name AS stylist_name
+       FROM stock_photos sp
+       LEFT JOIN stylists s ON s.id = sp.stylist_id
+       WHERE sp.salon_id = ?
+       ORDER BY sp.created_at DESC`
+    ).all(salon_id);
+
+    const stylists = db.prepare(
+      `SELECT id, name FROM stylists WHERE salon_id = ? ORDER BY name ASC`
+    ).all(salon_id);
+
+    const photoCards = stockPhotos.length
+      ? stockPhotos.map(p => `
+          <div class="flex items-center gap-3 bg-slate-800 rounded-xl p-3">
+            <img src="${p.url}" class="w-16 h-16 rounded-lg object-cover border border-slate-700 flex-shrink-0" />
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-slate-100 font-medium truncate">${p.label || "Unlabeled"}</p>
+              <p class="text-xs text-slate-400">${p.stylist_name ? "Stylist: " + p.stylist_name : "Salon-wide"}</p>
+            </div>
+            <form method="POST" action="/manager/admin/stock-photos/delete?salon=${salon_id}" class="flex-shrink-0">
+              <input type="hidden" name="photo_id" value="${p.id}" />
+              <button class="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-slate-700">Remove</button>
+            </form>
+          </div>
+        `).join("")
+      : `<p class="text-slate-500 text-sm italic">No stock photos uploaded yet.</p>`;
+
+    const stylistOptions = stylists.map(s =>
+      `<option value="${s.id}">${s.name}</option>`
+    ).join("");
+
+    return `
+    <section class="mb-10">
+      <h2 class="text-lg font-semibold text-white mb-1">Stock Photos</h2>
+      <p class="text-sm text-slate-400 mb-4">Used for availability posts. Upload salon-wide or per-stylist background photos.</p>
+
+      <div class="space-y-3 mb-6">
+        ${photoCards}
+      </div>
+
+      <form method="POST" action="/manager/admin/stock-photos/upload?salon=${salon_id}"
+            enctype="multipart/form-data"
+            class="bg-slate-900 border border-slate-700 rounded-2xl p-5 space-y-3">
+        <h3 class="text-sm font-semibold text-slate-200">Upload New Stock Photo</h3>
+        <input type="file" name="stock_photo" accept="image/*" required
+          class="w-full text-sm text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-slate-700 file:text-slate-100 hover:file:bg-slate-600" />
+        <input name="label" placeholder="Label (e.g. Salon Interior, Spring Backdrop)"
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100" />
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Link to a stylist (optional — leave blank for salon-wide)</label>
+          <select name="stylist_id" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100">
+            <option value="">Salon-wide</option>
+            ${stylistOptions}
+          </select>
+        </div>
+        <button class="w-full bg-blue-600 hover:bg-blue-700 rounded-lg py-2 text-sm font-semibold text-white">
+          Upload Stock Photo
+        </button>
+      </form>
+    </section>
+    `;
+  })()}
+
   `;
 
   // Render page
@@ -830,6 +918,49 @@ router.get("/delete-stylist", requireAuth, (req, res) => {
   }
 });
 
+
+// ───────────────────────────────────────────────────────────
+// STOCK PHOTOS — Upload
+// ───────────────────────────────────────────────────────────
+router.post("/stock-photos/upload", requireAuth, stockPhotoUpload.single("stock_photo"), (req, res) => {
+  const salon_id = req.query.salon || req.manager?.salon_id;
+  if (!req.file) return res.redirect(`/manager/admin?salon=${salon_id}`);
+
+  const base = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+  const url  = `${base}/uploads/${req.file.filename}`;
+  const label      = (req.body.label || "").trim() || null;
+  const stylist_id = req.body.stylist_id || null;
+
+  db.prepare(`
+    INSERT INTO stock_photos (id, salon_id, stylist_id, label, url)
+    VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?)
+  `).run(salon_id, stylist_id || null, label, url);
+
+  console.log(`[Admin] Stock photo uploaded for salon ${salon_id}: ${url}`);
+  return res.redirect(`/manager/admin?salon=${salon_id}`);
+});
+
+// ───────────────────────────────────────────────────────────
+// STOCK PHOTOS — Delete
+// ───────────────────────────────────────────────────────────
+router.post("/stock-photos/delete", requireAuth, (req, res) => {
+  const salon_id = req.query.salon || req.manager?.salon_id;
+  const { photo_id } = req.body;
+
+  if (photo_id) {
+    const row = db.prepare(`SELECT url FROM stock_photos WHERE id = ? AND salon_id = ?`).get(photo_id, salon_id);
+    if (row) {
+      db.prepare(`DELETE FROM stock_photos WHERE id = ?`).run(photo_id);
+      // Optionally remove the file from disk
+      try {
+        const filePath = path.join(path.resolve("public"), new URL(row.url).pathname);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch { /* ignore file removal errors */ }
+    }
+  }
+
+  return res.redirect(`/manager/admin?salon=${salon_id}`);
+});
 
 // ───────────────────────────────────────────────────────────
 // Export

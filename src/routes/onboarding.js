@@ -2,7 +2,25 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
+import multer from "multer";
 import db from "../../db.js";
+
+const UPLOADS_DIR = path.resolve("public/uploads");
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const stylistPhotoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+    filename:    (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || ".jpg";
+      cb(null, `stylist-${Date.now()}${ext}`);
+    },
+  }),
+  fileFilter: (_req, file, cb) => {
+    cb(null, /image\/(jpeg|png|webp|gif)/.test(file.mimetype));
+  },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+});
 
 const router = express.Router();
 
@@ -686,7 +704,7 @@ router.get("/stylists", (req, res) => {
           ${editStylist ? "Edit Stylist" : "Add Stylist"}
         </h3>
 
-        <form id="stylist-form" method="POST" class="space-y-4">
+        <form id="stylist-form" method="POST" enctype="multipart/form-data" class="space-y-4">
 
           <input type="hidden" name="stylist_id" value="${
             editStylist ? editStylist.id : ""
@@ -711,6 +729,19 @@ router.get("/stylists", (req, res) => {
               class="bg-slate-800 rounded p-2 text-sm"
               value="${editStylist ? editStylist.instagram_handle || "" : ""}"
             />
+          </div>
+
+          <!-- Stylist Photo -->
+          <div>
+            <label class="block mb-1 text-sm">Stylist Photo <span class="text-slate-400 font-normal">(used for availability posts)</span></label>
+            ${editStylist?.photo_url
+              ? `<div class="mb-2 flex items-center gap-3">
+                   <img src="${editStylist.photo_url}" class="w-16 h-16 rounded-lg object-cover border border-slate-700" />
+                   <span class="text-xs text-slate-400">Current photo — upload a new one to replace</span>
+                 </div>`
+              : ""}
+            <input type="file" name="stylist_photo" accept="image/*"
+              class="w-full text-sm text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-slate-700 file:text-slate-100 hover:file:bg-slate-600" />
           </div>
 
           <!-- Specialties tag input -->
@@ -808,7 +839,7 @@ router.get("/stylists", (req, res) => {
   );
 });
 
-router.post("/stylists", (req, res) => {
+router.post("/stylists", stylistPhotoUpload.single("stylist_photo"), (req, res) => {
   const manager = getSessionManager(req);
   if (!manager) return res.redirect("/manager/login");
 
@@ -830,19 +861,33 @@ router.post("/stylists", (req, res) => {
     return res.redirect("/onboarding/stylists");
   }
 
+  // Build public photo URL if a file was uploaded
+  const base = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+  const photoUrl = req.file
+    ? `${base}/uploads/${req.file.filename}`
+    : null;
+
   if (stylist_id) {
-    // UPDATE existing stylist
-    db.prepare(
-      `UPDATE stylists
-       SET name = ?, phone = ?, instagram_handle = ?, specialties = ?
-       WHERE id = ? AND salon_id = ?`
-    ).run(stylist_name, stylist_phone, stylist_ig, specs, stylist_id, salon_id);
+    // UPDATE existing stylist — only overwrite photo if a new one was uploaded
+    if (photoUrl) {
+      db.prepare(
+        `UPDATE stylists
+         SET name = ?, phone = ?, instagram_handle = ?, specialties = ?, photo_url = ?
+         WHERE id = ? AND salon_id = ?`
+      ).run(stylist_name, stylist_phone, stylist_ig, specs, photoUrl, stylist_id, salon_id);
+    } else {
+      db.prepare(
+        `UPDATE stylists
+         SET name = ?, phone = ?, instagram_handle = ?, specialties = ?
+         WHERE id = ? AND salon_id = ?`
+      ).run(stylist_name, stylist_phone, stylist_ig, specs, stylist_id, salon_id);
+    }
   } else {
     // INSERT new stylist
     db.prepare(
-      `INSERT INTO stylists (id, salon_id, name, phone, instagram_handle, specialties)
-       VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?)`
-    ).run(salon_id, stylist_name, stylist_phone, stylist_ig, specs);
+      `INSERT INTO stylists (id, salon_id, name, phone, instagram_handle, specialties, photo_url)
+       VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?)`
+    ).run(salon_id, stylist_name, stylist_phone, stylist_ig, specs, photoUrl);
   }
 
   res.redirect("/onboarding/stylists");
