@@ -237,7 +237,7 @@ router.get("/", (req, res) => {
   const { fromUtc, toUtc } = rangeToUtc(range, tz, start, end);
 
   let sql = `
-    SELECT id, stylist_name, salon_id, status, created_at, scheduled_for, salon_post_number, final_caption, image_url, image_urls
+    SELECT id, stylist_name, salon_id, status, post_type, created_at, scheduled_for, salon_post_number, final_caption, image_url, image_urls
     FROM posts
     WHERE salon_id = ?
       AND datetime(created_at) BETWEEN datetime(?) AND datetime(?)
@@ -269,16 +269,32 @@ router.get("/", (req, res) => {
     return res.send(csv);
   }
 
+  const postTypeColors = {
+    standard_post: "bg-slate-700 text-slate-200",
+    before_after:  "bg-purple-900 text-purple-200",
+    products:      "bg-green-900 text-green-200",
+    promotions:    "bg-yellow-900 text-yellow-200",
+    availability:  "bg-blue-900 text-blue-200",
+  };
+
   const rows = posts
     .map(
-      (p) => `
+      (p) => {
+        const pt = p.post_type || "standard_post";
+        const ptLabel = pt.replace(/_/g, " ");
+        const ptColor = postTypeColors[pt] || postTypeColors.standard_post;
+        return `
       <tr class="border-b border-slate-800/70 hover:bg-slate-900/80">
         <td class="px-3 py-2 text-xs text-slate-300">#${p.salon_post_number ?? "—"}</td>
         <td class="px-3 py-2 text-sm text-slate-100">${p.stylist_name || "—"}</td>
         <td class="px-3 py-2 text-xs uppercase tracking-wide text-mpPrimary">${p.status}</td>
+        <td class="px-3 py-2 text-xs">
+          <span class="inline-block rounded px-2 py-0.5 text-xs font-medium capitalize ${ptColor}">${ptLabel}</span>
+        </td>
         <td class="px-3 py-2 text-xs text-slate-300">${formatLocalTime(p.created_at, salon_id)}</td>
         <td class="px-3 py-2 text-xs text-slate-300">${formatLocalTime(p.scheduled_for, salon_id)}</td>
-      </tr>`
+      </tr>`;
+      }
     )
     .join("\n");
 
@@ -402,6 +418,7 @@ router.get("/", (req, res) => {
               <th class="px-3 py-2 text-left">ID</th>
               <th class="px-3 py-2 text-left">Stylist</th>
               <th class="px-3 py-2 text-left">Status</th>
+              <th class="px-3 py-2 text-left">Type</th>
               <th class="px-3 py-2 text-left">Created</th>
               <th class="px-3 py-2 text-left">Scheduled</th>
             </tr>
