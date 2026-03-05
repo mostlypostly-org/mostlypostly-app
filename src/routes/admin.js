@@ -15,6 +15,20 @@ import { isContentSafe, sanitizeText } from "../../src/utils/moderation.js";
 const UPLOADS_DIR = path.resolve("public/uploads");
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
+const managerPhotoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+    filename:    (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || ".jpg";
+      cb(null, `manager-${Date.now()}${ext}`);
+    },
+  }),
+  fileFilter: (_req, file, cb) => {
+    cb(null, /image\/(jpeg|png|webp|gif)/.test(file.mimetype));
+  },
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
 const stockPhotoUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
@@ -483,6 +497,75 @@ dbStylists.forEach((s) => {
         ></div>
 
   <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- MY PROFILE (manager as stylist)                       -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  ${(() => {
+    const mgrRow = db.prepare(`
+      SELECT id, name, phone, instagram_handle, photo_url, specialties, preferred_music_genre
+      FROM managers WHERE id = ?
+    `).get(req.manager?.id);
+
+    const currentPhoto = mgrRow?.photo_url || "";
+    const currentHandle = mgrRow?.instagram_handle || "";
+    const currentSpecialties = mgrRow?.specialties || "";
+    const currentMusic = mgrRow?.preferred_music_genre || "";
+
+    return `
+    <section class="mb-10">
+      <h2 class="text-lg font-semibold text-white mb-1">My Stylist Profile</h2>
+      <p class="text-sm text-slate-400 mb-4">Used when you post content as a stylist (photo, IG handle, availability posts, etc.)</p>
+
+      <form method="POST" action="/manager/admin/update-my-profile?salon=${salon_id}"
+            enctype="multipart/form-data"
+            class="bg-slate-900 border border-slate-700 rounded-2xl p-5 space-y-4">
+
+        ${currentPhoto ? `
+          <div class="flex items-center gap-3">
+            <img src="${currentPhoto}" class="w-16 h-16 rounded-lg object-cover border border-slate-700" />
+            <span class="text-xs text-slate-400">Current photo — upload a new one to replace</span>
+          </div>` : ""}
+
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Profile Photo</label>
+          <input type="file" name="manager_photo" accept="image/*"
+            class="w-full text-sm text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-slate-700 file:text-slate-100 hover:file:bg-slate-600" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Instagram Handle</label>
+            <input name="instagram_handle" value="${currentHandle}"
+              placeholder="yourhandle (no @)"
+              class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Preferred Music Genre</label>
+            <select name="preferred_music_genre"
+              class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100">
+              <option value="">None</option>
+              ${["Pop", "Country", "Hip-Hop", "R&B", "Rock", "Latin", "EDM"].map(g =>
+                `<option value="${g}" ${currentMusic === g ? "selected" : ""}>${g}</option>`
+              ).join("")}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Specialties <span class="text-slate-500">(comma separated)</span></label>
+          <input name="specialties" value="${currentSpecialties}"
+            placeholder="e.g. Balayage, Color, Extensions"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100" />
+        </div>
+
+        <button class="w-full bg-indigo-600 hover:bg-indigo-700 rounded-lg py-2 text-sm font-semibold text-white">
+          Save Profile
+        </button>
+      </form>
+    </section>
+    `;
+  })()}
+
+  <!-- ═══════════════════════════════════════════════════════ -->
   <!-- STOCK PHOTOS                                           -->
   <!-- ═══════════════════════════════════════════════════════ -->
   ${(() => {
@@ -918,6 +1001,39 @@ router.get("/delete-stylist", requireAuth, (req, res) => {
   }
 });
 
+
+// ───────────────────────────────────────────────────────────
+// MY PROFILE — Save manager stylist profile
+// ───────────────────────────────────────────────────────────
+router.post("/update-my-profile", requireAuth, managerPhotoUpload.single("manager_photo"), (req, res) => {
+  const salon_id  = req.query.salon || req.manager?.salon_id;
+  const manager_id = req.manager?.id;
+  if (!manager_id) return res.redirect(`/manager/admin?salon=${salon_id}`);
+
+  const base = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+  const photoUrl = req.file ? `${base}/uploads/${req.file.filename}` : null;
+
+  const instagram_handle     = (req.body.instagram_handle || "").replace(/^@+/, "").trim() || null;
+  const specialties          = (req.body.specialties || "").trim() || null;
+  const preferred_music_genre = (req.body.preferred_music_genre || "").trim() || null;
+
+  if (photoUrl) {
+    db.prepare(`
+      UPDATE managers
+      SET instagram_handle = ?, photo_url = ?, specialties = ?, preferred_music_genre = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(instagram_handle, photoUrl, specialties, preferred_music_genre, manager_id);
+  } else {
+    db.prepare(`
+      UPDATE managers
+      SET instagram_handle = ?, specialties = ?, preferred_music_genre = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(instagram_handle, specialties, preferred_music_genre, manager_id);
+  }
+
+  console.log(`[Admin] Manager profile updated: ${manager_id}`);
+  return res.redirect(`/manager/admin?salon=${salon_id}`);
+});
 
 // ───────────────────────────────────────────────────────────
 // STOCK PHOTOS — Upload

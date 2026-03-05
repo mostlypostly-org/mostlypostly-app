@@ -60,12 +60,18 @@ If no clear times, return the message split into short lines.`;
 // Pick background: stylist photo → salon stock → DALL-E
 // ─────────────────────────────────────────────────────────
 async function pickBackground(stylistId, salonId) {
-  // 1. Stylist personal photo
+  // 1. Personal photo — check both stylists and managers tables
   if (stylistId) {
-    const row = db.prepare(`SELECT photo_url FROM stylists WHERE id = ?`).get(stylistId);
-    if (row?.photo_url) {
+    const stylistRow = db.prepare(`SELECT photo_url FROM stylists WHERE id = ?`).get(stylistId);
+    if (stylistRow?.photo_url) {
       console.log("[Availability] Using stylist personal photo");
-      return row.photo_url;
+      return stylistRow.photo_url;
+    }
+
+    const managerRow = db.prepare(`SELECT photo_url FROM managers WHERE id = ?`).get(stylistId);
+    if (managerRow?.photo_url) {
+      console.log("[Availability] Using manager personal photo");
+      return managerRow.photo_url;
     }
 
     // 2. Stylist-linked stock photo
