@@ -217,7 +217,12 @@ app.use("/manager", managerAuthRoutes);
 app.use("/manager", managerRoutes);
 
 // -------------------------------------------------------
-// 3. ONBOARDING ROUTES (allowed BEFORE guard)
+// 3. STYLIST PORTAL (token-auth, no session — must be before onboarding guard)
+// -------------------------------------------------------
+app.use("/stylist", stylistPortal);
+
+// -------------------------------------------------------
+// 4. ONBOARDING ROUTES (allowed BEFORE guard)
 // -------------------------------------------------------
 app.use("/onboarding", onboardingRoutes);
 
@@ -240,11 +245,6 @@ app.use(restoreManagerSession);
 // 7. ADMIN ROUTES
 // -------------------------------------------------------
 app.use("/manager/admin", adminRouter);
-
-// =====================================================
-// Stylist Portal (no auth)
-// =====================================================
-app.use("/stylist", stylistPortal);
 
 // =====================================================
 // Analytics API (public JSON endpoints for dashboard)

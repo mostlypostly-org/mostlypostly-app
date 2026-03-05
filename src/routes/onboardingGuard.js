@@ -41,6 +41,9 @@ if (url.startsWith("/inbound/telegram")) {
   // Allow onboarding routes
   if (url.startsWith("/onboarding")) return next();
 
+  // Allow stylist portal (token-authenticated, no session needed)
+  if (url.startsWith("/stylist")) return next();
+
   const manager_id = req.session?.manager_id;
   const salon_id = req.session?.salon_id;
 
