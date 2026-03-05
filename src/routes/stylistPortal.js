@@ -46,7 +46,20 @@ router.get("/:id", validateStylistToken, (req, res) => {
 
       <h1 class="text-2xl font-bold mb-4">Edit Post</h1>
 
-      <img src="${post.image_url}" class="rounded-xl w-full mb-4" />
+      ${(() => {
+        let urls = [];
+        try { urls = JSON.parse(post.image_urls || "[]"); } catch { }
+        if (!urls.length && post.image_url) urls = [post.image_url];
+        if (urls.length <= 1) {
+          return `<img src="${urls[0] || ""}" class="rounded-xl w-full mb-4" />`;
+        }
+        return `
+          <div class="flex gap-2 mb-4 overflow-x-auto">
+            ${urls.map(u => `<img src="${u}" class="w-32 h-32 rounded-xl object-cover border border-slate-700 flex-shrink-0" />`).join("")}
+          </div>
+          <p class="text-xs text-slate-400 mb-4">${urls.length} photos — caption applies to all</p>
+        `;
+      })()}
 
       <form method="POST" action="/stylist/${post.id}/update?token=${req.query.token}">
         <textarea name="caption" class="w-full bg-slate-900 p-3 rounded-xl border border-slate-700 h-40 mb-4">${post.final_caption}</textarea>

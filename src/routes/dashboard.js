@@ -237,7 +237,7 @@ router.get("/", (req, res) => {
   const { fromUtc, toUtc } = rangeToUtc(range, tz, start, end);
 
   let sql = `
-    SELECT id, stylist_name, salon_id, status, created_at, scheduled_for, salon_post_number, final_caption, image_url
+    SELECT id, stylist_name, salon_id, status, created_at, scheduled_for, salon_post_number, final_caption, image_url, image_urls
     FROM posts
     WHERE salon_id = ?
       AND datetime(created_at) BETWEEN datetime(?) AND datetime(?)

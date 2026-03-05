@@ -18,6 +18,29 @@ function esc(str) {
     .replace(/'/g, "&#x27;");
 }
 
+// Render image thumbnail(s) — single img or horizontal strip for multi-image posts
+function imageStrip(p, thumbClass = "w-32 h-32") {
+  let urls = [];
+  try { urls = JSON.parse(p.image_urls || "[]"); } catch { }
+  if (!urls.length && p.image_url) urls = [p.image_url];
+  if (!urls.length) return `<div class="${thumbClass} rounded-lg bg-slate-800 border border-slate-700"></div>`;
+
+  if (urls.length === 1) {
+    return `<img src="${esc(urls[0])}" class="${thumbClass} rounded-lg object-cover border border-slate-700" />`;
+  }
+
+  // Multi-image: horizontal strip with count badge
+  const stripThumb = thumbClass.includes("w-32") ? "w-20 h-20" : "w-16 h-16";
+  return `
+    <div class="flex flex-col gap-1">
+      <div class="flex gap-1">
+        ${urls.map(u => `<img src="${esc(u)}" class="${stripThumb} rounded-lg object-cover border border-slate-700" />`).join("")}
+      </div>
+      <span class="text-xs text-slate-400 text-center">${urls.length} photos</span>
+    </div>
+  `;
+}
+
 /* -------------------------------------------------------------
    AUTH MIDDLEWARE (SESSION ONLY)
 ------------------------------------------------------------- */
@@ -102,10 +125,7 @@ router.get("/", requireAuth, (req, res) => {
             return `
           <div class="rounded-xl bg-slate-900 border border-slate-800 p-5 mb-5">
             <div class="flex gap-4">
-              <img
-                src="${esc(p.image_url)}"
-                class="w-32 h-32 rounded-lg object-cover border border-slate-700"
-              />
+              ${imageStrip(p, "w-32 h-32")}
 
               <div class="flex-1">
                 <p class="text-xs text-slate-400 mb-1">
@@ -160,10 +180,7 @@ router.get("/", requireAuth, (req, res) => {
           <div class="recent-card rounded-xl bg-slate-900 border border-slate-800 p-4 mb-4">
 
             <div class="flex gap-4">
-              <img
-                src="${esc(p.image_url)}"
-                class="w-24 h-24 rounded-lg object-cover border border-slate-700"
-              />
+              ${imageStrip(p, "w-24 h-24")}
 
               <div class="flex-1">
 
