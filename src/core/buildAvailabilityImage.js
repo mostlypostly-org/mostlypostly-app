@@ -235,15 +235,15 @@ function escSvg(str) {
  * @param {string}   opts.bookingCta
  * @returns {Promise<string>}  Public URL of the saved story image
  */
-export async function buildAvailabilityImage({ text, stylistName, salonName, salonId, stylistId, bookingCta }) {
+export async function buildAvailabilityImage({ text, stylistName, salonName, salonId, stylistId, bookingCta, submittedImageUrl }) {
   console.log("[Availability] Building story image…");
 
   // 1. Parse slots
   const slots = await parseAvailabilitySlots(text);
   console.log("[Availability] Slots parsed:", slots);
 
-  // 2. Pick background
-  const bgUrl = await pickBackground(stylistId, salonId);
+  // 2. Pick background — submitted photo wins, then stock/DALL-E
+  const bgUrl = submittedImageUrl || await pickBackground(stylistId, salonId);
 
   // 3. Fetch and resize background to story dimensions
   let bgLayer;

@@ -109,13 +109,13 @@ router.get("/", requireAuth, async (req, res) => {
     )
     .all(salon_id);
 
-  // Fetch recent (all except manager_pending)
+  // Fetch recent (exclude drafts and pending-approval — those show elsewhere)
   const recentRaw = db
     .prepare(
       `SELECT *
         FROM posts
         WHERE salon_id = ?
-          AND status NOT IN ('manager_pending')
+          AND status NOT IN ('manager_pending', 'draft')
         ORDER BY created_at DESC
        LIMIT 25`
     )

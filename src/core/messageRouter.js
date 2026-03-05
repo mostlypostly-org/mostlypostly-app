@@ -511,6 +511,7 @@ async function processNewImageFlow({
         salonId: salon?.salon_id || salon?.id || "",
         stylistId: stylist?.stylist_id || stylist?.id || null,
         bookingCta,
+        submittedImageUrl: imageUrls[0] || null,
       });
 
       // Save as draft with the story image
