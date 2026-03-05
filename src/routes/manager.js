@@ -37,7 +37,19 @@ async function ensurePublicImageUrls(p) {
   return p;
 }
 
-// Render image thumbnail(s) — Twilio URLs are served via the media proxy
+// Placeholder shown when an image URL is broken/expired
+const BROKEN_IMG_PLACEHOLDER = `
+  style="display:none" onload="this.style.display='';this.nextElementSibling.style.display='none'"
+  onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+`;
+function placeholderDiv(cls) {
+  return `<div class="${cls} rounded-lg bg-slate-800 border border-slate-700 flex-col items-center justify-center gap-1 text-slate-600" style="display:none">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4-4 4 4 4-6 4 6M4 4h16v16H4z"/></svg>
+    <span class="text-[9px] uppercase tracking-wide">Expired</span>
+  </div>`;
+}
+
+// Render image thumbnail(s) — Twilio URLs served via proxy; expired files show placeholder
 function imageStrip(p, thumbClass = "w-32 h-32") {
   let urls = [];
   try { urls = JSON.parse(p.image_urls || "[]"); } catch { }
@@ -47,7 +59,10 @@ function imageStrip(p, thumbClass = "w-32 h-32") {
   const displayUrls = urls.map(toProxyUrl);
 
   if (displayUrls.length === 1) {
-    return `<img src="${esc(displayUrls[0])}" class="${thumbClass} rounded-lg object-cover border border-slate-700" />`;
+    return `<div class="relative ${thumbClass} flex-shrink-0">
+      <img src="${esc(displayUrls[0])}" class="w-full h-full rounded-lg object-cover border border-slate-700" ${BROKEN_IMG_PLACEHOLDER} />
+      ${placeholderDiv("w-full h-full absolute inset-0")}
+    </div>`;
   }
 
   // Multi-image: horizontal strip with count badge
@@ -55,7 +70,11 @@ function imageStrip(p, thumbClass = "w-32 h-32") {
   return `
     <div class="flex flex-col gap-1">
       <div class="flex gap-1">
-        ${displayUrls.map(u => `<img src="${esc(u)}" class="${stripThumb} rounded-lg object-cover border border-slate-700" />`).join("")}
+        ${displayUrls.map(u => `
+          <div class="relative ${stripThumb} flex-shrink-0">
+            <img src="${esc(u)}" class="w-full h-full rounded-lg object-cover border border-slate-700" ${BROKEN_IMG_PLACEHOLDER} />
+            ${placeholderDiv("w-full h-full absolute inset-0")}
+          </div>`).join("")}
       </div>
       <span class="text-xs text-slate-400 text-center">${urls.length} photos</span>
     </div>

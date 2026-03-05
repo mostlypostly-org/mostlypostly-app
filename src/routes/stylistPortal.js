@@ -75,14 +75,27 @@ function resolveDisplayUrls(post) {
   );
 }
 
+const BROKEN_PORTAL = `onload="this.parentElement.querySelector('.img-expired').style.display='none'" onerror="this.style.display='none';this.parentElement.querySelector('.img-expired').style.display='flex'"`;
+
 function renderImages(displayUrls) {
   if (!displayUrls.length) return "";
   if (displayUrls.length === 1) {
-    return `<img src="${esc(displayUrls[0])}" class="rounded-2xl w-full max-h-72 object-cover mb-5 border border-slate-800" />`;
+    return `
+      <div class="relative w-full max-h-72 mb-5">
+        <img src="${esc(displayUrls[0])}" class="rounded-2xl w-full max-h-72 object-cover border border-slate-800" ${BROKEN_PORTAL} />
+        <div class="img-expired rounded-2xl w-full h-40 bg-slate-800 border border-slate-700 hidden flex-col items-center justify-center gap-2 text-slate-500">
+          <span class="text-sm">Image expired</span>
+          <span class="text-xs text-slate-600">Send a new photo to update</span>
+        </div>
+      </div>`;
   }
   return `
     <div class="flex gap-2 overflow-x-auto mb-2 pb-1">
-      ${displayUrls.map(u => `<img src="${esc(u)}" class="w-36 h-36 rounded-2xl object-cover border border-slate-800 flex-shrink-0" />`).join("")}
+      ${displayUrls.map(u => `
+        <div class="relative w-36 h-36 flex-shrink-0">
+          <img src="${esc(u)}" class="w-36 h-36 rounded-2xl object-cover border border-slate-800" ${BROKEN_PORTAL} />
+          <div class="img-expired absolute inset-0 rounded-2xl bg-slate-800 border border-slate-700 hidden flex-col items-center justify-center text-slate-500 text-xs">Expired</div>
+        </div>`).join("")}
     </div>
     <p class="text-xs text-slate-500 mb-5">${displayUrls.length} photos · caption applies to all</p>
   `;
