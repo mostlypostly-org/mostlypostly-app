@@ -229,7 +229,7 @@ CREATE TABLE IF NOT EXISTS stylist_portal_tokens (
    ------------------------------------------------------------ */
 CREATE TABLE IF NOT EXISTS moderation_flags (
   id         TEXT PRIMARY KEY,
-  post_id    TEXT NOT NULL,
+  post_id    TEXT,
   status     TEXT DEFAULT 'clean',
   level      TEXT,
   reasons    TEXT,

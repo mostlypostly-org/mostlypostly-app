@@ -124,12 +124,13 @@ export function logEvent(p = {}) {
 }
 
 export function logModeration(p = {}) {
+  if (!p.post_id) return; // post_id required by FK — skip pre-save moderation checks
   try {
     const salonId = resolveSalonId(p);
     const payload = {
       id: rid(),
       salon_id: salonId,
-      post_id: p.post_id ? String(p.post_id) : null,
+      post_id: String(p.post_id),
       level: p.level || "info",
       reasons: Array.isArray(p.reasons)
         ? JSON.stringify(p.reasons)
