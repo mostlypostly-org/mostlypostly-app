@@ -325,6 +325,35 @@ app.get("/status", (_req, res) =>
 
 app.get("/healthz", (_req, res) => res.status(200).send("ok"));
 
+app.get("/health/scheduler", (_req, res) => {
+  try {
+    const queued = db.prepare(
+      `SELECT COUNT(*) AS n FROM posts WHERE status='manager_approved' AND scheduled_for IS NOT NULL`
+    ).get().n;
+
+    const stalled = db.prepare(
+      `SELECT COUNT(*) AS n FROM posts
+       WHERE status='manager_approved'
+         AND scheduled_for IS NOT NULL
+         AND datetime(scheduled_for) < datetime('now','-2 hours')`
+    ).get().n;
+
+    const failed = db.prepare(
+      `SELECT COUNT(*) AS n FROM posts WHERE status='failed'`
+    ).get().n;
+
+    const recentlyPublished = db.prepare(
+      `SELECT COUNT(*) AS n FROM posts
+       WHERE status='published'
+         AND datetime(published_at) > datetime('now','-24 hours')`
+    ).get().n;
+
+    res.json({ ok: true, queued, stalled, failed, published_last_24h: recentlyPublished });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // =====================================================
 // SCHEDULER INIT
 // =====================================================

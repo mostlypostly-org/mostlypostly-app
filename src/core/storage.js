@@ -9,37 +9,9 @@ import path from "path";
 import crypto from "crypto";
 import { db } from "../../db.js"; // NOTE: storage.js is in src/core, db.js is project root
 
-// -----------------------------
-// Paths (JSON mirror)
-// -----------------------------
-const DATA_DIR = path.resolve("./data");
-const POSTS_FILE = path.join(DATA_DIR, "posts.json");
+// Salons dir still needed for JSON-based consent helpers (local dev)
 const SALONS_DIR = process.env.SALONS_DIR || path.resolve("./salons");
-
-// Ensure data + salons exist
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-if (!fs.existsSync(POSTS_FILE)) fs.writeFileSync(POSTS_FILE, "[]", "utf8");
 if (!fs.existsSync(SALONS_DIR)) fs.mkdirSync(SALONS_DIR, { recursive: true });
-
-// ======================================================
-// 🔄 JSON mirror helpers
-// ======================================================
-function loadAllPosts() {
-  try {
-    return JSON.parse(fs.readFileSync(POSTS_FILE, "utf8"));
-  } catch (err) {
-    console.error("⚠️ Failed to load posts.json:", err);
-    return [];
-  }
-}
-
-function saveAllPosts(posts) {
-  try {
-    fs.writeFileSync(POSTS_FILE, JSON.stringify(posts, null, 2), "utf8");
-  } catch (err) {
-    console.error("⚠️ Failed to write posts.json:", err);
-  }
-}
 
 // ======================================================
 // 🧱 DB helpers — updated for v1.3 schema
@@ -184,33 +156,14 @@ export function savePost(
     updated_at: now
   };
 
-  // 1) Insert into DB
   try {
     insertPostStmt.run(payload);
   } catch (err) {
     console.error("❌ DB insert failed (posts):", err.message);
   }
 
-  // 2) JSON mirror (simplified)
-  posts.push({
-    id,
-    salon: salon?.salon_info?.name || "Unknown Salon",
-    stylist_name: payload.stylist_name,
-    stylist_phone: payload.stylist_phone,
-    service_type: payload.service_type,
-    base_caption: payload.base_caption,
-    final_caption: payload.final_caption,
-    hashtags: tagsArr,
-    cta: payload.cta,
-    image_url: payload.image_url,
-    status: payload.status,
-    created_at: payload.created_at,
-    updated_at: payload.updated_at
-  });
-  saveAllPosts(posts);
-
   if (io) io.emit("post:new", payload);
-  console.log(`✅ Post saved to DB & JSON for ${payload.stylist_name} (${payload.status})`);
+  console.log(`✅ Post saved to DB for ${payload.stylist_name} (${payload.status})`);
   return payload;
 }
 
@@ -291,33 +244,7 @@ export function updatePostStatus(id, status, reasonOrExtra = null) {
     console.error("❌ DB update failed (posts):", err.message);
   }
 
-  // 2) JSON mirror update (keeps legacy structure, including caption)
-  const posts = loadAllPosts();
-  const idx = posts.findIndex((p) => p.id === id);
-  if (idx !== -1) {
-    posts[idx].status = status;
-    posts[idx].updated_at = new Date().toISOString();
-
-    if (typeof reasonOrExtra === "string") {
-      posts[idx].denied_reason = reasonOrExtra;
-    } else if (reasonOrExtra && typeof reasonOrExtra === "object") {
-      posts[idx] = {
-        ...posts[idx],
-        ...reasonOrExtra,
-        ...(Array.isArray(reasonOrExtra.hashtags)
-          ? { hashtags: reasonOrExtra.hashtags }
-          : {}),
-      };
-    }
-
-    saveAllPosts(posts);
-  } else {
-    console.warn(
-      `⚠️ updatePostStatus: Post ${id} not found in JSON mirror (DB was updated).`
-    );
-  }
-
-  // 3) Return a merged view from DB (best-effort)
+  // Return updated row from DB (best-effort)
   try {
     const row = db
       .prepare(
@@ -347,35 +274,19 @@ export function updatePostStatus(id, status, reasonOrExtra = null) {
 // ======================================================
 export function findPendingPostByManager(managerIdentifier) {
   const idStr = String(managerIdentifier).trim();
-
   try {
-    const row = db.prepare(`
+    return db.prepare(`
       SELECT *
       FROM posts
       WHERE status='manager_pending'
         AND (manager_phone = ? OR manager_chat_id = ?)
       ORDER BY datetime(COALESCE(updated_at, created_at)) DESC
       LIMIT 1
-    `).get(idStr, idStr);
-
-    if (row) return row;
+    `).get(idStr, idStr) || null;
   } catch (err) {
     console.warn("⚠️ DB lookup (manager_pending) failed:", err.message);
-  }
-
-  // Fallback to JSON
-  const posts = loadAllPosts();
-  const matches = posts.filter(
-    (p) =>
-      p.status === "manager_pending" &&
-      (String(p.manager_phone).trim() === idStr ||
-        String(p.manager_chat_id).trim() === idStr)
-  );
-  if (!matches.length) {
-    console.log("⚠️ No pending post found for manager:", idStr);
     return null;
   }
-  return matches.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0];
 }
 
 // ======================================================
@@ -383,32 +294,19 @@ export function findPendingPostByManager(managerIdentifier) {
 // ======================================================
 export function findPostAwaitingReason(managerIdentifier) {
   const idStr = String(managerIdentifier).trim();
-
   try {
-    const row = db.prepare(`
+    return db.prepare(`
       SELECT *
       FROM posts
       WHERE status='awaiting_reason'
         AND (manager_phone = ? OR manager_chat_id = ?)
       ORDER BY datetime(COALESCE(updated_at, created_at)) DESC
       LIMIT 1
-    `).get(idStr, idStr);
-
-    if (row) return row;
+    `).get(idStr, idStr) || null;
   } catch (err) {
     console.warn("⚠️ DB lookup (awaiting_reason) failed:", err.message);
+    return null;
   }
-
-  // Fallback to JSON
-  const posts = loadAllPosts();
-  const match = posts.find(
-    (p) =>
-      p.status === "awaiting_reason" &&
-      (String(p.manager_phone).trim() === idStr ||
-        String(p.manager_chat_id).trim() === idStr)
-  );
-  if (match) console.log("📝 Found post awaiting denial reason for:", idStr);
-  return match || null;
 }
 
 // ======================================================
@@ -416,28 +314,18 @@ export function findPostAwaitingReason(managerIdentifier) {
 // ======================================================
 export function findLatestDraft(stylistIdentifier) {
   const idStr = String(stylistIdentifier).trim();
-
   try {
-    const row = db.prepare(`
+    return db.prepare(`
       SELECT *
       FROM posts
       WHERE status='draft' AND stylist_phone = ?
       ORDER BY datetime(COALESCE(created_at, updated_at)) DESC
       LIMIT 1
-    `).get(idStr);
-
-    if (row) return row;
+    `).get(idStr) || null;
   } catch (err) {
     console.warn("⚠️ DB lookup (latest draft) failed:", err.message);
+    return null;
   }
-
-  // Fallback to JSON mirror
-  const posts = loadAllPosts()
-    .filter(
-      (p) => String(p.stylist_phone).trim() === idStr && p.status === "draft"
-    )
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  return posts[0] || null;
 }
 
 // ======================================================

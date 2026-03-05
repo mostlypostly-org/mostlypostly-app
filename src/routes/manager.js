@@ -8,6 +8,16 @@ import { handleManagerApproval } from "../core/messageRouter.js";
 
 const router = express.Router();
 
+// Escape all HTML special characters, safe for use in attributes and text nodes
+function esc(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 /* -------------------------------------------------------------
    AUTH MIDDLEWARE (SESSION ONLY)
 ------------------------------------------------------------- */
@@ -86,22 +96,20 @@ router.get("/", requireAuth, (req, res) => {
       ? `<p class="text-slate-300 text-sm">No pending posts.</p>`
       : pending
           .map((p) => {
-            const caption = (p.final_caption || p.caption || "")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")
+            const caption = esc(p.final_caption || p.caption || "")
               .replace(/\n/g, "<br/>");
 
             return `
           <div class="rounded-xl bg-slate-900 border border-slate-800 p-5 mb-5">
             <div class="flex gap-4">
-              <img 
-                src="${p.image_url}" 
-                class="w-32 h-32 rounded-lg object-cover border border-slate-700" 
+              <img
+                src="${esc(p.image_url)}"
+                class="w-32 h-32 rounded-lg object-cover border border-slate-700"
               />
 
               <div class="flex-1">
                 <p class="text-xs text-slate-400 mb-1">
-                  Pending • Post #${p.salon_post_number || "—"}
+                  Pending • Post #${esc(p.salon_post_number) || "—"}
                 </p>
 
                 <p class="text-sm whitespace-pre-line text-slate-100 leading-relaxed">
@@ -145,9 +153,7 @@ router.get("/", requireAuth, (req, res) => {
   recent.length === 0
     ? `<div class="text-slate-500 text-sm italic">No recent posts.</div>`
     : recent.map((p) => {
-        const caption = (p.final_caption || p.caption || "")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
+        const caption = esc(p.final_caption || p.caption || "")
           .replace(/\n/g, "<br/>");
 
           return `
@@ -155,16 +161,16 @@ router.get("/", requireAuth, (req, res) => {
 
             <div class="flex gap-4">
               <img
-                src="${p.image_url}"
+                src="${esc(p.image_url)}"
                 class="w-24 h-24 rounded-lg object-cover border border-slate-700"
               />
 
               <div class="flex-1">
 
                 <p class="text-xs text-slate-400">
-                  Status: <span class="font-semibold">${p.status}</span> • Post #${p.salon_post_number || "—"}
+                  Status: <span class="font-semibold">${esc(p.status)}</span> • Post #${esc(p.salon_post_number) || "—"}
                 </p>
-                <p class="text-xs text-slate-500 mb-2">${fmt(p.created_at)}</p>
+                <p class="text-xs text-slate-500 mb-2">${esc(fmt(p.created_at))}</p>
 
                 <!-- Collapsed Caption -->
                 <p class="text-sm text-slate-300 leading-relaxed line-clamp-2">
@@ -297,7 +303,7 @@ router.get("/deny", requireAuth, (req, res) => {
       <h1 class="text-lg font-bold text-white mb-4">Deny Post</h1>
 
       <form method="POST" action="/manager/deny" class="space-y-4">
-        <input type="hidden" name="post_id" value="${id}" />
+        <input type="hidden" name="post_id" value="${esc(id)}" />
 
         <div>
           <label class="text-xs text-slate-400">Reason</label>
@@ -359,7 +365,7 @@ router.get("/edit/:id", requireAuth, (req, res) => {
         <textarea
           name="caption"
           class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 h-48"
-        >${post.final_caption || post.caption || ""}</textarea>
+        >${esc(post.final_caption || post.caption || "")}</textarea>
 
         <button class="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-lg text-sm font-semibold">
           Save Changes
