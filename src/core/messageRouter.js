@@ -469,27 +469,26 @@ async function processNewImageFlow({
   // 0️⃣ Classify post type from message text
   const postType = classifyPostType(text || "");
 
-  // 0b️⃣ Before/After: step-by-step guided flow (handled upstream — should not reach here)
+  // 0b️⃣ Before/After: build side-by-side collage, replace image list
   let activeImageUrls = [...imageUrls];
   let activeImageUrl  = imageUrl;
 
   if (postType === "before_after") {
-    // If somehow both images arrived at once, build collage directly
-    if (imageUrls.length >= 2) {
-      try {
-        await sendMessage.sendText(chatId, "Building your Before/After collage… hang tight!");
-        const collageUrl = await buildBeforeAfterCollage(imageUrls.slice(0, 2), salon?.salon_id || "");
-        activeImageUrls  = [collageUrl];
-        activeImageUrl   = collageUrl;
-      } catch (err) {
-        console.error("❌ [Router] Collage build failed:", err.message);
-        await sendMessage.sendText(chatId, "Sorry, we couldn't build the collage. Please try again.");
-        return;
-      }
-    } else {
-      // Single image with before_after text — start the guided flow
-      drafts.set(chatId, { _ba_step: "awaiting_before", _ba_notes: text || "" });
-      await sendMessage.sendText(chatId, "Got it! Send your *BEFORE* photo now.");
+    if (imageUrls.length < 2) {
+      await sendMessage.sendText(chatId,
+        "For a Before/After post please send exactly 2 photos — the Before photo first, then the After photo."
+      );
+      return;
+    }
+    try {
+      await sendMessage.sendText(chatId, "Building your Before/After collage… hang tight!");
+      const collageUrl = await buildBeforeAfterCollage(imageUrls.slice(0, 2), salon?.salon_id || "");
+      activeImageUrls  = [collageUrl];
+      activeImageUrl   = collageUrl;
+      console.log(`[Router] Before/After collage ready: ${collageUrl}`);
+    } catch (err) {
+      console.error("❌ [Router] Collage build failed:", err.message);
+      await sendMessage.sendText(chatId, "Sorry, we couldn't build the collage. Please try again.");
       return;
     }
   }
@@ -1220,58 +1219,6 @@ export async function handleIncomingMessage({
     return;
   }
 
-
-  // ── Before/After guided step flow ──────────────────────────
-  const baDraft = drafts.get(chatId);
-
-  // Stylist texts "before and after" with no photo → start the flow
-  if (!primaryImageUrl && classifyPostType(text || "") === "before_after") {
-    drafts.set(chatId, { _ba_step: "awaiting_before", _ba_notes: text || "" });
-    await sendMessage.sendText(chatId, "Got it! Send your *BEFORE* photo now.");
-    endTimer(start);
-    return;
-  }
-
-  // Awaiting BEFORE photo
-  if (primaryImageUrl && baDraft?._ba_step === "awaiting_before") {
-    drafts.set(chatId, {
-      ...baDraft,
-      _ba_step:   "awaiting_after",
-      _ba_before: primaryImageUrl,
-    });
-    await sendMessage.sendText(chatId, "Before photo saved! Now send your *AFTER* photo.");
-    endTimer(start);
-    return;
-  }
-
-  // Awaiting AFTER photo → build collage and continue
-  if (primaryImageUrl && baDraft?._ba_step === "awaiting_after") {
-    const beforeUrl = baDraft._ba_before;
-    const afterUrl  = primaryImageUrl;
-    const notes     = baDraft._ba_notes || "";
-    drafts.delete(chatId);
-
-    try {
-      await sendMessage.sendText(chatId, "Building your Before/After collage… hang tight!");
-      const collageUrl = await buildBeforeAfterCollage([beforeUrl, afterUrl], salon?.salon_id || "");
-      await processNewImageFlow({
-        chatId,
-        text: notes,
-        imageUrls: [collageUrl],
-        drafts,
-        generateCaption,
-        moderateAIOutput,
-        sendMessage,
-        stylist,
-        salon,
-      });
-    } catch (err) {
-      console.error("❌ [Router] Before/After collage failed:", err.message);
-      await sendMessage.sendText(chatId, "Sorry, we couldn't build the collage. Please try again.");
-    }
-    endTimer(start);
-    return;
-  }
 
   // Availability posts don't require an image — route them directly
   if (!primaryImageUrl && classifyPostType(text || "") === "availability") {
