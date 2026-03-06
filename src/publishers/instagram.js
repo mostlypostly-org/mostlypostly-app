@@ -216,7 +216,7 @@ export async function publishToInstagramCarousel({ salon_id, caption, imageUrls 
  * publishStoryToInstagram({ salon_id, imageUrl })
  * Publishes a single image as an Instagram Story.
  */
-export async function publishStoryToInstagram({ salon_id, imageUrl }) {
+export async function publishStoryToInstagram({ salon_id, imageUrl, linkUrl }) {
   if (!salon_id) throw new Error("publishStoryToInstagram: missing salon_id");
   if (!imageUrl) throw new Error("publishStoryToInstagram: missing imageUrl");
 
@@ -234,6 +234,7 @@ export async function publishStoryToInstagram({ salon_id, imageUrl }) {
       media_type: "STORIES",
       access_token: token,
     });
+    if (linkUrl) params.set("link", linkUrl);
     const resp = await fetch(url, { method: "POST", body: params });
     const data = await resp.json();
     if (!resp.ok || !data?.id) {

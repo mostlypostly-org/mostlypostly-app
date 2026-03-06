@@ -232,9 +232,11 @@ export async function runSchedulerOnce() {
           if (postType === "availability" || postType === "promotions") {
             // Availability + Promotions → Instagram Story only (no Facebook story yet)
             const image = allImages[0] || post.image_url;
+            const storyLinkUrl = salon.booking_url || salon.booking_link || null;
             igResp = await publishStoryToInstagram({
               salon_id: salon.slug,
               imageUrl: image,
+              linkUrl: storyLinkUrl,
             });
           } else if (isMulti) {
             fbResp = await publishToFacebookMulti(fbPageId, post.final_caption, allImages, fbToken);
