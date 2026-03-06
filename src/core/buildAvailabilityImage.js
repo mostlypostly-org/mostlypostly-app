@@ -150,68 +150,65 @@ async function fetchBuffer(url) {
 // Build the availability story image
 // ─────────────────────────────────────────────────────────
 function buildOverlaySvg({ slots, stylistName, salonName, bookingCta }) {
-  const slotLineHeight = 68;
-  const headerH = 300;
-  const footerH = 260;
-  const slotsH = slots.length * slotLineHeight + 40;
-  const totalH = H;
+  const slotLineHeight = 90;
+  const slotsStartY = 980;
 
-  // Slot rows
+  // Slot rows — centered lower on the image
   const slotRows = slots.map((slot, i) => `
     <g>
-      <rect x="60" y="${headerH + 20 + i * slotLineHeight}" width="${W - 120}" height="56"
-        rx="12" fill="rgba(255,255,255,0.12)" />
-      <text x="${W / 2}" y="${headerH + 20 + i * slotLineHeight + 36}"
-        font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="600"
+      <rect x="60" y="${slotsStartY + i * slotLineHeight}" width="${W - 120}" height="68"
+        rx="14" fill="rgba(255,255,255,0.15)" />
+      <text x="${W / 2}" y="${slotsStartY + i * slotLineHeight + 45}"
+        font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="600"
         fill="white" text-anchor="middle">${escSvg(slot)}</text>
     </g>
   `).join("");
 
   return Buffer.from(`
     <svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-      <!-- Dark gradient overlay -->
+      <!-- Lighter overlay so background photo shows through more -->
       <defs>
         <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stop-color="rgba(0,0,0,0.70)" />
-          <stop offset="40%"  stop-color="rgba(0,0,0,0.40)" />
-          <stop offset="70%"  stop-color="rgba(0,0,0,0.40)" />
-          <stop offset="100%" stop-color="rgba(0,0,0,0.75)" />
+          <stop offset="0%"   stop-color="rgba(0,0,0,0.45)" />
+          <stop offset="40%"  stop-color="rgba(0,0,0,0.20)" />
+          <stop offset="70%"  stop-color="rgba(0,0,0,0.25)" />
+          <stop offset="100%" stop-color="rgba(0,0,0,0.65)" />
         </linearGradient>
       </defs>
       <rect width="${W}" height="${H}" fill="url(#grad)" />
 
-      <!-- Salon name -->
-      <text x="${W / 2}" y="140"
-        font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700"
-        fill="rgba(255,255,255,0.75)" text-anchor="middle" letter-spacing="4">
+      <!-- Salon name — vertically centered upper half -->
+      <text x="${W / 2}" y="560"
+        font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700"
+        fill="rgba(255,255,255,0.85)" text-anchor="middle" letter-spacing="5">
         ${escSvg(salonName.toUpperCase())}
       </text>
 
       <!-- "NOW BOOKING" header -->
-      <text x="${W / 2}" y="220"
-        font-family="Arial, Helvetica, sans-serif" font-size="68" font-weight="900"
+      <text x="${W / 2}" y="680"
+        font-family="Arial, Helvetica, sans-serif" font-size="88" font-weight="900"
         fill="white" text-anchor="middle" letter-spacing="2">
         NOW BOOKING
       </text>
 
       <!-- Divider -->
-      <line x1="120" y1="255" x2="${W - 120}" y2="255" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+      <line x1="100" y1="720" x2="${W - 100}" y2="720" stroke="rgba(255,255,255,0.45)" stroke-width="2"/>
 
       <!-- Availability slots -->
       ${slotRows}
 
       <!-- Stylist name -->
-      <text x="${W / 2}" y="${H - 180}"
-        font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700"
+      <text x="${W / 2}" y="${H - 200}"
+        font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="700"
         fill="white" text-anchor="middle">
         ${escSvg(stylistName)}
       </text>
 
       <!-- Booking CTA -->
-      <rect x="140" y="${H - 150}" width="${W - 280}" height="70" rx="35"
+      <rect x="120" y="${H - 160}" width="${W - 240}" height="76" rx="38"
         fill="rgba(255,255,255,0.18)" />
-      <text x="${W / 2}" y="${H - 105}"
-        font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="600"
+      <text x="${W / 2}" y="${H - 112}"
+        font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="600"
         fill="white" text-anchor="middle">
         ${escSvg(bookingCta || "Book via link in bio.")}
       </text>
