@@ -5,9 +5,9 @@ import { db } from "../../db.js";
 
 const router = express.Router();
 
-const FB_OAUTH_URL = "https://www.facebook.com/v19.0/dialog/oauth";
-const FB_TOKEN_URL = "https://graph.facebook.com/v19.0/oauth/access_token";
-const FB_API_URL = "https://graph.facebook.com/v19.0";
+const FB_OAUTH_URL = "https://www.facebook.com/v21.0/dialog/oauth";
+const FB_TOKEN_URL = "https://graph.facebook.com/v21.0/oauth/access_token";
+const FB_API_URL = "https://graph.facebook.com/v21.0";
 
 function getRedirectUri() {
   const uri = process.env.FB_REDIRECT_URI;
@@ -32,8 +32,11 @@ router.get("/login", (req, res) => {
       "pages_read_engagement",
       "pages_manage_posts",
       "pages_manage_metadata",
+      "pages_read_user_content",
+      "read_insights",
       "instagram_basic",
       "instagram_content_publish",
+      "instagram_manage_insights",
       "business_management",
     ].join(","),
     state: JSON.stringify({ salon_id }),
@@ -73,7 +76,17 @@ router.get("/callback", async (req, res) => {
     return res.status(400).send("<h2>Facebook Error: No access token returned.</h2>");
   }
 
-  const userAccessToken = tokenJson.access_token;
+  // Exchange short-lived user token for long-lived user token (60-day)
+  // Page tokens derived from long-lived user tokens never expire
+  const llParams = new URLSearchParams({
+    grant_type: "fb_exchange_token",
+    client_id: clientId,
+    client_secret: clientSecret,
+    fb_exchange_token: tokenJson.access_token,
+  });
+  const llResp = await fetch(`${FB_TOKEN_URL}?${llParams}`);
+  const llJson = await llResp.json();
+  const userAccessToken = llJson.access_token || tokenJson.access_token;
 
   // Fetch Facebook Pages this user manages
   const pagesResp = await fetch(

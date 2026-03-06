@@ -371,6 +371,25 @@ router.get("/", (req, res) => {
     <div class="rounded-2xl bg-mpCharcoal text-white px-5 py-3 text-sm font-medium shadow-xl"></div>
   </div>
   <script>
+    async function runBackfill() {
+      const msg = document.getElementById('sync-toast').querySelector('div');
+      document.getElementById('sync-toast').classList.remove('hidden');
+      msg.textContent = 'Backfilling FB post IDs...';
+      try {
+        const res = await fetch('/analytics/backfill-fb-ids${qs}', { method: 'POST' });
+        const data = await res.json();
+        msg.textContent = res.ok
+          ? 'Matched ' + data.matched + ' of ' + data.scanned + ' posts to FB IDs.'
+          : 'Error: ' + (data.error || 'unknown');
+        setTimeout(() => {
+          document.getElementById('sync-toast').classList.add('hidden');
+          if (res.ok && data.matched > 0) location.reload();
+        }, 3000);
+      } catch(e) {
+        msg.textContent = 'Backfill failed: ' + e.message;
+        setTimeout(() => document.getElementById('sync-toast').classList.add('hidden'), 3000);
+      }
+    }
     async function runSync() {
       const btn = document.getElementById('syncBtn');
       const toast = document.getElementById('sync-toast');
@@ -398,9 +417,14 @@ router.get("/", (req, res) => {
         <h1 class="text-2xl font-extrabold text-mpCharcoal">Analytics — <span class="text-mpAccent">${salonName}</span></h1>
         <p class="mt-1 text-sm text-mpMuted">Social performance across Facebook and Instagram.</p>
       </div>
-      <button onclick="runSync()" class="shrink-0 rounded-full bg-mpCharcoal px-5 py-2.5 text-sm font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
-        Sync Insights
-      </button>
+      <div class="flex gap-2">
+        <button onclick="runBackfill()" class="shrink-0 rounded-full border border-mpBorder bg-white px-4 py-2.5 text-sm font-semibold text-mpCharcoal hover:border-mpAccent transition-colors">
+          Backfill FB IDs
+        </button>
+        <button onclick="runSync()" class="shrink-0 rounded-full bg-mpCharcoal px-5 py-2.5 text-sm font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
+          Sync Insights
+        </button>
+      </div>
     </div>
     ${syncBanner}
     ${summaryCards}
@@ -412,6 +436,62 @@ router.get("/", (req, res) => {
   `;
 
   res.send(pageShell({ title: `Analytics — ${salonName}`, body, salon_id }));
+});
+
+// ─── POST /analytics/backfill-fb-ids ─────────────────────────────────────────
+// Fetches the page's recent posts from FB Graph API and matches them to DB rows
+// that are missing fb_post_id, using published_at timestamp proximity.
+
+router.post("/backfill-fb-ids", async (req, res) => {
+  const salon_id = resolveSalonId(req);
+  if (!salon_id) return res.status(400).json({ error: "No salon context" });
+
+  const salonRow = db.prepare(
+    `SELECT facebook_page_id, facebook_page_token FROM salons WHERE slug=?`
+  ).get(salon_id);
+
+  if (!salonRow?.facebook_page_id || !salonRow?.facebook_page_token) {
+    return res.status(400).json({ error: "Salon missing Facebook credentials" });
+  }
+
+  const { facebook_page_id: pageId, facebook_page_token: token } = salonRow;
+
+  // Fetch last 100 posts from the FB page
+  const fbUrl = `https://graph.facebook.com/v21.0/${pageId}/posts?fields=id,created_time&limit=100&access_token=${token}`;
+  const fbRes = await fetch(fbUrl);
+  const fbJson = await fbRes.json();
+
+  if (!fbRes.ok || fbJson.error) {
+    return res.status(502).json({ error: fbJson?.error?.message || "FB API error" });
+  }
+
+  const fbPosts = fbJson.data || [];
+
+  // Get our DB posts that are published but missing fb_post_id
+  const dbPosts = db.prepare(`
+    SELECT id, published_at FROM posts
+    WHERE salon_id=? AND status='published' AND (fb_post_id IS NULL OR fb_post_id='')
+    ORDER BY datetime(published_at) DESC LIMIT 200
+  `).all(salon_id);
+
+  let matched = 0;
+  for (const dbPost of dbPosts) {
+    if (!dbPost.published_at) continue;
+    const dbTime = new Date(dbPost.published_at + "Z").getTime();
+
+    // Find FB post within 5-minute window of our published_at
+    const fbMatch = fbPosts.find(fp => {
+      const fbTime = new Date(fp.created_time).getTime();
+      return Math.abs(fbTime - dbTime) < 5 * 60 * 1000;
+    });
+
+    if (fbMatch) {
+      db.prepare(`UPDATE posts SET fb_post_id=? WHERE id=?`).run(fbMatch.id, dbPost.id);
+      matched++;
+    }
+  }
+
+  res.json({ scanned: dbPosts.length, fb_posts_fetched: fbPosts.length, matched });
 });
 
 // ─── POST /analytics/sync ─────────────────────────────────────────────────────
