@@ -483,7 +483,8 @@ async function processNewImageFlow({
     try {
       await sendMessage.sendText(chatId, "Building your Before/After collage… hang tight!");
       const collageUrl = await buildBeforeAfterCollage(imageUrls.slice(0, 2), salon?.salon_id || "");
-      activeImageUrls  = [collageUrl];
+      // Keep original URLs in activeImageUrls so swap can rebuild; collage goes in activeImageUrl
+      activeImageUrls  = imageUrls.slice(0, 2);
       activeImageUrl   = collageUrl;
       console.log(`[Router] Before/After collage ready: ${collageUrl}`);
     } catch (err) {

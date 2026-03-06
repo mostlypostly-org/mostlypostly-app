@@ -65,6 +65,14 @@ function errorPage(msg) {
 
 // Convert Twilio URLs to server-side proxy URLs for browser display
 function resolveDisplayUrls(post) {
+  // For before/after posts image_urls holds the two originals; image_url is the collage — show the collage
+  if (post.post_type === "before_after" && post.image_url) {
+    return [post.image_url].map(u =>
+      /^https:\/\/api\.twilio\.com/i.test(u)
+        ? `/api/media-proxy?url=${encodeURIComponent(u)}`
+        : u
+    );
+  }
   let urls = [];
   try { urls = JSON.parse(post.image_urls || "[]"); } catch { }
   if (!urls.length && post.image_url) urls = [post.image_url];
@@ -201,15 +209,17 @@ router.post("/:id/swap", validateToken, async (req, res) => {
 
     // Flip the order and rebuild
     const [first, second] = urls;
-    const collageUrl = await buildBeforeAfterCollage([second, first], post.salon_id);
+    const flipped = [second, first];
+    const collageUrl = await buildBeforeAfterCollage(flipped, post.salon_id);
 
+    // Keep flipped originals in image_urls so future swaps still work
     db.prepare(`
       UPDATE posts
       SET image_url  = ?,
           image_urls = ?,
           updated_at = datetime('now')
       WHERE id = ?
-    `).run(collageUrl, JSON.stringify([collageUrl]), post.id);
+    `).run(collageUrl, JSON.stringify(flipped), post.id);
 
     return res.redirect(`/stylist/${post.id}?token=${token}&swapped=1`);
   } catch (err) {
