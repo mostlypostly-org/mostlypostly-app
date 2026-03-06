@@ -266,11 +266,11 @@ router.get("/", (req, res) => {
   }
 
   const postTypeColors = {
-    standard_post: "bg-mpBorder text-mpCharcoal",
-    before_after:  "bg-purple-100 text-purple-700",
-    products:      "bg-green-100 text-green-700",
-    promotions:    "bg-yellow-100 text-yellow-700",
-    availability:  "bg-mpAccentLight text-mpAccent",
+    standard_post: "bg-mpMuted text-white",
+    before_after:  "bg-purple-500 text-white",
+    products:      "bg-green-600 text-white",
+    promotions:    "bg-yellow-500 text-white",
+    availability:  "bg-mpAccent text-white",
   };
 
   const rows = posts

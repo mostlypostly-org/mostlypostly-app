@@ -345,8 +345,8 @@ router.get("/", (req, res) => {
           ${recent.map(p => {
             const pubDate = p.published_at ? DateTime.fromSQL(p.published_at, { zone: "utc" }).setZone(tz).toFormat("MMM d, h:mm a") : "—";
             const platforms = [
-              p.ig_media_id ? `<span class="text-[10px] rounded-full bg-purple-100 text-purple-700 px-2 py-0.5 font-bold">IG</span>` : "",
-              p.fb_post_id  ? `<span class="text-[10px] rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 font-bold">FB</span>` : "",
+              p.ig_media_id ? `<span class="text-[10px] rounded-full bg-gradient-to-br from-purple-500 to-pink-400 text-white px-2 py-0.5 font-bold">IG</span>` : "",
+              p.fb_post_id  ? `<span class="text-[10px] rounded-full bg-blue-600 text-white px-2 py-0.5 font-bold">FB</span>` : "",
             ].filter(Boolean).join(" ");
             return `
             <tr class="border-t border-mpBorder hover:bg-mpBg/60">
