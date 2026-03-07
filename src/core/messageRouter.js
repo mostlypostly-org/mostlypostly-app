@@ -7,78 +7,8 @@ import { enqueuePost } from "../scheduler.js";
 import { getSalonPolicy } from "../scheduler.js";
 
 
-// --- Ensure manager_tokens table exists (runs only once safely) ---
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS manager_tokens (
-    token TEXT PRIMARY KEY,
-    salon_id TEXT,
-    manager_phone TEXT,
-    expires_at TEXT
-  )
-`).run();
-
-// --- Issue & verify token ---
-// --- Issue & verify token ---
-// salonSlug should match managers.salon_id (e.g. 'rejuve-salon-spa')
-function issueManagerToken(salonSlug, managerPhone) {
-  const token = crypto.randomBytes(16).toString("hex");
-  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-  try {
-    // Detect schema for backwards compatibility
-    const cols = db.prepare("PRAGMA table_info(manager_tokens)").all();
-    const hasManagerId = cols.some(c => c.name === "manager_id");
-
-    if (hasManagerId) {
-      // 🔍 Find the real manager row in the DB
-      let mgrRow = null;
-
-      if (salonSlug) {
-        mgrRow = db.prepare(
-          "SELECT id FROM managers WHERE phone = ? AND salon_id = ? LIMIT 1"
-        ).get(managerPhone, salonSlug);
-      } else {
-        mgrRow = db.prepare(
-          "SELECT id FROM managers WHERE phone = ? LIMIT 1"
-        ).get(managerPhone);
-      }
-
-      if (!mgrRow) {
-        throw new Error(
-          `No manager row found for phone=${managerPhone || "null"} salon=${salonSlug || "null"}`
-        );
-      }
-
-      // Insert token tied to the actual manager_id
-      db.prepare(`
-        INSERT INTO manager_tokens (id, manager_id, token, expires_at, salon_id, manager_phone)
-        VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?)
-      `).run(
-        mgrRow.id,
-        token,
-        expires,
-        salonSlug || null,
-        managerPhone || null
-      );
-    } else {
-      // Legacy schema without manager_id
-      db.prepare(`
-        INSERT INTO manager_tokens (token, salon_id, manager_phone, expires_at)
-        VALUES (?, ?, ?, ?)
-      `).run(token, salonSlug || null, managerPhone || null, expires);
-    }
-
-    const verify = db.prepare(
-      "SELECT id, manager_id, token, expires_at, salon_id, manager_phone FROM manager_tokens WHERE token = ?"
-    ).get(token);
-
-    console.log("🔑 Token stored row:", verify);
-    return token;
-  } catch (err) {
-    console.error("❌ Failed to insert or verify token:", err.message);
-    return null;
-  }
-}
+// Manager tokens removed — managers authenticate via email/password only.
+// Tokens are reserved for stylist portal access (future).
 
 import { publishToFacebook } from "../publishers/facebook.js";
 import { publishToInstagram } from "../publishers/instagram.js";
@@ -1039,17 +969,14 @@ export async function handleIncomingMessage({
           (salon?.salon_name?.toLowerCase().replace(/\s+/g, "")) ||
           "unknown";
 
-        const token = issueManagerToken(salonKey, manager.phone);
-        console.log("🔑 Manager token created:", token);
-
           const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
-          const managerLink = `${BASE_URL}/manager/login?token=${token}`;
+          const managerLink = `${BASE_URL}/manager`;
 
-          const notifyBody = `✂️ MostlyPostly: New post from ${stylistName}
+          const notifyBody = `MostlyPostly: New post from ${stylistName} is waiting for your approval.
 
-          Review here: ${managerLink}
+Log in to review: ${managerLink}
 
-          (Reply APPROVE to auto-schedule this post for your next available slot.)`;
+(Or reply APPROVE to auto-schedule for your next available slot.)`;
 
           if (manager?.phone) {
             console.log("📤 Sending manager approval link via Twilio →", manager.phone);

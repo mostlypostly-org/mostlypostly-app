@@ -13,67 +13,11 @@ const lowerHex = () =>
 const router = express.Router();
 
 /* -------------------------------
-   Helper: find token row (valid)
----------------------------------*/
-function findValidTokenRow(token) {
-  if (!token) return null;
-
-  // Only allow non-expired tokens (expires_at in the future)
-  const row = db
-    .prepare(
-      `
-      SELECT mt.*, m.email, m.salon_id
-      FROM manager_tokens mt
-      JOIN managers m ON m.id = mt.manager_id
-      WHERE mt.token = ?
-        AND (mt.expires_at IS NULL OR datetime(mt.expires_at) > datetime('now'))
-      LIMIT 1
-    `
-    )
-    .get(token);
-
-  return row || null;
-}
-
-/* -------------------------------
    GET /manager/login
-   - If token: validate token & log them in
-   - Otherwise show login form
+   - Email/password login form
 ---------------------------------*/
 router.get("/login", (req, res) => {
-  const { token } = req.query || {};
-
-  // 🔑 Magic-link path: /manager/login?token=...
-  if (token) {
-    const row = findValidTokenRow(token);
-
-    if (!row) {
-      return res
-        .status(401)
-        .type("html")
-        .send(
-          `<h2>Invalid or expired login link</h2><p>Please request a new login link from your MostlyPostly manager.</p>`
-        );
-    }
-
-    // Mark token as used
-    db.prepare(
-      `
-      UPDATE manager_tokens
-      SET used_at = datetime('now')
-      WHERE token = ?
-    `
-    ).run(token);
-
-    // Basic session payload (using row from token lookup)
-    req.session.manager_id = row.manager_id;
-    req.session.salon_id = row.salon_id;
-    req.session.manager_email = row.email;
-
-    return res.redirect("/manager");
-  }
-
-  // 🧑‍💻 Normal email/password login form
+  // Email/password login form
   const { exists, reset } = req.query || {};
   const banner = exists === "1"
     ? `<div style="background:#FFF0EE;border:1px solid #F2C4BB;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#A0443A;">
@@ -914,24 +858,6 @@ router.post("/reset-password", async (req, res) => {
   return res.redirect("/manager/login?reset=success");
 });
 
-
-/* -------------------------------
-   Magic link helper:
-   GET /manager/login-with-token?token=...
----------------------------------*/
-router.get("/login-with-token", (req, res) => {
-  const { token } = req.query || {};
-  if (!token) {
-    return res
-      .status(400)
-      .type("html")
-      .send("Missing token. Please use the link from your SMS.");
-  }
-
-  // Re-use the same flow as /manager/login?token=...
-  const redirectUrl = `/manager/login?token=${encodeURIComponent(token)}`;
-  return res.redirect(redirectUrl);
-});
 
 /* -------------------------------
    GET /manager/logout

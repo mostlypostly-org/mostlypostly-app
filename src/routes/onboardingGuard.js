@@ -16,11 +16,12 @@ export default function onboardingGuard(req, res, next) {
     return next();
   }
 
-  // Allow login/signup and token login
+  // Allow login/signup and password reset
   if (
     url.startsWith("/manager/login") ||
     url.startsWith("/manager/signup") ||
-    url.startsWith("/manager/login-with-token")
+    url.startsWith("/manager/forgot-password") ||
+    url.startsWith("/manager/reset-password")
   ) {
     return next();
   }
