@@ -82,7 +82,7 @@ export default function pageShell({
   <!-- Mobile menu -->
   <div id="mobileNav" class="hidden fixed inset-0 z-40 bg-white flex-col md:hidden">
     <div class="flex items-center justify-between px-6 py-4 border-b border-mpBorder">
-      <img src="/public/logo/logo-mark.png" alt="MostlyPostly" class="h-9 w-auto" />
+      <img src="/public/logo/logo-mark.png" alt="MostlyPostly" class="h-12 w-auto" />
       <button id="mobileNavClose" class="text-mpMuted text-3xl leading-none">×</button>
     </div>
     <nav class="flex-1 px-6 py-6 space-y-4 text-base font-medium">
