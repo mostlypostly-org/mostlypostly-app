@@ -140,7 +140,7 @@ router.get("/login", (req, res) => {
       pointer-events: none;
     }
 
-    .left-logo { width: 260px; height: auto; filter: brightness(0) invert(1); position: relative; z-index: 1; }
+    .left-logo { width: 320px; height: auto; filter: brightness(0) invert(1); position: relative; z-index: 1; }
 
     .left-tagline {
       font-size: 14px;
@@ -376,7 +376,7 @@ router.get("/signup", (req, res) => {
       background: radial-gradient(circle, rgba(212,137,122,0.22) 0%, transparent 70%);
       bottom: -100px; right: -100px; pointer-events: none;
     }
-    .left-logo { width: 260px; height: auto; filter: brightness(0) invert(1); position: relative; z-index: 1; }
+    .left-logo { width: 320px; height: auto; filter: brightness(0) invert(1); position: relative; z-index: 1; }
     .left-tagline { font-size: 14px; color: rgba(255,255,255,0.55); text-align: center; max-width: 280px; line-height: 1.7; position: relative; z-index: 1; }
 
     .feat-list { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 12px; position: relative; z-index: 1; }

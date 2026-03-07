@@ -181,14 +181,14 @@ let teamRows = "";
 // Managers
 dbManagers.forEach((m) => {
   teamRows += `
-    <tr class="border-b border-zinc-800/80">
-      <td class="px-3 py-2 text-sm text-zinc-100">${m.name}</td>
-      <td class="px-3 py-2 text-xs text-zinc-300">Manager</td>
-      <td class="px-3 py-2 text-xs text-zinc-300">${m.phone}</td>
-      <td class="px-3 py-2 text-xs text-zinc-300">—</td>
-      <td class="px-3 py-2 text-xs text-zinc-300">—</td>
-      <td class="px-3 py-2 text-xs text-zinc-300">—</td>
-      <td class="px-3 py-2 text-xs text-zinc-300 text-right"></td>
+    <tr class="border-b border-mpBorder">
+      <td class="px-3 py-2 text-sm text-mpCharcoal">${m.name}</td>
+      <td class="px-3 py-2 text-xs text-mpMuted">Manager</td>
+      <td class="px-3 py-2 text-xs text-mpMuted">${m.phone}</td>
+      <td class="px-3 py-2 text-xs text-mpMuted">—</td>
+      <td class="px-3 py-2 text-xs text-mpMuted">—</td>
+      <td class="px-3 py-2 text-xs text-mpMuted">—</td>
+      <td class="px-3 py-2 text-xs text-mpMuted text-right"></td>
     </tr>
   `;
 });
@@ -207,15 +207,15 @@ dbStylists.forEach((s) => {
   }
 
   teamRows += `
-    <tr class="border-b border-zinc-800/80">
-      <td class="px-3 py-2 text-sm text-zinc-100">${s.name}</td>
-      <td class="px-3 py-2 text-xs text-zinc-300">Service Provider</td>
-      <td class="px-3 py-2 text-xs text-zinc-300">${s.phone}</td>
-      <td class="px-3 py-2 text-xs text-zinc-300">${s.instagram_handle || "—"}</td>
-      <td class="px-3 py-2 text-xs text-zinc-300">${specialties.join(", ") || "—"}</td>
-      <td class="px-3 py-2 text-xs text-zinc-300">—</td>
+    <tr class="border-b border-mpBorder">
+      <td class="px-3 py-2 text-sm text-mpCharcoal">${s.name}</td>
+      <td class="px-3 py-2 text-xs text-mpMuted">Service Provider</td>
+      <td class="px-3 py-2 text-xs text-mpMuted">${s.phone}</td>
+      <td class="px-3 py-2 text-xs text-mpMuted">${s.instagram_handle || "—"}</td>
+      <td class="px-3 py-2 text-xs text-mpMuted">${specialties.join(", ") || "—"}</td>
+      <td class="px-3 py-2 text-xs text-mpMuted">—</td>
 
-      <td class="px-3 py-2 text-xs text-zinc-300 text-right">
+      <td class="px-3 py-2 text-xs text-mpMuted text-right">
         <button
           class="text-xs text-mpAccent hover:text-mpCharcoal underline"
           onclick='window.admin.openEditStylist({
@@ -245,8 +245,8 @@ dbStylists.forEach((s) => {
 
       <!-- Facebook & Instagram -->
       <div class="rounded-2xl border border-mpBorder bg-white px-4 py-4">
-        <h2 class="text-sm font-semibold text-zinc-50 mb-2">Facebook & Instagram</h2>
-        <dl class="space-y-1 text-xs text-zinc-300">
+        <h2 class="text-sm font-semibold text-mpCharcoal mb-2">Facebook & Instagram</h2>
+        <dl class="space-y-1 text-xs text-mpCharcoal">
           <div class="flex justify-between">
             <dt class="text-mpMuted">Facebook Page ID</dt>
             <dd>${salonRow.facebook_page_id || "Not configured"}</dd>
@@ -276,7 +276,7 @@ dbStylists.forEach((s) => {
             Connect / Refresh Facebook & Instagram
           </a>
         </div>
-        <p class="mt-2 text-[11px] text-zinc-500">
+        <p class="mt-2 text-[11px] text-mpCharcoal0">
               Uses your MostlyPostly Facebook App to grant or refresh Page & Instagram permissions.
             </p>
       </div>
@@ -284,11 +284,11 @@ dbStylists.forEach((s) => {
       <!-- Salon Info -->
       <div class="rounded-2xl border border-mpBorder bg-white px-4 py-4">
         <div class="flex items-center justify-between mb-2">
-          <h2 class="text-sm font-semibold text-zinc-50">Business Info</h2>
+          <h2 class="text-sm font-semibold text-mpCharcoal">Business Info</h2>
           <button onclick="window.admin.openSalonInfo()" class="text-mpMuted hover:text-mpCharcoal text-xs">✏️</button>
         </div>
 
-        <dl class="space-y-1 text-xs text-zinc-300">
+        <dl class="space-y-1 text-xs text-mpCharcoal">
 
           <div class="flex justify-between"><dt class="text-mpMuted">Name</dt><dd>${
             info.name
@@ -362,13 +362,13 @@ dbStylists.forEach((s) => {
       <!-- Posting Window -->
       <div class="rounded-2xl border border-mpBorder bg-white px-4 py-4">
         <div class="flex items-center justify-between mb-2">
-          <h2 class="text-sm font-semibold text-zinc-50">Posting Rules</h2>
+          <h2 class="text-sm font-semibold text-mpCharcoal">Posting Rules</h2>
           <button onclick="window.admin.openPostingRules()" class="text-mpMuted hover:text-mpCharcoal text-xs">✏️</button>
         </div>
-          <p class="text-xs text-zinc-300 mb-3">
+          <p class="text-xs text-mpMuted mb-3">
             MostlyPostly only posts inside your configured window (business local time).
           </p>
-        <dl class="space-y-1 text-xs text-zinc-300">
+        <dl class="space-y-1 text-xs text-mpCharcoal">
           <div class="flex justify-between">
             <dt class="text-mpMuted">Posting Window Start</dt>
             <dd>${fmtTime(settings.posting_window.start)}</dd>
@@ -387,11 +387,11 @@ dbStylists.forEach((s) => {
       <!-- Manager Rules -->
       <div class="rounded-2xl border border-mpBorder bg-white px-4 py-4">
         <div class="flex items-center justify-between mb-2">
-          <h2 class="text-sm font-semibold text-zinc-50">Manager Rules</h2>
+          <h2 class="text-sm font-semibold text-mpCharcoal">Manager Rules</h2>
           <button onclick="window.admin.openManagerRules()" class="text-mpMuted hover:text-mpCharcoal text-xs">✏️</button>
         </div>
 
-        <dl class="space-y-1 text-xs text-zinc-300">
+        <dl class="space-y-1 text-xs text-mpCharcoal">
           <div class="flex justify-between">
             <dt class="text-mpMuted">Require Manager Approval</dt>
             <dd>${salonRow.require_manager_approval ? "Enabled" : "Disabled"}</dd>
@@ -420,7 +420,7 @@ dbStylists.forEach((s) => {
       <div class="rounded-2xl border border-mpBorder bg-white px-4 py-4">
         <div class="mb-3">
           <div class="flex justify-between mb-1">
-            <h2 class="text-sm font-semibold text-zinc-50">Registered Team Members</h2>
+            <h2 class="text-sm font-semibold text-mpCharcoal">Registered Team Members</h2>
 
             <!-- Working Add Button -->
             <button onclick="window.admin.openAddStylist()"
