@@ -51,6 +51,12 @@ if (url.startsWith("/inbound/telegram")) {
   // Allow stylist management (same auth as admin)
   if (url.startsWith("/manager/stylists")) return next();
 
+  // Allow vendor management (same auth as admin)
+  if (url.startsWith("/manager/vendors")) return next();
+
+  // Allow internal vendor admin (protected by its own INTERNAL_SECRET check)
+  if (url.startsWith("/internal/vendors")) return next();
+
   // Allow stylist portal (token-authenticated, no session needed)
   if (url.startsWith("/stylist")) return next();
 

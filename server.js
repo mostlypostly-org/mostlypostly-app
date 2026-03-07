@@ -75,6 +75,8 @@ import onboardingGuard from "./src/routes/onboardingGuard.js";
 import adminRouter from "./src/routes/admin.js";
 import schedulerConfigRoute from "./src/routes/schedulerConfig.js";
 import stylistManagerRoute from "./src/routes/stylistManager.js";
+import vendorFeedsRoute from "./src/routes/vendorFeeds.js";
+import vendorAdminRoute from "./src/routes/vendorAdmin.js";
 import billingRoutes, { stripeWebhookHandler } from "./src/routes/billing.js";
 import { lookupStylist } from "./src/core/salonLookup.js";
 
@@ -303,6 +305,16 @@ app.use("/manager/scheduler", schedulerConfigRoute);
 // 9. STYLIST MANAGEMENT ROUTES
 // -------------------------------------------------------
 app.use("/manager/stylists", stylistManagerRoute);
+
+// -------------------------------------------------------
+// 10. VENDOR FEEDS (salon-facing, Pro plan)
+// -------------------------------------------------------
+app.use("/manager/vendors", vendorFeedsRoute);
+
+// -------------------------------------------------------
+// 11. VENDOR ADMIN (internal MostlyPostly tool)
+// -------------------------------------------------------
+app.use("/internal/vendors", vendorAdminRoute);
 
 // =====================================================
 // Analytics API (public JSON endpoints for dashboard)

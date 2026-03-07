@@ -11,6 +11,8 @@ import { run as run007 } from "./007_post_insights.js";
 import { run as run008 } from "./008_billing.js";
 import { run as run009 } from "./009_scheduler_policy.js";
 import { run as run010 } from "./010_stylist_profiles.js";
+import { run as run011 } from "./011_vendor_campaigns.js";
+import { run as run012 } from "./012_content_types.js";
 
 export const migrations = [
   { name: "001_baseline_patches",        run: run001 },
@@ -23,4 +25,6 @@ export const migrations = [
   { name: "008_billing",                 run: run008 },
   { name: "009_scheduler_policy",        run: run009 },
   { name: "010_stylist_profiles",        run: run010 },
+  { name: "011_vendor_campaigns",        run: run011 },
+  { name: "012_content_types",           run: run012 },
 ];

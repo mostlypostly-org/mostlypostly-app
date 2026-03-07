@@ -50,6 +50,17 @@ const CONTENT_TYPE_LABELS = {
   standard_post:     "Standard Service Post",
   promotions:        "Promotions",
   product_education: "Product Education",
+  vendor_promotion:  "Vendor Brand Promotions",
+};
+
+const CONTENT_TYPE_DESCRIPTIONS = {
+  availability:      "Open slot announcements — time-sensitive, shown for 24 hours.",
+  before_after:      "Transformation posts — highest engagement and reach for salons.",
+  celebration:       "Birthday and work anniversary posts for your team.",
+  standard_post:     "AI-generated posts from stylist photos sent via SMS.",
+  promotions:        "Special offers, seasonal deals, and limited-time pricing.",
+  product_education: "Service spotlights and product education posts.",
+  vendor_promotion:  "Brand partner campaigns (Aveda, Redken, etc.). Pro plan only.",
 };
 
 const MIX_DEFAULTS = {
@@ -116,6 +127,19 @@ router.get("/", requireAuth, (req, res) => {
   const fbCapPct    = Math.min(100, Math.round((stats.fbToday / fbCap) * 100));
   const igCapPct    = Math.min(100, Math.round((stats.igToday / igCap) * 100));
   const capBarColor = (pct) => pct >= 100 ? "bg-red-400" : pct >= 75 ? "bg-yellow-400" : "bg-green-400";
+
+  // --- Content types enabled ---
+  const DEFAULT_TYPES_ENABLED = {
+    standard_post: true, before_after: true, availability: true,
+    celebration: true, promotions: true, product_education: true, vendor_promotion: true,
+  };
+  let contentTypesEnabled = { ...DEFAULT_TYPES_ENABLED };
+  try {
+    const parsed = JSON.parse(salon.content_types_enabled || "null");
+    if (parsed && typeof parsed === "object") contentTypesEnabled = { ...DEFAULT_TYPES_ENABLED, ...parsed };
+  } catch {}
+
+  const isPro = (salon.plan || "trial") === "pro";
 
   // --- Content priority rows ---
   let priorityOrder = [...DEFAULT_PRIORITY];
@@ -369,6 +393,43 @@ router.get("/", requireAuth, (req, res) => {
         <div id="mixTotal" class="mt-4 text-xs text-mpMuted"></div>
       </div>
 
+      <!-- Content Type Toggles -->
+      <div class="rounded-2xl border border-mpBorder bg-white px-6 py-5 shadow-sm">
+        <h2 class="text-base font-bold text-mpCharcoal mb-1">Content Type Controls</h2>
+        <p class="text-xs text-mpMuted mb-5">
+          Enable or disable specific content types. Disabled types are skipped by the scheduler entirely —
+          useful if you manage celebrations elsewhere, or want to pause vendor posts temporarily.
+        </p>
+        <div class="space-y-3">
+          ${Object.entries(CONTENT_TYPE_LABELS).map(([type, label]) => {
+            const enabled = contentTypesEnabled[type] !== false;
+            const isVendor = type === "vendor_promotion";
+            const locked = isVendor && !isPro;
+            return `
+            <div class="flex items-start justify-between gap-4 py-2 border-b border-mpBorder last:border-0">
+              <div class="flex-1">
+                <p class="text-sm font-medium text-mpCharcoal flex items-center gap-2">
+                  ${label}
+                  ${locked ? `<span class="text-[10px] bg-mpBg border border-mpBorder rounded-full px-2 py-0.5 text-mpMuted font-semibold">Pro</span>` : ""}
+                </p>
+                <p class="text-[11px] text-mpMuted mt-0.5">${CONTENT_TYPE_DESCRIPTIONS[type] || ""}</p>
+              </div>
+              <label class="relative inline-flex items-center ${locked ? "cursor-not-allowed opacity-50" : "cursor-pointer"} shrink-0 mt-0.5">
+                <input type="checkbox" name="ctype_${type}" value="1"
+                       ${enabled ? "checked" : ""}
+                       ${locked ? "disabled" : ""}
+                       class="sr-only peer" />
+                <div class="w-10 h-6 bg-mpBorder peer-focus:ring-2 peer-focus:ring-mpAccent rounded-full peer
+                            peer-checked:bg-mpAccent after:content-[''] after:absolute after:top-0.5 after:left-0.5
+                            after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
+                            peer-checked:after:translate-x-4"></div>
+              </label>
+            </div>`;
+          }).join("")}
+        </div>
+        ${!isPro ? `<p class="mt-4 text-[11px] text-mpMuted">Vendor Brand Promotions require a <a href="/manager/billing?salon=${salon_id}" class="text-mpAccent underline">Pro plan</a>.</p>` : ""}
+      </div>
+
       <!-- Stylist Fairness -->
       <div class="rounded-2xl border border-mpBorder bg-white px-6 py-5 shadow-sm">
         <h2 class="text-base font-bold text-mpCharcoal mb-1">Stylist Fairness</h2>
@@ -521,6 +582,13 @@ router.post("/update", requireAuth, (req, res) => {
     content_priority,
   } = req.body;
 
+  // Build content_types_enabled from checkboxes
+  const allTypes = ["standard_post","before_after","availability","celebration","promotions","product_education","vendor_promotion"];
+  const contentTypesEnabled = {};
+  for (const type of allTypes) {
+    contentTypesEnabled[type] = req.body[`ctype_${type}`] === "1";
+  }
+
   // Clamp daily caps to plan maximum server-side (manager can go lower, never higher than plan)
   function clampCap(val) {
     const n = parseInt(val, 10);
@@ -555,8 +623,9 @@ router.post("/update", requireAuth, (req, res) => {
       tiktok_daily_max    = ?,
       fairness_window_min = COALESCE(?, fairness_window_min),
       content_priority    = COALESCE(?, content_priority),
-      content_mix         = ?,
-      updated_at          = datetime('now')
+      content_mix            = ?,
+      content_types_enabled  = ?,
+      updated_at             = datetime('now')
     WHERE slug = ?
   `).run(
     posting_start_time || null,
@@ -569,6 +638,7 @@ router.post("/update", requireAuth, (req, res) => {
     parseInt(fairness_window_min, 10) >= 0 ? parseInt(fairness_window_min, 10) : null,
     priorityJson,
     Object.keys(contentMix).length ? JSON.stringify(contentMix) : null,
+    JSON.stringify(contentTypesEnabled),
     salon_id
   );
 
