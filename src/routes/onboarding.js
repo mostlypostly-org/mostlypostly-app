@@ -1230,7 +1230,7 @@ router.post("/complete", (req, res) => {
      WHERE slug=?`
   ).run(salon_id);
 
-  res.redirect(`/dashboard?salon=${salon_id}`);
+  res.redirect(`/billing/checkout?plan=starter&cycle=monthly`);
 });
 
 export default router;

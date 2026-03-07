@@ -73,6 +73,7 @@ import managerRoutes from "./src/routes/manager.js";
 import onboardingRoutes from "./src/routes/onboarding.js";
 import onboardingGuard from "./src/routes/onboardingGuard.js";
 import adminRouter from "./src/routes/admin.js";
+import billingRoutes, { stripeWebhookHandler } from "./src/routes/billing.js";
 import { lookupStylist } from "./src/core/salonLookup.js";
 
 // Scheduler
@@ -119,6 +120,11 @@ app.use(
     },
   })
 );
+
+// =====================================================
+// Stripe Webhook — MUST be before bodyParser (needs raw body)
+// =====================================================
+app.post("/billing/webhook", express.raw({ type: "application/json" }), stripeWebhookHandler);
 
 // =====================================================
 // Global Middleware
@@ -259,6 +265,12 @@ app.use("/stylist", stylistPortal);
 // 4. ONBOARDING ROUTES (allowed BEFORE guard)
 // -------------------------------------------------------
 app.use("/onboarding", onboardingRoutes);
+
+// -------------------------------------------------------
+// 4b. BILLING ROUTES (checkout, success, manager/billing)
+// -------------------------------------------------------
+app.use("/billing", billingRoutes);
+app.use(billingRoutes); // also handles /manager/billing
 
 // -------------------------------------------------------
 // 4. ONBOARDING GUARD (must run AFTER onboarding)

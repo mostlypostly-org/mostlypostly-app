@@ -8,6 +8,7 @@ import { run as run004 } from "./004_post_types.js";
 import { run as run005 } from "./005_manager_profile.js";
 import { run as run006 } from "./006_brand_palette.js";
 import { run as run007 } from "./007_post_insights.js";
+import { run as run008 } from "./008_billing.js";
 
 export const migrations = [
   { name: "001_baseline_patches",        run: run001 },
@@ -17,4 +18,5 @@ export const migrations = [
   { name: "005_manager_profile",         run: run005 },
   { name: "006_brand_palette",           run: run006 },
   { name: "007_post_insights",           run: run007 },
+  { name: "008_billing",                 run: run008 },
 ];

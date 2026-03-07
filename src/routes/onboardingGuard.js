@@ -42,6 +42,9 @@ if (url.startsWith("/inbound/telegram")) {
   // Allow onboarding routes
   if (url.startsWith("/onboarding")) return next();
 
+  // Allow billing routes (checkout, success — webhook already exempt before guard)
+  if (url.startsWith("/billing")) return next();
+
   // Allow stylist portal (token-authenticated, no session needed)
   if (url.startsWith("/stylist")) return next();
 

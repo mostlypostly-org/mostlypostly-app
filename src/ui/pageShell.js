@@ -69,6 +69,7 @@ export default function pageShell({
           ${link("/manager", "Dashboard", "manager")}
           ${link("/dashboard", "Database", "database")}
           ${link("/analytics", "Analytics", "scheduler")}
+          ${link("/manager/billing", "Billing", "billing")}
           ${link("/manager/admin", "Admin", "admin")}
           ${link("/manager/logout", "Logout", "logout")}
         </nav>
@@ -86,11 +87,12 @@ export default function pageShell({
       <button id="mobileNavClose" class="text-mpMuted text-3xl leading-none">×</button>
     </div>
     <nav class="flex-1 px-6 py-6 space-y-4 text-base font-medium">
-      <a href="/manager${qsSalon}"   class="block py-2 border-b border-mpBorder text-mpCharcoal">Dashboard</a>
-      <a href="/dashboard${qsSalon}" class="block py-2 border-b border-mpBorder text-mpMuted">Database</a>
-      <a href="/analytics${qsSalon}" class="block py-2 border-b border-mpBorder text-mpMuted">Analytics</a>
+      <a href="/manager${qsSalon}"        class="block py-2 border-b border-mpBorder text-mpCharcoal">Dashboard</a>
+      <a href="/dashboard${qsSalon}"     class="block py-2 border-b border-mpBorder text-mpMuted">Database</a>
+      <a href="/analytics${qsSalon}"     class="block py-2 border-b border-mpBorder text-mpMuted">Analytics</a>
+      <a href="/manager/billing${qsSalon}" class="block py-2 border-b border-mpBorder text-mpMuted">Billing</a>
       <a href="/manager/admin${qsSalon}" class="block py-2 border-b border-mpBorder text-mpMuted">Admin</a>
-      <a href="/manager/logout" class="block py-2 text-mpMuted">Logout</a>
+      <a href="/manager/logout"          class="block py-2 text-mpMuted">Logout</a>
     </nav>
   </div>
 
