@@ -669,26 +669,44 @@ router.get("/debug", async (req, res) => {
     report.checks.push({ test: "IG account", ok: false, detail: "No instagram_business_id in DB — reconnect Facebook in Admin" });
   }
 
-  // 6. Test FB post insights on an actual stored fb_post_id
+  // 6. Test FB post access + insights on an actual stored fb_post_id
   const sampleFbPost = db.prepare(
-    `SELECT fb_post_id FROM posts WHERE salon_id=? AND fb_post_id IS NOT NULL AND fb_post_id != '' LIMIT 1`
+    `SELECT fb_post_id, published_at FROM posts WHERE salon_id=? AND fb_post_id IS NOT NULL AND fb_post_id != '' LIMIT 1`
   ).get(salon_id);
   if (sampleFbPost) {
     const pid = sampleFbPost.fb_post_id;
     try {
-      // Resolve photo ID to post ID if needed
-      let resolvedId = pid;
-      if (!String(pid).includes("_")) {
-        const rr = await fetch(`${GRAPH}/${pid}?fields=post_id&access_token=${token}`);
-        const rj = await rr.json();
-        if (rj.post_id) resolvedId = rj.post_id;
+      // First: can we even READ the post object?
+      const postR = await fetch(`${GRAPH}/${pid}?fields=id,message,created_time,likes.summary(true)&access_token=${token}`);
+      const postJ = await postR.json();
+      report.checks.push({
+        test: `FB post readable (${pid})`,
+        ok: !postJ.error,
+        detail: postJ.error?.message || `created_time=${postJ.created_time}, likes=${postJ.likes?.summary?.total_count}`
+      });
+
+      // Second: can we get insights?
+      if (!postJ.error) {
+        const r = await fetch(`${GRAPH}/${pid}/insights?metric=post_impressions,post_impressions_unique,post_engaged_users&access_token=${token}`);
+        const j = await r.json();
+        report.checks.push({ test: `FB post insights (${pid})`, ok: !j.error, detail: j.error?.message || `${(j.data||[]).length} metrics returned` });
       }
-      const r = await fetch(`${GRAPH}/${resolvedId}/insights?metric=post_impressions,post_impressions_unique,post_engaged_users&access_token=${token}`);
-      const j = await r.json();
-      report.checks.push({ test: `FB post insights (${pid}→${resolvedId})`, ok: !j.error, detail: j.error?.message || `${(j.data||[]).length} metrics returned` });
     } catch (e) {
-      report.checks.push({ test: `FB post insights (${pid})`, ok: false, detail: e.message });
+      report.checks.push({ test: `FB post readable (${pid})`, ok: false, detail: e.message });
     }
+  }
+
+  // 6b. Also show the most recent 3 posts from the live FB page feed for comparison
+  try {
+    const feedR = await fetch(`${GRAPH}/${pageId}/feed?fields=id,created_time&limit=3&access_token=${token}`);
+    const feedJ = await feedR.json();
+    report.checks.push({
+      test: "FB page feed (live)",
+      ok: !feedJ.error,
+      detail: feedJ.error?.message || (feedJ.data||[]).map(p => `${p.id} @ ${p.created_time}`).join(" | ")
+    });
+  } catch (e) {
+    report.checks.push({ test: "FB page feed (live)", ok: false, detail: e.message });
   }
 
   // 7. Count DB posts with/without media IDs
