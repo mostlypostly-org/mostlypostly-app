@@ -58,11 +58,11 @@ export default function pageShell({
 <body class="bg-mpBg text-mpCharcoal antialiased">
 
   <header class="border-b border-mpBorder bg-white/90 backdrop-blur sticky top-0 z-30">
-    <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-6xl pl-0 pr-4 sm:pr-6 lg:pr-8">
       <div class="flex items-center justify-between py-3">
 
         <a href="/manager${qsSalon}" class="flex items-center" aria-label="MostlyPostly">
-          <img src="/public/logo/logo-trimmed.png" alt="MostlyPostly" class="w-80 h-auto" />
+          <img src="/public/logo/logo-trimmed.png" alt="MostlyPostly" class="w-64 h-auto" />
         </a>
 
         <nav class="hidden md:flex items-center gap-8 text-sm font-medium">
