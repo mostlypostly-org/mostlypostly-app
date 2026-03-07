@@ -7,20 +7,31 @@ const GRAPH = "https://graph.facebook.com/v22.0";
 // ─── Facebook ────────────────────────────────────────────────────────────────
 
 async function fetchFBInsights(fbPostId, pageToken) {
+  // If the stored ID is a photo object ID (no underscore = not in pageId_postId format),
+  // resolve it to the actual post ID which is required for post insights.
+  let resolvedId = fbPostId;
+  if (!String(fbPostId).includes("_")) {
+    const resolveRes = await fetch(`${GRAPH}/${fbPostId}?fields=post_id&access_token=${pageToken}`);
+    const resolveJson = await resolveRes.json();
+    if (resolveJson.post_id) {
+      resolvedId = resolveJson.post_id;
+      console.log(`🔧 [FB Insights] Resolved photo ID ${fbPostId} → post ID ${resolvedId}`);
+    }
+  }
+
   const metrics = [
     "post_impressions",
     "post_impressions_unique",
     "post_engaged_users",
-    "post_clicks_by_type",
     "post_reactions_by_type_total",
   ].join(",");
 
-  const url = `${GRAPH}/${fbPostId}/insights?metric=${metrics}&access_token=${pageToken}`;
+  const url = `${GRAPH}/${resolvedId}/insights?metric=${metrics}&access_token=${pageToken}`;
   const res = await fetch(url);
   const json = await res.json();
 
   if (!res.ok || json.error) {
-    throw new Error(`FB insights error for ${fbPostId}: ${json?.error?.message || res.status}`);
+    throw new Error(`FB insights error for ${resolvedId}: ${json?.error?.message || res.status}`);
   }
 
   const byName = {};
@@ -28,7 +39,6 @@ async function fetchFBInsights(fbPostId, pageToken) {
     byName[item.name] = item.values?.[0]?.value ?? 0;
   }
 
-  const clicksByType = byName["post_clicks_by_type"] || {};
   const reactionsByType = byName["post_reactions_by_type_total"] || {};
   const totalReactions = typeof reactionsByType === "object"
     ? Object.values(reactionsByType).reduce((s, v) => s + (v || 0), 0)
@@ -37,10 +47,6 @@ async function fetchFBInsights(fbPostId, pageToken) {
   const impressions = byName["post_impressions"] || 0;
   const reach       = byName["post_impressions_unique"] || 0;
   const engaged     = byName["post_engaged_users"] || 0;
-  const linkClicks  = clicksByType["link clicks"] || 0;
-  const otherClicks = Object.entries(clicksByType)
-    .filter(([k]) => k !== "link clicks")
-    .reduce((s, [, v]) => s + (v || 0), 0);
 
   return {
     platform:      "facebook",
@@ -48,8 +54,8 @@ async function fetchFBInsights(fbPostId, pageToken) {
     reach,
     engaged_users: engaged,
     reactions:     totalReactions,
-    link_clicks:   linkClicks,
-    other_clicks:  otherClicks,
+    link_clicks:   0,
+    other_clicks:  0,
     engagement_rate: reach > 0 ? parseFloat(((engaged / reach) * 100).toFixed(2)) : 0,
   };
 }

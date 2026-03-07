@@ -599,7 +599,29 @@ router.get("/debug", async (req, res) => {
     report.checks.push({ test: "IG account", ok: false, detail: "No instagram_business_id in DB — reconnect Facebook in Admin" });
   }
 
-  // 6. Count DB posts with/without media IDs
+  // 6. Test FB post insights on an actual stored fb_post_id
+  const sampleFbPost = db.prepare(
+    `SELECT fb_post_id FROM posts WHERE salon_id=? AND fb_post_id IS NOT NULL AND fb_post_id != '' LIMIT 1`
+  ).get(salon_id);
+  if (sampleFbPost) {
+    const pid = sampleFbPost.fb_post_id;
+    try {
+      // Resolve photo ID to post ID if needed
+      let resolvedId = pid;
+      if (!String(pid).includes("_")) {
+        const rr = await fetch(`${GRAPH}/${pid}?fields=post_id&access_token=${token}`);
+        const rj = await rr.json();
+        if (rj.post_id) resolvedId = rj.post_id;
+      }
+      const r = await fetch(`${GRAPH}/${resolvedId}/insights?metric=post_impressions,post_impressions_unique,post_engaged_users&access_token=${token}`);
+      const j = await r.json();
+      report.checks.push({ test: `FB post insights (${pid}→${resolvedId})`, ok: !j.error, detail: j.error?.message || `${(j.data||[]).length} metrics returned` });
+    } catch (e) {
+      report.checks.push({ test: `FB post insights (${pid})`, ok: false, detail: e.message });
+    }
+  }
+
+  // 7. Count DB posts with/without media IDs
   const postStats = db.prepare(`
     SELECT
       COUNT(*) as total,

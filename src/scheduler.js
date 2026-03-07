@@ -262,6 +262,10 @@ export async function runSchedulerOnce() {
             });
           }
 
+          // FB photo posts return { id: photoId, post_id: actualPostId }.
+          // Store post_id when available — it's required for insights queries.
+          const fbPostId = fbResp?.post_id || fbResp?.id || null;
+
           db.prepare(
             `UPDATE posts
              SET status='published',
@@ -269,7 +273,7 @@ export async function runSchedulerOnce() {
                  ig_media_id=?,
                  published_at=datetime('now','utc')
              WHERE id=?`
-          ).run(fbResp?.id || null, igResp?.id || null, post.id);
+          ).run(fbPostId, igResp?.id || null, post.id);
 
           console.log(`✅ [${post.id}] Published`);
         } catch (err) {
