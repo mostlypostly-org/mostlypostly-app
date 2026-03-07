@@ -154,57 +154,27 @@ function pageTemplate({ step, stepLabel, content }) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: { sans: [‘"Plus Jakarta Sans"’, ‘ui-sans-serif’, ‘system-ui’, ‘sans-serif’] },
+            colors: {
+              mpCharcoal:     "#2B2D35",
+              mpCharcoalDark: "#1a1c22",
+              mpAccent:       "#D4897A",
+              mpAccentLight:  "#F2DDD9",
+              mpBg:           "#FDF8F6",
+              mpCard:         "#FFFFFF",
+              mpBorder:       "#EDE7E4",
+              mpMuted:        "#7A7C85",
+            }
+          }
+        }
+      };
+    </script>
     <style>
-      body { font-family: ‘Plus Jakarta Sans’, ui-sans-serif, system-ui, sans-serif !important; background: #FDF8F6 !important; color: #2B2D35 !important; }
-
-      /* Override dark Tailwind classes used in step content */
-      .bg-slate-950, .bg-slate-900, .bg-slate-800 { background-color: #FFFFFF !important; }
-      .border-slate-700, .border-slate-800 { border-color: #EDE7E4 !important; }
-      .text-slate-100, .text-slate-200, .text-slate-300 { color: #2B2D35 !important; }
-      .text-slate-400, .text-slate-500 { color: #7A7C85 !important; }
-      .text-indigo-400, .text-blue-400 { color: #D4897A !important; }
-      .bg-indigo-600, .bg-blue-600 { background-color: #2B2D35 !important; }
-      .hover\\:bg-indigo-700:hover, .hover\\:bg-blue-700:hover { background-color: #1a1c22 !important; }
-      .ring-indigo-500, .focus\\:ring-indigo-500:focus { --tw-ring-color: rgba(212,137,122,0.3) !important; }
-      .border-indigo-500:focus, .focus\\:border-indigo-500:focus { border-color: #D4897A !important; }
-
-      /* Form inputs */
-      input:not([type=checkbox]):not([type=radio]):not([type=file]),
-      select, textarea {
-        background: #FDF8F6 !important;
-        color: #2B2D35 !important;
-        border: 1px solid #EDE7E4 !important;
-        border-radius: 8px !important;
-        font-family: inherit !important;
-      }
-      input:not([type=checkbox]):not([type=radio]):not([type=file]):focus,
-      select:focus, textarea:focus {
-        border-color: #D4897A !important;
-        box-shadow: 0 0 0 3px rgba(212,137,122,0.15) !important;
-        outline: none !important;
-      }
-
-      /* Buttons */
-      button[type=submit], input[type=submit] {
-        background: #2B2D35 !important;
-        color: #fff !important;
-        border-radius: 999px !important;
-        font-family: inherit !important;
-        font-weight: 700 !important;
-        border: none !important;
-        cursor: pointer !important;
-        transition: background 0.2s !important;
-      }
-      button[type=submit]:hover { background: #1a1c22 !important; }
-
-      /* Tag/badge chips */
-      .bg-slate-800.border.border-slate-700 { background: #F2DDD9 !important; border-color: #D4897A !important; color: #2B2D35 !important; }
-      .hover\\:border-indigo-500:hover { border-color: #D4897A !important; }
-      .border-red-500 { border-color: #ef4444 !important; }
-
-      /* File input */
-      .file\\:bg-slate-700 { background: #EDE7E4 !important; }
-      .file\\:text-slate-100 { color: #2B2D35 !important; }
+      body { font-family: ‘Plus Jakarta Sans’, ui-sans-serif, system-ui, sans-serif; background: #FDF8F6; color: #2B2D35; }
     </style>
   </head>
 
@@ -265,49 +235,49 @@ router.get("/salon", (req, res) => {
       <form method="POST" class="space-y-4">
 
         <div>
-          <label class="block mb-1 text-sm">Salon Name</label>
-          <input name="name" class="w-full bg-slate-800 rounded p-2"
+          <label class="block text-sm font-medium text-mpMuted mb-1">Salon Name</label>
+          <input name="name" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
                  value="${salon.name || ""}" required />
         </div>
 
         <!-- Business Phone -->
         <div>
-          <label class="block mb-1 text-sm">Business Phone</label>
+          <label class="block text-sm font-medium text-mpMuted mb-1">Business Phone</label>
           <input name="phone"
                  pattern="^\\d{10}$"
                  title="Enter a 10-digit phone number"
-                 class="w-full bg-slate-800 rounded p-2"
+                 class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
                  value="${salon.phone || ""}" />
         </div>
 
         <div>
-          <label class="block mb-1 text-sm">Website</label>
+          <label class="block text-sm font-medium text-mpMuted mb-1">Website</label>
           <input name="website"
                  type="url"
                  placeholder="https://example.com"
-                 class="w-full bg-slate-800 rounded p-2"
+                 class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
                  value="${salon.website || ""}" />
         </div>
 
         <div>
-          <label class="block mb-1 text-sm">Booking Link</label>
+          <label class="block text-sm font-medium text-mpMuted mb-1">Booking Link</label>
           <input name="booking_link"
                  type="url"
                  placeholder="https://booking.com/your-salon"
-                 class="w-full bg-slate-800 rounded p-2"
+                 class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
                  value="${salon.booking_link || ""}" />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block mb-1 text-sm">City</label>
-            <input name="city" class="w-full bg-slate-800 rounded p-2"
+            <label class="block text-sm font-medium text-mpMuted mb-1">City</label>
+            <input name="city" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
                    value="${salon.city || ""}" />
           </div>
 
           <div>
-            <label class="block mb-1 text-sm">State</label>
-            <select name="state" class="w-full bg-slate-800 rounded p-2">
+            <label class="block text-sm font-medium text-mpMuted mb-1">State</label>
+            <select name="state" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent">
               ${[
                 "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
                 "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
@@ -327,8 +297,8 @@ router.get("/salon", (req, res) => {
         </div>
 
         <div>
-          <label class="block mb-1 text-sm">Industry</label>
-          <select name="industry" class="w-full bg-slate-800 rounded p-2">
+          <label class="block text-sm font-medium text-mpMuted mb-1">Industry</label>
+          <select name="industry" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent">
             <option value="salon" ${
               salon.industry === "salon" ? "selected" : ""
             }>Salon</option>
@@ -346,8 +316,8 @@ router.get("/salon", (req, res) => {
 
         <!-- Timezone -->
         <div>
-          <label class="block mb-1 text-sm">Timezone</label>
-          <select name="timezone" class="w-full bg-slate-800 rounded p-2">
+          <label class="block text-sm font-medium text-mpMuted mb-1">Timezone</label>
+          <select name="timezone" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent">
             ${[
               ["Eastern (US & Canada)", "America/New_York"],
               ["Central (US & Canada)", "America/Chicago"],
@@ -365,7 +335,7 @@ router.get("/salon", (req, res) => {
           </select>
         </div>
 
-        <button class="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 rounded p-3 font-semibold">
+        <button class="w-full mt-4 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-bold py-3 rounded-full text-sm transition">
           Continue →
         </button>
       </form>
@@ -478,11 +448,11 @@ function paletteSwatches(palette) {
   ];
   return colors.map(({ key, label }) => `
     <div class="flex items-center gap-3">
-      <div class="w-12 h-12 rounded-lg border border-slate-600 flex-shrink-0"
+      <div class="w-12 h-12 rounded-xl border border-mpBorder shadow-sm flex-shrink-0"
            style="background:${palette[key] || '#888'}"></div>
       <div>
-        <p class="text-sm font-medium">${label}</p>
-        <p class="text-xs text-slate-400 font-mono">${palette[key] || '—'}</p>
+        <p class="text-sm font-medium text-mpCharcoal">${label}</p>
+        <p class="text-xs text-mpMuted font-mono">${palette[key] || '—'}</p>
       </div>
       <input type="hidden" name="${key}" value="${palette[key] || ''}" />
     </div>
@@ -516,29 +486,29 @@ router.get("/brand", async (req, res) => {
     step: 2,
     stepLabel: "Brand Colors",
     content: hasPalette ? `
-      <p class="text-slate-300 text-sm mb-5">
-        We pulled your brand colors from <span class="text-indigo-300 font-mono">${salon.website || "your website"}</span>.
+      <p class="text-mpMuted text-sm mb-5">
+        We pulled your brand colors from <span class="text-mpAccent font-mono">${salon.website || "your website"}</span>.
         Confirm they look right before continuing.
       </p>
       <form method="POST" class="space-y-4">
         ${paletteSwatches(palette)}
-        <div class="pt-4 border-t border-slate-700 mt-4">
-          <p class="text-xs text-slate-500 mb-4">These colors will be used on your availability and promotion posts.</p>
-          <button class="w-full bg-indigo-600 hover:bg-indigo-700 rounded p-3 font-semibold">
+        <div class="pt-4 border-t border-mpBorder mt-4">
+          <p class="text-xs text-mpMuted mb-4">These colors will be used on your availability and promotion posts.</p>
+          <button class="w-full bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-bold py-3 rounded-full text-sm transition">
             Looks good — Continue →
           </button>
-          <a href="/onboarding/brand?reset=1" class="block text-center text-slate-400 hover:text-white text-sm mt-3 underline">
+          <a href="/onboarding/brand?reset=1" class="block text-center text-mpMuted hover:text-mpCharcoal text-sm mt-3 underline">
             Re-extract colors
           </a>
         </div>
       </form>
     ` : `
-      <p class="text-slate-300 text-sm mb-5">
-        We couldn't automatically extract colors${salon.website ? ` from <span class="font-mono text-indigo-300">${salon.website}</span>` : " (no website set)"}. You can skip this step for now and set colors later in Admin settings.
+      <p class="text-mpMuted text-sm mb-5">
+        We couldn't automatically extract colors${salon.website ? ` from <span class="font-mono text-mpAccent">${salon.website}</span>` : " (no website set)"}. You can skip this step for now and set colors later in Admin settings.
       </p>
       <form method="POST" class="space-y-4">
         <input type="hidden" name="skip" value="1" />
-        <button class="w-full bg-indigo-600 hover:bg-indigo-700 rounded p-3 font-semibold">
+        <button class="w-full bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-bold py-3 rounded-full text-sm transition">
           Skip for now — Continue →
         </button>
       </form>
@@ -609,8 +579,8 @@ router.get("/rules", (req, res) => {
         <!-- Posting window (12-hour dropdowns) -->
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block mb-1 text-sm">Posting Window Start</label>
-            <select name="posting_start_time" class="w-full bg-slate-800 rounded p-2 text-sm">
+            <label class="block text-sm font-medium text-mpMuted mb-1">Posting Window Start</label>
+            <select name="posting_start_time" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent">
               ${timeOptions
                 .map(
                   ([label, val]) =>
@@ -623,8 +593,8 @@ router.get("/rules", (req, res) => {
           </div>
 
           <div>
-            <label class="block mb-1 text-sm">Posting Window End</label>
-            <select name="posting_end_time" class="w-full bg-slate-800 rounded p-2 text-sm">
+            <label class="block text-sm font-medium text-mpMuted mb-1">Posting Window End</label>
+            <select name="posting_end_time" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent">
               ${timeOptions
                 .map(
                   ([label, val]) =>
@@ -640,24 +610,24 @@ router.get("/rules", (req, res) => {
         <!-- Spacing Min / Max -->
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block mb-1 text-sm">Spacing Min (minutes)</label>
-            <input name="spacing_min" type="number" class="w-full bg-slate-800 rounded p-2"
+            <label class="block text-sm font-medium text-mpMuted mb-1">Spacing Min (minutes)</label>
+            <input name="spacing_min" type="number" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
                    value="${salon.spacing_min || 20}" />
-            <p class="text-xs text-slate-400 mt-1">Recommended: 20 minutes</p>
+            <p class="text-xs text-mpMuted mt-1">Recommended: 20 minutes</p>
           </div>
 
           <div>
-            <label class="block mb-1 text-sm">Spacing Max (minutes)</label>
-            <input name="spacing_max" type="number" class="w-full bg-slate-800 rounded p-2"
+            <label class="block text-sm font-medium text-mpMuted mb-1">Spacing Max (minutes)</label>
+            <input name="spacing_max" type="number" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
                    value="${salon.spacing_max || 45}" />
-            <p class="text-xs text-slate-400 mt-1">Recommended: 45 minutes</p>
+            <p class="text-xs text-mpMuted mt-1">Recommended: 45 minutes</p>
           </div>
         </div>
 
         <!-- Auto-approval -->
         <div>
-          <label class="block mb-1 text-sm">Auto-Approval</label>
-          <select name="auto_approval" class="w-full bg-slate-800 rounded p-2">
+          <label class="block text-sm font-medium text-mpMuted mb-1">Auto-Approval</label>
+          <select name="auto_approval" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent">
             <option value="0" ${salon.auto_approval ? "" : "selected"}>Disabled</option>
             <option value="1" ${salon.auto_approval ? "selected" : ""}>Enabled</option>
           </select>
@@ -665,8 +635,8 @@ router.get("/rules", (req, res) => {
 
         <!-- Auto-publish -->
         <div>
-          <label class="block mb-1 text-sm">Auto-Publish</label>
-          <select name="auto_publish" class="w-full bg-slate-800 rounded p-2">
+          <label class="block text-sm font-medium text-mpMuted mb-1">Auto-Publish</label>
+          <select name="auto_publish" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent">
             <option value="0" ${salon.auto_publish ? "" : "selected"}>Disabled</option>
             <option value="1" ${salon.auto_publish ? "selected" : ""}>Enabled</option>
           </select>
@@ -674,8 +644,8 @@ router.get("/rules", (req, res) => {
 
         <!-- Tone Profile -->
         <div>
-          <label class="block mb-1 text-sm">Tone Profile</label>
-          <select name="tone" class="w-full bg-slate-800 rounded p-2">
+          <label class="block text-sm font-medium text-mpMuted mb-1">Tone Profile</label>
+          <select name="tone" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent">
             ${[
               "Professional",
               "Fun & Energetic",
@@ -693,7 +663,7 @@ router.get("/rules", (req, res) => {
           </select>
         </div>
 
-        <button class="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 rounded p-3 font-semibold">
+        <button class="w-full mt-4 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-bold py-3 rounded-full text-sm transition">
           Continue →
         </button>
       </form>
@@ -763,8 +733,8 @@ router.get("/manager", (req, res) => {
       <form method="POST" class="space-y-4">
 
         <div>
-          <label class="block mb-1 text-sm">Manager Name</label>
-          <input class="w-full bg-slate-800 rounded p-2 opacity-60 cursor-not-allowed"
+          <label class="block text-sm font-medium text-mpMuted mb-1">Manager Name</label>
+          <input class="w-full border border-mpBorder bg-mpBg rounded-xl px-4 py-2.5 text-sm text-mpMuted opacity-60 cursor-not-allowed"
                  value="${ms?.name || salon.manager_display_name || ""}"
                  disabled />
           <input type="hidden" name="manager_display_name"
@@ -772,8 +742,8 @@ router.get("/manager", (req, res) => {
         </div>
 
         <div>
-          <label class="block mb-1 text-sm">Title</label>
-          <input class="w-full bg-slate-800 rounded p-2 opacity-60 cursor-not-allowed"
+          <label class="block text-sm font-medium text-mpMuted mb-1">Title</label>
+          <input class="w-full border border-mpBorder bg-mpBg rounded-xl px-4 py-2.5 text-sm text-mpMuted opacity-60 cursor-not-allowed"
                  value="${salon.manager_title || "Owner"}"
                  disabled />
           <input type="hidden" name="manager_title"
@@ -781,15 +751,15 @@ router.get("/manager", (req, res) => {
         </div>
 
         <div>
-          <label class="block mb-1 text-sm">Manager Phone</label>
-          <input class="w-full bg-slate-800 rounded p-2 opacity-60 cursor-not-allowed"
+          <label class="block text-sm font-medium text-mpMuted mb-1">Manager Phone</label>
+          <input class="w-full border border-mpBorder bg-mpBg rounded-xl px-4 py-2.5 text-sm text-mpMuted opacity-60 cursor-not-allowed"
                  value="${ms?.phone || salon.manager_phone || ""}"
                  disabled />
           <input type="hidden" name="manager_phone"
                  value="${ms?.phone || salon.manager_phone || ""}">
         </div>
 
-        <button class="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 rounded p-3 font-semibold">
+        <button class="w-full mt-4 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-bold py-3 rounded-full text-sm transition">
           Continue →
         </button>
 
@@ -858,21 +828,21 @@ router.get("/stylists", (req, res) => {
       const specs = parseSpecs(s);
       const specLabel = specs.join(", ");
       return `
-        <div class="grid grid-cols-5 gap-4 mb-3 items-center text-xs">
-          <div class="truncate font-semibold text-slate-100">${s.name || "—"}</div>
-          <div class="truncate text-slate-300">${s.phone || "—"}</div>
-          <div class="truncate text-slate-300">${s.instagram_handle || "—"}</div>
-          <div class="truncate text-slate-300">${specLabel || "—"}</div>
+        <div class="grid grid-cols-5 gap-4 mb-3 items-center text-xs py-2 border-b border-mpBorder last:border-0">
+          <div class="truncate font-semibold text-mpCharcoal">${s.name || "—"}</div>
+          <div class="truncate text-mpMuted">${s.phone || "—"}</div>
+          <div class="truncate text-mpMuted">${s.instagram_handle || "—"}</div>
+          <div class="truncate text-mpMuted">${specLabel || "—"}</div>
           <div class="flex justify-end gap-2">
             <a href="/onboarding/stylists?edit=${s.id}"
-               class="text-[11px] px-2 py-1 rounded bg-slate-800 border border-slate-700 hover:border-indigo-500">
+               class="text-[11px] px-2.5 py-1 rounded-lg border border-mpBorder bg-white text-mpCharcoal hover:border-mpAccent transition">
               Edit
             </a>
             <form method="POST" action="/onboarding/stylists/delete" class="inline">
               <input type="hidden" name="stylist_id" value="${s.id}" />
               <button type="submit"
-                class="text-[11px] px-2 py-1 rounded bg-slate-800 border border-red-500 hover:bg-red-600 hover:text-white">
-                🗑
+                class="text-[11px] px-2.5 py-1 rounded-lg border border-red-200 bg-white text-red-400 hover:bg-red-50 hover:border-red-400 transition">
+                ✕
               </button>
             </form>
           </div>
@@ -888,11 +858,11 @@ router.get("/stylists", (req, res) => {
       content: `
       ${
         stylistRows ||
-        "<p class='text-slate-400 mb-4 text-sm'>No stylists added yet.</p>"
+        "<p class='text-mpMuted mb-4 text-sm'>No stylists added yet.</p>"
       }
 
-      <div class="border-t border-slate-700 mt-4 pt-4">
-        <h3 class="text-sm font-semibold text-slate-100 mb-2">
+      <div class="border-t border-mpBorder mt-4 pt-4">
+        <h3 class="text-sm font-semibold text-mpCharcoal mb-2">
           ${editStylist ? "Edit Stylist" : "Add Stylist"}
         </h3>
 
@@ -906,60 +876,60 @@ router.get("/stylists", (req, res) => {
             <input
               name="stylist_name"
               placeholder="Stylist Name"
-              class="bg-slate-800 rounded p-2 text-sm"
+              class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
               value="${editStylist ? editStylist.name || "" : ""}"
             />
             <input
               name="stylist_phone"
               placeholder="Phone (10 digits)"
-              class="bg-slate-800 rounded p-2 text-sm"
+              class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
               value="${editStylist ? editStylist.phone || "" : ""}"
             />
             <input
               name="stylist_ig"
               placeholder="@instagram"
-              class="bg-slate-800 rounded p-2 text-sm"
+              class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
               value="${editStylist ? editStylist.instagram_handle || "" : ""}"
             />
           </div>
 
           <!-- Stylist Photo -->
           <div>
-            <label class="block mb-1 text-sm">Stylist Photo <span class="text-slate-400 font-normal">(used for availability posts)</span></label>
+            <label class="block text-sm font-medium text-mpMuted mb-1">Stylist Photo <span class="text-mpMuted font-normal">(used for availability posts)</span></label>
             ${editStylist?.photo_url
               ? `<div class="mb-2 flex items-center gap-3">
-                   <img src="${editStylist.photo_url}" class="w-16 h-16 rounded-lg object-cover border border-slate-700" />
-                   <span class="text-xs text-slate-400">Current photo — upload a new one to replace</span>
+                   <img src="${editStylist.photo_url}" class="w-16 h-16 rounded-xl object-cover border border-mpBorder" />
+                   <span class="text-xs text-mpMuted">Current photo — upload a new one to replace</span>
                  </div>`
               : ""}
             <input type="file" name="stylist_photo" accept="image/*"
-              class="w-full text-sm text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-slate-700 file:text-slate-100 hover:file:bg-slate-600" />
+              class="w-full text-sm text-mpMuted file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-mpBg file:text-mpCharcoal file:border file:border-mpBorder hover:file:bg-mpAccentLight" />
           </div>
 
           <!-- Specialties tag input -->
           <div>
-            <label class="block mb-1 text-sm">Specialties</label>
+            <label class="block text-sm font-medium text-mpMuted mb-1">Specialties</label>
             <div id="specialties-tags" class="flex flex-wrap gap-2 mb-2"></div>
             <input
               type="text"
               id="specialty-input"
               placeholder="Type a specialty and press Enter"
-              class="w-full bg-slate-800 rounded p-2 text-sm"
+              class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
             />
             <input type="hidden" name="specialties_json" id="specialties-json" />
-            <p class="text-[11px] text-slate-400 mt-1">
+            <p class="text-[11px] text-mpMuted mt-1">
               Suggestions: Men's Grooming, Vivids, Balayage, Lived-in Blonde, Short Haircuts, Extensions, Spa, Coloring
             </p>
           </div>
 
-          <button class="w-full bg-indigo-600 hover:bg-indigo-700 rounded p-3 font-semibold">
+          <button class="w-full bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-bold py-3 rounded-full text-sm transition">
             ${editStylist ? "Save Changes" : "Add Stylist"}
           </button>
 
         </form>
 
         <form method="POST" action="/onboarding/review">
-          <button class="w-full mt-6 bg-emerald-600 hover:bg-emerald-700 rounded p-3 font-semibold">
+          <button class="w-full mt-6 bg-mpAccent hover:bg-[#c47060] text-white font-bold py-3 rounded-full text-sm transition">
             Continue to Review →
           </button>
         </form>
@@ -981,13 +951,13 @@ router.get("/stylists", (req, res) => {
             specialties.forEach((spec, idx) => {
               const chip = document.createElement("span");
               chip.className =
-                "inline-flex items-center gap-1 rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-100 border border-slate-700";
+                "inline-flex items-center gap-1 rounded-full bg-mpAccentLight px-3 py-1 text-xs text-mpCharcoal border border-mpBorder";
               const label = document.createElement("span");
               label.textContent = spec;
               const btn = document.createElement("button");
               btn.type = "button";
               btn.textContent = "×";
-              btn.className = "text-slate-400 hover:text-red-400";
+              btn.className = "text-mpMuted hover:text-red-400";
               btn.addEventListener("click", () => {
                 specialties.splice(idx, 1);
                 syncHidden();
@@ -1173,7 +1143,7 @@ router.get("/review", (req, res) => {
         <!-- SALON DETAILS -->
         <div>
           <h3 class="text-lg font-semibold mb-2">Salon Details</h3>
-          <div class="text-sm space-y-1 text-slate-300">
+          <div class="text-sm space-y-1 text-mpMuted">
             <div><strong>Name:</strong> ${salon.name}</div>
             <div><strong>Business Phone:</strong> ${formatPhone(
               salon.phone
@@ -1193,7 +1163,7 @@ router.get("/review", (req, res) => {
         <!-- POSTING RULES -->
         <div>
           <h3 class="text-lg font-semibold mb-2">Posting Rules</h3>
-          <div class="text-sm space-y-1 text-slate-300">
+          <div class="text-sm space-y-1 text-mpMuted">
             <div><strong>Window:</strong> ${
               salon.posting_start_time
             } → ${salon.posting_end_time}</div>
@@ -1213,7 +1183,7 @@ router.get("/review", (req, res) => {
         <!-- MANAGER -->
         <div>
           <h3 class="text-lg font-semibold mb-2">Manager</h3>
-          <div class="text-sm space-y-1 text-slate-300">
+          <div class="text-sm space-y-1 text-mpMuted">
             <div><strong>Name:</strong> ${salon.manager_display_name}</div>
             <div><strong>Title:</strong> ${salon.manager_title}</div>
             <div><strong>Phone:</strong> ${formatPhone(
@@ -1225,7 +1195,7 @@ router.get("/review", (req, res) => {
         <!-- STYLISTS -->
         <div>
           <h3 class="text-lg font-semibold mb-2">Stylists</h3>
-          <ul class="text-sm text-slate-300 space-y-1">
+          <ul class="text-sm text-mpMuted space-y-1">
             ${
               stylistHtml ||
               "<li>No stylists added.</li>"
@@ -1234,7 +1204,7 @@ router.get("/review", (req, res) => {
         </div>
 
         <form method="POST" action="/onboarding/complete">
-          <button class="w-full mt-6 bg-emerald-600 hover:bg-emerald-700 rounded p-3 font-semibold">
+          <button class="w-full mt-6 bg-mpAccent hover:bg-[#c47060] text-white font-bold py-3 rounded-full text-sm transition">
             Finish & Activate Salon →
           </button>
         </form>
