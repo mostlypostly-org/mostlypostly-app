@@ -819,101 +819,47 @@ router.get("/reset-password", (req, res) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Reset Password — MostlyPostly</title>
+  <title>Set New Password — MostlyPostly</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- Tailwind CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    /* HARD RESET — overrides all inherited styles */
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      background-color: #020617 !important;
-      color: #E5E7EB !important;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
-    /* Force readable inputs */
-    input {
-      background-color: #FFFFFF !important;
-      color: #020617 !important;
-      caret-color: #020617 !important;
-    }
-
-    input::placeholder {
-      color: #64748B !important;
-    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; background: #FDF8F6; color: #2B2D35; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
   </style>
 </head>
-
 <body>
-  <div class="min-h-screen flex items-center justify-center px-4">
+  <div style="width:100%;max-width:420px;background:#fff;border-radius:20px;padding:40px 36px;box-shadow:0 4px 32px rgba(43,45,53,0.08);border:1px solid #EDE7E4;">
 
-    <div class="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-xl">
-
-      <div class="flex justify-center mb-6">
-        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-sm font-semibold text-white">
-          MP
-        </div>
-      </div>
-
-      <h1 class="text-2xl font-bold text-center text-white mb-2">
-        Set a new password
-      </h1>
-
-      <p class="text-sm text-center text-slate-400 mb-6">
-        Choose a secure password for your MostlyPostly account.
-      </p>
-
-      <form method="POST" action="/manager/reset-password" class="space-y-4">
-        <input type="hidden" name="token" value="${safeToken}" />
-
-        <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1">
-            New password
-          </label>
-          <input
-            type="password"
-            name="password"
-            required
-            minlength="8"
-            placeholder="At least 8 characters"
-            class="w-full rounded-xl border border-slate-700 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1">
-            Confirm new password
-          </label>
-          <input
-            type="password"
-            name="password_confirm"
-            required
-            minlength="8"
-            placeholder="Re-enter password"
-            class="w-full rounded-xl border border-slate-700 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-
-        <button
-          type="submit"
-          class="mt-2 w-full rounded-full bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition"
-        >
-          Update password
-        </button>
-      </form>
-
-      <div class="mt-6 text-center">
-        <a href="/manager/login" class="text-xs text-slate-400 hover:text-white">
-          ← Back to login
-        </a>
-      </div>
-
+    <div style="text-align:center;margin-bottom:28px;">
+      <img src="/public/logo/logo-trimmed.png" alt="MostlyPostly" style="width:240px;height:auto;" />
     </div>
+
+    <h1 style="font-size:22px;font-weight:800;color:#2B2D35;margin-bottom:6px;">Set a new password</h1>
+    <p style="font-size:13px;color:#7A7C85;margin-bottom:24px;">Choose a secure password for your MostlyPostly account.</p>
+
+    <form method="POST" action="/manager/reset-password">
+      <input type="hidden" name="token" value="${safeToken}" />
+
+      <label style="display:block;font-size:12px;font-weight:600;color:#2B2D35;margin-bottom:5px;">New password</label>
+      <input type="password" name="password" required minlength="8" placeholder="At least 8 characters"
+        style="width:100%;border-radius:10px;padding:11px 14px;border:1px solid #EDE7E4;background:#FDF8F6;font-size:14px;color:#2B2D35;margin-bottom:16px;font-family:inherit;" />
+
+      <label style="display:block;font-size:12px;font-weight:600;color:#2B2D35;margin-bottom:5px;">Confirm new password</label>
+      <input type="password" name="password_confirm" required minlength="8" placeholder="Re-enter password"
+        style="width:100%;border-radius:10px;padding:11px 14px;border:1px solid #EDE7E4;background:#FDF8F6;font-size:14px;color:#2B2D35;margin-bottom:20px;font-family:inherit;" />
+
+      <button type="submit"
+        style="background:#2B2D35;color:#fff;font-weight:700;border-radius:999px;padding:13px 0;width:100%;font-size:14px;border:none;cursor:pointer;font-family:inherit;">
+        Update password →
+      </button>
+    </form>
+
+    <div style="text-align:center;margin-top:16px;">
+      <a href="/manager/login" style="font-size:12px;color:#7A7C85;text-decoration:none;">← Back to login</a>
+    </div>
+
   </div>
 </body>
 </html>
