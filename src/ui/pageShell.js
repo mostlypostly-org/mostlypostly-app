@@ -33,39 +33,6 @@ export default function pageShell({
       </div>`;
   }
 
-  // Admin has a hover flyout sub-menu
-  function adminNavItem() {
-    const active = isActive("admin");
-    const linkClasses = active
-      ? "bg-mpAccentLight text-mpAccent"
-      : "text-mpMuted hover:bg-mpBg hover:text-mpCharcoal";
-    return `
-      <div class="group relative w-full flex justify-center px-3">
-        <a href="/manager/admin${qs}" aria-label="Admin"
-           class="flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${linkClasses}">
-          ${ICONS.cog}
-        </a>
-        <!-- Flyout sub-menu on hover -->
-        <div class="pointer-events-none group-hover:pointer-events-auto
-                    absolute left-[calc(100%-4px)] top-0 ml-3 z-50
-                    w-48 rounded-xl bg-white border border-mpBorder shadow-xl py-2
-                    opacity-0 group-hover:opacity-100 transition-opacity">
-          <p class="px-4 pb-1 pt-1 text-[10px] font-bold uppercase tracking-widest text-mpMuted">Admin</p>
-          <a href="/manager/admin${qs}"
-             class="flex items-center gap-2 px-4 py-2 text-sm text-mpMuted hover:text-mpCharcoal hover:bg-mpBg transition-colors">
-            General Settings
-          </a>
-          <a href="/manager/stylists${qs}"
-             class="flex items-center gap-2 px-4 py-2 text-sm text-mpMuted hover:text-mpCharcoal hover:bg-mpBg transition-colors">
-            Team
-          </a>
-          <a href="/manager/admin${qs}#integrations"
-             class="flex items-center gap-2 px-4 py-2 text-sm text-mpMuted hover:text-mpCharcoal hover:bg-mpBg transition-colors">
-            Integrations
-          </a>
-        </div>
-      </div>`;
-  }
 
   // Mobile nav link (full-width with label)
   function mobileNavLink(href, label, key) {
@@ -113,9 +80,7 @@ export default function pageShell({
     body { font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; }
     /* Ensure sidebar flyout tooltips/menus escape sidebar bounds */
     #app-sidebar { overflow: visible; }
-    /* Smooth sidebar group hover for flyouts */
     .group:hover .group-hover\\:opacity-100 { opacity: 1; }
-    .group:hover .group-hover\\:pointer-events-auto { pointer-events: auto; }
   </style>
 </head>
 
@@ -130,7 +95,7 @@ export default function pageShell({
     <!-- Logo mark -->
     <a href="/manager${qs}"
        class="flex h-16 w-16 shrink-0 items-center justify-center border-b border-mpBorder">
-      <img src="/public/logo/logo-mark.png" alt="MostlyPostly" class="h-9 w-auto" />
+      <img src="/public/logo/logo-mark.png" alt="MostlyPostly" class="h-7 w-auto" />
     </a>
 
     <!-- Primary nav -->
@@ -141,7 +106,7 @@ export default function pageShell({
       ${navItem("/manager/stylists",  ICONS.team,    "Team",      "team")}
       ${navItem("/manager/scheduler", ICONS.clock,   "Scheduler", "scheduler")}
       ${navItem("/manager/billing",   ICONS.card,    "Billing",   "billing")}
-      ${adminNavItem()}
+      ${navItem("/manager/admin",     ICONS.cog,     "Admin",     "admin")}
     </nav>
 
     <!-- Logout at bottom -->
