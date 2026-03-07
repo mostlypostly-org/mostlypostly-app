@@ -522,11 +522,17 @@ router.post("/signup", async (req, res) => {
       return res.redirect("/manager/login?exists=1");
     }
 
-    // Create salon slug from businessName
-    const salonSlug = businessName
+    // Create salon slug from businessName (deduplicate if taken)
+    const baseSlug = businessName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
+
+    let salonSlug = baseSlug;
+    let slugSuffix = 2;
+    while (db.prepare("SELECT id FROM salons WHERE slug = ?").get(salonSlug)) {
+      salonSlug = `${baseSlug}-${slugSuffix++}`;
+    }
 
     const salonId = lowerHex();
 
