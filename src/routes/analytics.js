@@ -372,8 +372,9 @@ router.get("/", (req, res) => {
   </div>
   <script>
     async function runBackfill() {
-      const msg = document.getElementById('sync-toast').querySelector('div');
-      document.getElementById('sync-toast').classList.remove('hidden');
+      const toast = document.getElementById('sync-toast');
+      const msg = toast.querySelector('div');
+      toast.classList.remove('hidden');
       msg.textContent = 'Backfilling FB post IDs...';
       try {
         const res = await fetch('/analytics/backfill-fb-ids${qs}', { method: 'POST' });
@@ -382,12 +383,30 @@ router.get("/", (req, res) => {
           ? 'Matched ' + data.matched + ' of ' + data.scanned + ' posts to FB IDs.'
           : 'Error: ' + (data.error || 'unknown');
         setTimeout(() => {
-          document.getElementById('sync-toast').classList.add('hidden');
+          toast.classList.add('hidden');
           if (res.ok && data.matched > 0) location.reload();
         }, 3000);
       } catch(e) {
         msg.textContent = 'Backfill failed: ' + e.message;
-        setTimeout(() => document.getElementById('sync-toast').classList.add('hidden'), 3000);
+        setTimeout(() => toast.classList.add('hidden'), 3000);
+      }
+    }
+    async function runResetBackfill() {
+      if (!confirm('This will clear all stored FB post IDs and re-match from the live Facebook page. Continue?')) return;
+      const toast = document.getElementById('sync-toast');
+      const msg = toast.querySelector('div');
+      toast.classList.remove('hidden');
+      msg.textContent = 'Resetting & relinking FB post IDs...';
+      try {
+        const res = await fetch('/analytics/reset-and-backfill-fb-ids${qs}', { method: 'POST' });
+        const data = await res.json();
+        msg.textContent = res.ok
+          ? 'Cleared ' + data.cleared + ' IDs, fetched ' + data.fb_posts_fetched + ' FB posts, matched ' + data.matched + '.'
+          : 'Error: ' + (data.error || 'unknown');
+        setTimeout(() => { toast.classList.add('hidden'); if (res.ok) location.reload(); }, 4000);
+      } catch(e) {
+        msg.textContent = 'Reset failed: ' + e.message;
+        setTimeout(() => toast.classList.add('hidden'), 3000);
       }
     }
     async function runSync() {
@@ -424,8 +443,8 @@ router.get("/", (req, res) => {
         <p class="mt-1 text-sm text-mpMuted">Social performance across Facebook and Instagram.</p>
       </div>
       <div class="flex gap-2">
-        <button onclick="runBackfill()" class="shrink-0 rounded-full border border-mpBorder bg-white px-4 py-2.5 text-sm font-semibold text-mpCharcoal hover:border-mpAccent transition-colors">
-          Backfill FB IDs
+        <button onclick="runResetBackfill()" class="shrink-0 rounded-full border border-mpBorder bg-white px-4 py-2.5 text-sm font-semibold text-mpCharcoal hover:border-mpAccent transition-colors">
+          Reset &amp; Relink FB
         </button>
         <button onclick="runSync()" class="shrink-0 rounded-full bg-mpCharcoal px-5 py-2.5 text-sm font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
           Sync Insights
@@ -442,6 +461,63 @@ router.get("/", (req, res) => {
   `;
 
   res.send(pageShell({ title: `Analytics — ${salonName}`, body, salon_id }));
+});
+
+// ─── POST /analytics/reset-and-backfill-fb-ids ───────────────────────────────
+// Clears all existing fb_post_id values then re-matches from the live FB page
+// timeline. Use this when stored IDs are stale (e.g. after re-authenticating).
+
+router.post("/reset-and-backfill-fb-ids", async (req, res) => {
+  const salon_id = resolveSalonId(req);
+  if (!salon_id) return res.status(400).json({ error: "No salon context" });
+
+  const salonRow = db.prepare(
+    `SELECT facebook_page_id, facebook_page_token FROM salons WHERE slug=?`
+  ).get(salon_id);
+
+  if (!salonRow?.facebook_page_id || !salonRow?.facebook_page_token) {
+    return res.status(400).json({ error: "Salon missing Facebook credentials" });
+  }
+
+  const { facebook_page_id: pageId, facebook_page_token: token } = salonRow;
+
+  // Clear all existing fb_post_id values for this salon
+  const cleared = db.prepare(
+    `UPDATE posts SET fb_post_id=NULL WHERE salon_id=? AND status='published'`
+  ).run(salon_id).changes;
+
+  // Fetch FB page posts (paginate up to 200)
+  const fbPosts = [];
+  let fbUrl = `https://graph.facebook.com/v22.0/${pageId}/feed?fields=id,created_time&limit=100&access_token=${token}`;
+  while (fbUrl && fbPosts.length < 200) {
+    const fbRes = await fetch(fbUrl);
+    const fbJson = await fbRes.json();
+    if (!fbRes.ok || fbJson.error) {
+      return res.status(502).json({ error: fbJson?.error?.message || "FB API error" });
+    }
+    fbPosts.push(...(fbJson.data || []));
+    fbUrl = fbJson.paging?.next || null;
+  }
+
+  // Match DB posts to FB posts by timestamp (±5 min window)
+  const dbPosts = db.prepare(`
+    SELECT id, published_at FROM posts
+    WHERE salon_id=? AND status='published'
+    ORDER BY datetime(published_at) DESC LIMIT 200
+  `).all(salon_id);
+
+  let matched = 0;
+  for (const dbPost of dbPosts) {
+    if (!dbPost.published_at) continue;
+    const dbTime = new Date(dbPost.published_at + "Z").getTime();
+    const fbMatch = fbPosts.find(fp => Math.abs(new Date(fp.created_time).getTime() - dbTime) < 5 * 60 * 1000);
+    if (fbMatch) {
+      db.prepare(`UPDATE posts SET fb_post_id=? WHERE id=?`).run(fbMatch.id, dbPost.id);
+      matched++;
+    }
+  }
+
+  res.json({ cleared, fb_posts_fetched: fbPosts.length, db_posts_scanned: dbPosts.length, matched });
 });
 
 // ─── POST /analytics/backfill-fb-ids ─────────────────────────────────────────
@@ -462,8 +538,8 @@ router.post("/backfill-fb-ids", async (req, res) => {
 
   const { facebook_page_id: pageId, facebook_page_token: token } = salonRow;
 
-  // Fetch last 100 posts from the FB page
-  const fbUrl = `https://graph.facebook.com/v22.0/${pageId}/posts?fields=id,created_time&limit=100&access_token=${token}`;
+  // Fetch last 100 posts from the FB page feed (feed includes photo posts)
+  const fbUrl = `https://graph.facebook.com/v22.0/${pageId}/feed?fields=id,created_time&limit=100&access_token=${token}`;
   const fbRes = await fetch(fbUrl);
   const fbJson = await fbRes.json();
 
@@ -484,13 +560,7 @@ router.post("/backfill-fb-ids", async (req, res) => {
   for (const dbPost of dbPosts) {
     if (!dbPost.published_at) continue;
     const dbTime = new Date(dbPost.published_at + "Z").getTime();
-
-    // Find FB post within 5-minute window of our published_at
-    const fbMatch = fbPosts.find(fp => {
-      const fbTime = new Date(fp.created_time).getTime();
-      return Math.abs(fbTime - dbTime) < 5 * 60 * 1000;
-    });
-
+    const fbMatch = fbPosts.find(fp => Math.abs(new Date(fp.created_time).getTime() - dbTime) < 5 * 60 * 1000);
     if (fbMatch) {
       db.prepare(`UPDATE posts SET fb_post_id=? WHERE id=?`).run(fbMatch.id, dbPost.id);
       matched++;
