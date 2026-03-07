@@ -176,21 +176,35 @@ router.get("/manager/billing", requireAuth, async (req, res) => {
     }
   }
 
+  const PLAN_DETAILS = {
+    starter: { monthly: 49,  annual: 44,  desc: "60 posts · 5 stylists · 1 location" },
+    growth:  { monthly: 149, annual: 134, desc: "200 posts · 20 stylists · 3 locations" },
+    pro:     { monthly: 249, annual: 224, desc: "500 posts · Unlimited stylists · 5 locations" },
+  };
+
   const planCards = ["starter", "growth", "pro"].map(p => {
-    const prices = { starter: 49, growth: 149, pro: 249 };
-    const desc   = { starter: "60 posts · 5 stylists · 1 location", growth: "200 posts · 20 stylists · 3 locations", pro: "500 posts · Unlimited stylists · 5 locations" };
     const isCurrent = salon.plan === p;
+    const d = PLAN_DETAILS[p];
     return `
       <div class="rounded-xl border ${isCurrent ? "border-mpAccent bg-mpAccentLight/20" : "border-mpBorder bg-mpBg"} p-5 flex flex-col">
         <div class="flex items-start justify-between">
           <p class="font-bold text-mpCharcoal capitalize">${p}</p>
           ${isCurrent ? `<span class="rounded-full bg-mpAccentLight px-2.5 py-0.5 text-[10px] font-bold text-mpAccent uppercase tracking-wide">Current</span>` : ""}
         </div>
-        <p class="text-2xl font-extrabold text-mpCharcoal mt-2">$${prices[p]}<span class="text-sm font-normal text-mpMuted">/mo</span></p>
-        <p class="text-xs text-mpMuted mt-1 leading-relaxed">${desc[p]}</p>
+        <p class="text-2xl font-extrabold text-mpCharcoal mt-2">
+          <span class="price-monthly">$${d.monthly}</span>
+          <span class="price-annual hidden">$${d.annual}</span>
+          <span class="text-sm font-normal text-mpMuted">/mo</span>
+        </p>
+        <p class="price-annual-note hidden text-[11px] text-green-600 font-medium mt-0.5">Billed $${d.annual * 12}/year — save 10%</p>
+        <p class="text-xs text-mpMuted mt-1 leading-relaxed">${d.desc}</p>
         ${isCurrent
           ? `<p class="mt-4 text-xs text-mpMuted">This is your current plan.</p>`
-          : `<a href="/billing/checkout?plan=${p}&cycle=${salon.billing_cycle || "monthly"}" class="mt-4 block text-center rounded-full bg-mpCharcoal text-white text-xs font-bold py-2.5 hover:bg-mpCharcoalDark transition-colors">Switch to ${p.charAt(0).toUpperCase() + p.slice(1)}</a>`
+          : `<a data-plan="${p}" data-monthly="/billing/checkout?plan=${p}&cycle=monthly" data-annual="/billing/checkout?plan=${p}&cycle=annual"
+                href="/billing/checkout?plan=${p}&cycle=monthly"
+                class="plan-checkout-btn mt-auto pt-4 block text-center rounded-full bg-mpCharcoal text-white text-xs font-bold py-2.5 hover:bg-mpCharcoalDark transition-colors">
+                Select ${p.charAt(0).toUpperCase() + p.slice(1)}
+             </a>`
         }
       </div>`;
   }).join("");
@@ -251,12 +265,48 @@ router.get("/manager/billing", requireAuth, async (req, res) => {
 
         <!-- Plan Options -->
         <div class="rounded-2xl border border-mpBorder bg-white p-6 shadow-sm">
-          <p class="text-xs font-bold uppercase tracking-widest text-mpMuted mb-4">Plans</p>
+          <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+            <p class="text-xs font-bold uppercase tracking-widest text-mpMuted">Plans</p>
+            <!-- Monthly / Annual toggle -->
+            <div class="flex items-center gap-3">
+              <span id="label-monthly" class="text-xs font-semibold text-mpCharcoal">Monthly</span>
+              <button type="button" id="cycleToggle" onclick="toggleCycle()"
+                class="relative inline-flex h-6 w-11 items-center rounded-full bg-mpBorder transition-colors focus:outline-none">
+                <span id="cycleThumb" class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform translate-x-1"></span>
+              </button>
+              <span id="label-annual" class="text-xs font-semibold text-mpMuted">
+                Annual <span class="text-green-600 font-bold">–10%</span>
+              </span>
+            </div>
+          </div>
           <div class="grid gap-4 sm:grid-cols-3">
             ${planCards}
           </div>
-          <p class="mt-4 text-xs text-mpMuted">All plans include a 14-day free trial. Cancel anytime. Annual billing saves 10%.</p>
+          <p class="mt-4 text-xs text-mpMuted">All plans include a 14-day free trial. Cancel anytime.</p>
         </div>
+
+        <script>
+          let isAnnual = false;
+          function toggleCycle() {
+            isAnnual = !isAnnual;
+            const thumb   = document.getElementById('cycleThumb');
+            const toggle  = document.getElementById('cycleToggle');
+            const lm      = document.getElementById('label-monthly');
+            const la      = document.getElementById('label-annual');
+
+            thumb.style.transform  = isAnnual ? 'translateX(1.375rem)' : 'translateX(0.25rem)';
+            toggle.style.background = isAnnual ? '#D4897A' : '';
+            lm.className = 'text-xs font-semibold ' + (isAnnual ? 'text-mpMuted' : 'text-mpCharcoal');
+            la.className = 'text-xs font-semibold ' + (isAnnual ? 'text-mpCharcoal' : 'text-mpMuted');
+
+            document.querySelectorAll('.price-monthly').forEach(el => el.classList.toggle('hidden', isAnnual));
+            document.querySelectorAll('.price-annual').forEach(el => el.classList.toggle('hidden', !isAnnual));
+            document.querySelectorAll('.price-annual-note').forEach(el => el.classList.toggle('hidden', !isAnnual));
+            document.querySelectorAll('.plan-checkout-btn').forEach(btn => {
+              btn.href = isAnnual ? btn.dataset.annual : btn.dataset.monthly;
+            });
+          }
+        </script>
 
       </div>
     `,
