@@ -223,7 +223,9 @@ router.get("/login", (req, res) => {
 
   <!-- LEFT PANEL -->
   <div class="left-panel">
-    <img src="/public/logo/logo-trimmed.png" alt="MostlyPostly" class="left-logo" />
+    <a href="https://mostlypostly.com" style="display:block;position:relative;z-index:1;">
+      <img src="/public/logo/logo-trimmed.png" alt="MostlyPostly" class="left-logo" />
+    </a>
     <p class="left-tagline">AI social media for salons. Text a photo, get a polished post on Facebook &amp; Instagram.</p>
 
     <!-- Stat pills -->
@@ -274,6 +276,9 @@ router.get("/login", (req, res) => {
       <hr class="divider" />
       <div class="footer-links">
         New to MostlyPostly? <a href="/manager/signup">Sign up</a>
+      </div>
+      <div style="text-align:center;margin-top:16px;">
+        <a href="https://mostlypostly.com" style="font-size:12px;color:#7A7C85;text-decoration:none;">← Back to MostlyPostly</a>
       </div>
     </div>
   </div>
@@ -371,7 +376,9 @@ router.get("/signup", (req, res) => {
 <div class="split-wrapper">
 
   <div class="left-panel">
-    <img src="/public/logo/logo-trimmed.png" alt="MostlyPostly" class="left-logo" />
+    <a href="https://mostlypostly.com" style="display:block;position:relative;z-index:1;">
+      <img src="/public/logo/logo-trimmed.png" alt="MostlyPostly" class="left-logo" />
+    </a>
     <p class="left-tagline">Everything your salon needs to stay consistent and visible online — on autopilot.</p>
     <div class="feat-list">
       <div class="feat-item">
@@ -422,6 +429,9 @@ router.get("/signup", (req, res) => {
 
       <hr class="divider" />
       <div class="footer-links">Already have an account? <a href="/manager/login">Sign in</a></div>
+      <div style="text-align:center;margin-top:16px;">
+        <a href="https://mostlypostly.com" style="font-size:12px;color:#7A7C85;text-decoration:none;">← Back to MostlyPostly</a>
+      </div>
     </div>
   </div>
 
@@ -545,7 +555,7 @@ router.post("/signup", async (req, res) => {
         return res.redirect("/manager/login");
       }
 
-      return res.redirect(`/onboarding/salon?salon=${encodeURIComponent(salonSlug)}`);
+      return res.redirect(`/manager/billing?new=1&salon=${encodeURIComponent(salonSlug)}`);
     });
 
   } catch (err) {

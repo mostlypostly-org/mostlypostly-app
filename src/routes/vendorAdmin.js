@@ -94,9 +94,12 @@ router.post("/set-plan", requireSecret, (req, res) => {
   const validStatus  = ["trialing", "active", "past_due", "canceled"];
   if (!validPlans.includes(plan)) return res.redirect(`/internal/vendors${qs(req)}`);
 
+  // When setting to a paid plan, mark trial_used so no re-trial is offered later
+  const effectiveStatus = validStatus.includes(plan_status) ? plan_status : "active";
+  const markTrialUsed = plan !== "trial" ? 1 : 0;
   db.prepare(`
-    UPDATE salons SET plan = ?, plan_status = ?, updated_at = datetime('now') WHERE slug = ?
-  `).run(plan, validStatus.includes(plan_status) ? plan_status : "active", salon_slug);
+    UPDATE salons SET plan = ?, plan_status = ?, trial_used = ?, updated_at = datetime('now') WHERE slug = ?
+  `).run(plan, effectiveStatus, markTrialUsed, salon_slug);
 
   console.log(`[vendorAdmin] Set ${salon_slug} → plan:${plan} status:${plan_status}`);
   res.redirect(`/internal/vendors${qs(req)}`);

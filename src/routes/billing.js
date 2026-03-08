@@ -53,7 +53,7 @@ router.get("/checkout", requireAuth, async (req, res) => {
   }
 
   const stripe = getStripe();
-  const salon  = db.prepare("SELECT name, stripe_customer_id, trial_used FROM salons WHERE slug=?").get(salon_id);
+  const salon  = db.prepare("SELECT name, stripe_customer_id, trial_used, status FROM salons WHERE slug=?").get(salon_id);
   const mgr    = db.prepare("SELECT email FROM managers WHERE id=?").get(manager_id);
 
   const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || process.env.BASE_URL || "http://localhost:3000";
@@ -68,8 +68,8 @@ router.get("/checkout", requireAuth, async (req, res) => {
       ...(offerTrial ? { trial_period_days: 14 } : {}),
       metadata: { salon_id, plan, cycle },
     },
-    success_url: `${PUBLIC_BASE_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url:  `${PUBLIC_BASE_URL}/manager`,
+    success_url: `${PUBLIC_BASE_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}${offerTrial ? "&trial=1" : ""}${salon.status === "setup_incomplete" ? "&new=1" : ""}`,
+    cancel_url:  `${PUBLIC_BASE_URL}/manager/billing`,
     metadata: { salon_id, plan, cycle },
     allow_promotion_codes: true,
   };
@@ -93,7 +93,17 @@ router.get("/checkout", requireAuth, async (req, res) => {
 
 router.get("/success", requireAuth, (req, res) => {
   const { salon_id } = req.session;
-  const salon = db.prepare("SELECT name, plan FROM salons WHERE slug=?").get(salon_id);
+  const isNew   = req.query.new === "1";
+  const hasTrial = req.query.trial === "1";
+
+  // New accounts: redirect to onboarding to complete setup
+  if (isNew) {
+    return res.redirect(`/onboarding/salon?salon=${encodeURIComponent(salon_id)}`);
+  }
+
+  const trialMsg = hasTrial
+    ? `Your 14-day free trial is active. No charge until your trial ends.<br/>We'll send a reminder before your first billing date.`
+    : `Your subscription is now active. Thank you for choosing MostlyPostly!`;
 
   res.send(pageShell({
     title: "Subscription Active",
@@ -107,10 +117,7 @@ router.get("/success", requireAuth, (req, res) => {
           </svg>
         </div>
         <h1 class="text-2xl font-extrabold text-mpCharcoal">You're all set!</h1>
-        <p class="mt-3 text-mpMuted leading-relaxed">
-          Your 14-day free trial is active. No charge until your trial ends.<br/>
-          We'll send a reminder before your first billing date.
-        </p>
+        <p class="mt-3 text-mpMuted leading-relaxed">${trialMsg}</p>
         <div class="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
           <a href="/manager?salon=${salon_id}" class="rounded-full bg-mpCharcoal px-8 py-3 text-sm font-bold text-white hover:bg-mpCharcoalDark transition-colors">
             Go to Dashboard →
@@ -128,6 +135,7 @@ router.get("/success", requireAuth, (req, res) => {
 
 router.get("/manager/billing", requireAuth, async (req, res) => {
   const { manager_id, salon_id } = req.session;
+  const isNewAccount = req.query.new === "1";
 
   const salon = db.prepare(`
     SELECT name, plan, plan_status, billing_cycle, trial_ends_at, stripe_customer_id, trial_used
@@ -218,6 +226,17 @@ router.get("/manager/billing", requireAuth, async (req, res) => {
     salon_id,
     body: `
       <div class="space-y-6 max-w-3xl">
+
+        ${isNewAccount ? `
+        <div class="rounded-2xl border border-mpAccent bg-mpAccentLight/30 p-5 flex gap-4 items-start">
+          <div class="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full bg-mpAccent/20 flex items-center justify-center">
+            <svg class="w-4 h-4 text-mpAccent" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div>
+            <p class="text-sm font-bold text-mpCharcoal">Account created! Choose your plan to continue.</p>
+            <p class="text-xs text-mpMuted mt-0.5">Select a plan below and enter your card details. Your 14-day free trial starts immediately — no charge until it ends.</p>
+          </div>
+        </div>` : ""}
 
         <div>
           <h1 class="text-2xl font-extrabold text-mpCharcoal">Billing &amp; Plan</h1>

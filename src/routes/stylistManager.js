@@ -90,13 +90,13 @@ function celebBadge(birthday, hireDate) {
 const CSV_HEADERS = [
   "first_name", "last_name", "phone", "instagram_handle",
   "tone_variant", "birthday_mmdd", "hire_date",
-  "specialties", "bio", "profile_url", "celebrations_enabled",
+  "specialties", "bio", "profile_url",
 ];
 
 const CSV_EXAMPLE = [
   "Jane", "Doe", "+13175550100", "janedoehair",
   "warm_playful", "03-15", "2021-06-01",
-  "Balayage,Color Correction", "Specializing in lived-in blondes.", "https://salon.com/jane", "1",
+  "Balayage,Color Correction", "Specializing in lived-in blondes.", "https://salon.com/jane",
 ];
 
 // ── GET / — Team list ─────────────────────────────────────────────────────────
@@ -356,9 +356,8 @@ router.post("/import", requireAuth, csvUpload.single("csv"), (req, res) => {
   const insert = db.prepare(`
     INSERT OR IGNORE INTO stylists
       (id, salon_id, name, first_name, last_name, phone, instagram_handle,
-       tone_variant, birthday_mmdd, hire_date, specialties, bio, profile_url,
-       celebrations_enabled)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       tone_variant, birthday_mmdd, hire_date, specialties, bio, profile_url)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
   `);
 
   let imported = 0;
@@ -375,8 +374,6 @@ router.post("/import", requireAuth, csvUpload.single("csv"), (req, res) => {
     const specialties = JSON.stringify(
       getCol(row, "specialties").split(",").map(x => x.trim()).filter(Boolean)
     );
-    const celebrations = getCol(row, "celebrations_enabled");
-
     try {
       insert.run(
         crypto.randomUUID(), salon_id, name, first_name || null, last_name || null,
@@ -388,7 +385,6 @@ router.post("/import", requireAuth, csvUpload.single("csv"), (req, res) => {
         specialties,
         getCol(row, "bio") || null,
         getCol(row, "profile_url") || null,
-        celebrations === "0" ? 0 : 1,
       );
       imported++;
     } catch (err) {
