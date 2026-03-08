@@ -5,7 +5,9 @@
 
 export function run(db) {
   db.exec(`
-    CREATE TABLE IF NOT EXISTS managers_new (
+    DROP TABLE IF EXISTS managers_new;
+
+    CREATE TABLE managers_new (
       id                   TEXT PRIMARY KEY,
       salon_id             TEXT NOT NULL,
       name                 TEXT,
