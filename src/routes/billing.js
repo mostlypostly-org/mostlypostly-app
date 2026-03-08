@@ -27,7 +27,7 @@ const PLAN_PRICES = {
   },
 };
 
-const PLAN_LIMITS = {
+export const PLAN_LIMITS = {
   starter: { posts: 60,  stylists: 5,   locations: 1 },
   growth:  { posts: 200, stylists: 20,  locations: 3 },
   pro:     { posts: 500, stylists: null, locations: 5 },

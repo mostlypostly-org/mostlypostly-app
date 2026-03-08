@@ -15,6 +15,7 @@ import { run as run011 } from "./011_vendor_campaigns.js";
 import { run as run012 } from "./012_content_types.js";
 import { run as run013 } from "./013_trial_used.js";
 import { run as run014 } from "./014_manager_phone_nonunique.js";
+import { run as run015 } from "./015_salon_groups.js";
 
 export const migrations = [
   { name: "001_baseline_patches",        run: run001 },
@@ -31,4 +32,5 @@ export const migrations = [
   { name: "012_content_types",           run: run012 },
   { name: "013_trial_used",              run: run013 },
   { name: "014_manager_phone_nonunique", run: run014 },
+  { name: "015_salon_groups",            run: run015 },
 ];

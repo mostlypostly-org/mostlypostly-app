@@ -48,6 +48,9 @@ if (url.startsWith("/inbound/telegram")) {
   // Allow billing management page for new accounts choosing a plan
   if (url.startsWith("/manager/billing")) return next();
 
+  // Allow locations management (accessible at any onboarding state)
+  if (url.startsWith("/manager/locations")) return next();
+
   // Allow scheduler config (same auth as admin)
   if (url.startsWith("/manager/scheduler")) return next();
 

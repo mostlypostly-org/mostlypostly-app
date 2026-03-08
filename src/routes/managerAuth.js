@@ -544,8 +544,14 @@ router.post("/signup", async (req, res) => {
       password_hash,
     });
 
+    // Create salon group for this account
+    const groupId = crypto.randomUUID();
+    db.prepare("INSERT INTO salon_groups (id, name, owner_manager_id) VALUES (?,?,?)").run(groupId, businessName, managerId);
+    db.prepare("UPDATE salons SET group_id = ? WHERE slug = ?").run(groupId, salonSlug);
+
     req.session.manager_id = managerId;
     req.session.salon_id = salonSlug;
+    req.session.group_id = groupId;
     req.session.manager_email = email;
 
     console.log("✅ Signup OK → redirecting to onboarding step 1:", salonSlug);
@@ -615,8 +621,10 @@ router.post("/login", (req, res) => {
   }
 
   // Use consistent session keys throughout the app
+  const groupRow = db.prepare("SELECT group_id FROM salons WHERE slug = ?").get(manager.salon_id);
   req.session.manager_id = manager.id;
   req.session.salon_id = manager.salon_id;
+  req.session.group_id = groupRow?.group_id || null;
   req.session.manager_email = manager.email;
 
   // Redirect to dashboard

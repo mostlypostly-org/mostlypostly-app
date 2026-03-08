@@ -1,5 +1,7 @@
 // src/ui/pageShell.js — Left sidebar navigation
 
+import { db } from "../../db.js";
+
 export default function pageShell({
   title = "MostlyPostly",
   body  = "",
@@ -8,6 +10,18 @@ export default function pageShell({
   manager_phone = "",
 }) {
   const qs = salon_id ? `?salon=${encodeURIComponent(salon_id)}` : "";
+
+  // Active location name for sidebar indicator
+  let activeSalonName = "";
+  if (salon_id) {
+    try {
+      const row = db.prepare("SELECT name FROM salons WHERE slug = ?").get(salon_id);
+      if (row) activeSalonName = row.name;
+    } catch (_) {}
+  }
+  const locationInitials = activeSalonName
+    ? activeSalonName.split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase()
+    : "";
 
   function isActive(key) {
     return current === key;
@@ -98,16 +112,32 @@ export default function pageShell({
       <img src="/public/logo/logo-mark.png" alt="MostlyPostly" class="h-5 w-auto" />
     </a>
 
+    <!-- Active location indicator -->
+    ${locationInitials ? `
+    <div class="group relative w-full flex justify-center pt-3 pb-1">
+      <a href="/manager/locations"
+         class="flex h-7 w-7 items-center justify-center rounded-lg bg-mpAccentLight text-mpAccent text-xs font-bold leading-none">
+        ${locationInitials}
+      </a>
+      <div class="pointer-events-none absolute left-[calc(100%-4px)] top-1/2 -translate-y-1/2 z-50
+                  whitespace-nowrap rounded-lg bg-mpCharcoal px-2.5 py-1.5 text-xs font-semibold text-white
+                  opacity-0 group-hover:opacity-100 transition-opacity shadow-lg ml-3">
+        ${activeSalonName}
+        <div class="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-mpCharcoal"></div>
+      </div>
+    </div>` : ""}
+
     <!-- Primary nav -->
     <nav class="flex flex-1 flex-col items-center py-3 gap-0.5">
-      ${navItem("/manager",           ICONS.home,    "Dashboard", "manager")}
-      ${navItem("/dashboard",         ICONS.database, "Database",  "database")}
-      ${navItem("/analytics",         ICONS.chart,   "Analytics", "analytics")}
-      ${navItem("/manager/stylists",  ICONS.team,    "Team",      "team")}
-      ${navItem("/manager/scheduler", ICONS.clock,   "Scheduler", "scheduler")}
-      ${navItem("/manager/vendors",   ICONS.tag,     "Vendors",   "vendors")}
-      ${navItem("/manager/billing",   ICONS.card,    "Billing",   "billing")}
-      ${navItem("/manager/admin",     ICONS.cog,     "Admin",     "admin")}
+      ${navItem("/manager",            ICONS.home,      "Dashboard", "manager")}
+      ${navItem("/dashboard",          ICONS.database,  "Database",  "database")}
+      ${navItem("/analytics",          ICONS.chart,     "Analytics", "analytics")}
+      ${navItem("/manager/stylists",   ICONS.team,      "Team",      "team")}
+      ${navItem("/manager/scheduler",  ICONS.clock,     "Scheduler", "scheduler")}
+      ${navItem("/manager/vendors",    ICONS.tag,       "Vendors",   "vendors")}
+      ${navItem("/manager/locations",  ICONS.building,  "Locations", "locations")}
+      ${navItem("/manager/billing",    ICONS.card,      "Billing",   "billing")}
+      ${navItem("/manager/admin",      ICONS.cog,       "Admin",     "admin")}
     </nav>
 
     <!-- Logout at bottom -->
@@ -136,14 +166,15 @@ export default function pageShell({
       <button id="mobileNavClose" class="text-mpMuted text-3xl leading-none">&times;</button>
     </div>
     <nav class="flex-1 px-5 py-4 space-y-0.5 overflow-y-auto">
-      ${mobileNavLink("/manager",           "Dashboard",  "manager")}
-      ${mobileNavLink("/dashboard",         "Database",   "database")}
-      ${mobileNavLink("/analytics",         "Analytics",  "analytics")}
-      ${mobileNavLink("/manager/stylists",  "Team",       "team")}
-      ${mobileNavLink("/manager/scheduler", "Scheduler",  "scheduler")}
-      ${mobileNavLink("/manager/vendors",   "Vendors",    "vendors")}
-      ${mobileNavLink("/manager/billing",   "Billing",    "billing")}
-      ${mobileNavLink("/manager/admin",     "Admin",      "admin")}
+      ${mobileNavLink("/manager",            "Dashboard",  "manager")}
+      ${mobileNavLink("/dashboard",          "Database",   "database")}
+      ${mobileNavLink("/analytics",          "Analytics",  "analytics")}
+      ${mobileNavLink("/manager/stylists",   "Team",       "team")}
+      ${mobileNavLink("/manager/scheduler",  "Scheduler",  "scheduler")}
+      ${mobileNavLink("/manager/vendors",    "Vendors",    "vendors")}
+      ${mobileNavLink("/manager/locations",  "Locations",  "locations")}
+      ${mobileNavLink("/manager/billing",    "Billing",    "billing")}
+      ${mobileNavLink("/manager/admin",      "Admin",      "admin")}
       <a href="/manager/logout"
          class="block py-2.5 text-sm font-medium text-mpMuted hover:text-mpCharcoal transition-colors">
         Logout
@@ -214,5 +245,9 @@ const ICONS = {
   tag: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
     <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
     <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z" />
+  </svg>`,
+
+  building: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Z" />
   </svg>`,
 };

@@ -78,6 +78,7 @@ import stylistManagerRoute from "./src/routes/stylistManager.js";
 import vendorFeedsRoute from "./src/routes/vendorFeeds.js";
 import vendorAdminRoute from "./src/routes/vendorAdmin.js";
 import billingRoutes, { stripeWebhookHandler } from "./src/routes/billing.js";
+import locationsRoute from "./src/routes/locations.js";
 import { lookupStylist } from "./src/core/salonLookup.js";
 
 // Scheduler
@@ -307,12 +308,17 @@ app.use("/manager/scheduler", schedulerConfigRoute);
 app.use("/manager/stylists", stylistManagerRoute);
 
 // -------------------------------------------------------
-// 10. VENDOR FEEDS (salon-facing, Pro plan)
+// 10. LOCATIONS (multi-location switcher)
+// -------------------------------------------------------
+app.use("/manager/locations", locationsRoute);
+
+// -------------------------------------------------------
+// 11. VENDOR FEEDS (salon-facing, Pro plan)
 // -------------------------------------------------------
 app.use("/manager/vendors", vendorFeedsRoute);
 
 // -------------------------------------------------------
-// 11. VENDOR ADMIN (internal MostlyPostly tool)
+// 12. VENDOR ADMIN (internal MostlyPostly tool)
 // -------------------------------------------------------
 app.use("/internal/vendors", vendorAdminRoute);
 

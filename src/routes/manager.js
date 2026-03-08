@@ -100,7 +100,7 @@ function requireAuth(req, res, next) {
 
   req.manager = {
     id: row.id,
-    salon_id: row.salon_id,
+    salon_id: req.session.salon_id || row.salon_id,
     phone: row.phone,
     name: row.name || "Manager",
   };
