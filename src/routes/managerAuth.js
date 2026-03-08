@@ -294,6 +294,7 @@ router.get("/login", (req, res) => {
    Split layout signup page
 ---------------------------------*/
 router.get("/signup", (req, res) => {
+  const planHint = ["starter","growth","pro"].includes(req.query.plan) ? req.query.plan : "";
   res.send(`
 <!DOCTYPE html>
 <html lang="en">
@@ -414,6 +415,7 @@ router.get("/signup", (req, res) => {
         <input type="tel" name="phone" class="input-box" placeholder="Mobile number" required />
 
         <input type="text" name="company" style="display:none" />
+        <input type="hidden" name="plan" value="${planHint}" />
 
         <div class="check-row">
           <input type="checkbox" required />
@@ -448,6 +450,7 @@ router.get("/signup", (req, res) => {
 router.post("/signup", async (req, res) => {
   try {
     const body = req.body || {};
+    const planHint = ["starter","growth","pro"].includes(body.plan) ? body.plan : null;
     console.log("🔎 Signup body payload:", body);
 
     // Normalize possible field names (defensive against old HTML / typos)
@@ -555,7 +558,18 @@ router.post("/signup", async (req, res) => {
         return res.redirect("/manager/login");
       }
 
-      return res.redirect(`/manager/billing?new=1&salon=${encodeURIComponent(salonSlug)}`);
+      // Send founder promo code via SMS if configured
+      const promoCode = process.env.FOUNDER_PROMO_CODE;
+      if (promoCode && phone) {
+        try {
+          await sendViaTwilio(phone, `Welcome to MostlyPostly! 🎉 Your 14-day free trial starts when you select a plan. As a founding member, use promo code ${promoCode} at checkout to lock in your founder rate. Questions? Reply here anytime.`);
+        } catch (smsErr) {
+          console.warn("[signup] Promo SMS failed:", smsErr.message);
+        }
+      }
+
+      const billingUrl = `/manager/billing?new=1&salon=${encodeURIComponent(salonSlug)}${planHint ? `&plan=${planHint}` : ""}`;
+      return res.redirect(billingUrl);
     });
 
   } catch (err) {

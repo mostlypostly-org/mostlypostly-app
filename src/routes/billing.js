@@ -136,6 +136,7 @@ router.get("/success", requireAuth, (req, res) => {
 router.get("/manager/billing", requireAuth, async (req, res) => {
   const { manager_id, salon_id } = req.session;
   const isNewAccount = req.query.new === "1";
+  const planHint = ["starter","growth","pro"].includes(req.query.plan) ? req.query.plan : null;
 
   const salon = db.prepare(`
     SELECT name, plan, plan_status, billing_cycle, trial_ends_at, stripe_customer_id, trial_used
@@ -195,12 +196,13 @@ router.get("/manager/billing", requireAuth, async (req, res) => {
 
   const planCards = ["starter", "growth", "pro"].map(p => {
     const isCurrent = salon.plan === p;
+    const isHinted  = planHint === p && !isCurrent;
     const d = PLAN_DETAILS[p];
     return `
-      <div class="rounded-xl border ${isCurrent ? "border-mpAccent bg-mpAccentLight/20" : "border-mpBorder bg-mpBg"} p-5 flex flex-col">
+      <div id="plan-card-${p}" class="rounded-xl border ${isCurrent ? "border-mpAccent bg-mpAccentLight/20" : isHinted ? "border-mpAccent ring-2 ring-mpAccent/30" : "border-mpBorder bg-mpBg"} p-5 flex flex-col">
         <div class="flex items-start justify-between">
           <p class="font-bold text-mpCharcoal capitalize">${p}</p>
-          ${isCurrent ? `<span class="rounded-full bg-mpAccentLight px-2.5 py-0.5 text-[10px] font-bold text-mpAccent uppercase tracking-wide">Current</span>` : ""}
+          ${isCurrent ? `<span class="rounded-full bg-mpAccentLight px-2.5 py-0.5 text-[10px] font-bold text-mpAccent uppercase tracking-wide">Current</span>` : isHinted ? `<span class="rounded-full bg-mpAccentLight px-2.5 py-0.5 text-[10px] font-bold text-mpAccent uppercase tracking-wide">Recommended</span>` : ""}
         </div>
         <p class="text-2xl font-extrabold text-mpCharcoal mt-2">
           <span class="price-monthly">$${d.monthly}</span>
@@ -306,6 +308,13 @@ router.get("/manager/billing", requireAuth, async (req, res) => {
           </div>
           <p class="mt-4 text-xs text-mpMuted">${salon.trial_used ? "Cancel anytime." : "New accounts include a 14-day free trial. Cancel anytime."}</p>
         </div>
+
+        ${planHint ? `<script>
+          document.addEventListener('DOMContentLoaded', () => {
+            const card = document.getElementById('plan-card-${planHint}');
+            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          });
+        </script>` : ""}
 
         <script>
           let isAnnual = false;
