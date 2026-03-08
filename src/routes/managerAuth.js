@@ -537,7 +537,7 @@ router.post("/signup", async (req, res) => {
       VALUES (@id, @salon_id, @name, @email, @phone, @password_hash, 'manager')
     `).run({
       id: managerId,
-      salon_id: salonId,
+      salon_id: salonSlug,
       name: name || businessName, // fallback to businessName if name missing
       email,
       phone,
