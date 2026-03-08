@@ -550,24 +550,20 @@ router.post("/signup", async (req, res) => {
 
     console.log("✅ Signup OK → redirecting to onboarding step 1:", salonSlug);
 
+    // Send founder promo code via SMS if configured (fire-and-forget before redirect)
+    const promoCode = process.env.FOUNDER_PROMO_CODE;
+    if (promoCode && phone) {
+      sendViaTwilio(phone, `Welcome to MostlyPostly! Your 14-day free trial starts when you select a plan. As a founding member, use promo code ${promoCode} at checkout to lock in your founder rate. Questions? Reply here anytime.`).catch(smsErr => {
+        console.warn("[signup] Promo SMS failed:", smsErr.message);
+      });
+    }
+
     // Ensure session is persisted before redirect
     req.session.save((err) => {
       if (err) {
         console.error("❌ Error saving session after signup:", err);
-        // fall back to login if session can't be saved
         return res.redirect("/manager/login");
       }
-
-      // Send founder promo code via SMS if configured
-      const promoCode = process.env.FOUNDER_PROMO_CODE;
-      if (promoCode && phone) {
-        try {
-          await sendViaTwilio(phone, `Welcome to MostlyPostly! 🎉 Your 14-day free trial starts when you select a plan. As a founding member, use promo code ${promoCode} at checkout to lock in your founder rate. Questions? Reply here anytime.`);
-        } catch (smsErr) {
-          console.warn("[signup] Promo SMS failed:", smsErr.message);
-        }
-      }
-
       const billingUrl = `/manager/billing?new=1&salon=${encodeURIComponent(salonSlug)}${planHint ? `&plan=${planHint}` : ""}`;
       return res.redirect(billingUrl);
     });
