@@ -730,6 +730,7 @@ router.post("/signup", (req, res, next) => salonLogoUpload(req, res, next), asyn
 */
 router.get("/check-your-email", (req, res) => {
   const email = req.session.pending_email || "";
+  const managerId = req.session.pending_manager_id || "";
   const resent = req.query.resent === "1";
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -747,10 +748,12 @@ router.get("/check-your-email", (req, res) => {
     h1{font-size:22px;font-weight:800;margin-bottom:8px;}
     .sub{font-size:14px;color:#7A7C85;line-height:1.6;margin-bottom:28px;}
     .email-badge{background:#F2DDD9;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;color:#2B2D35;display:inline-block;margin-bottom:28px;}
-    .btn{display:block;width:100%;background:#2B2D35;color:#fff;font-weight:700;border-radius:999px;padding:13px;font-size:14px;border:none;cursor:pointer;font-family:inherit;text-decoration:none;margin-bottom:12px;}
     .resend-form{margin-top:8px;}
     .resend-btn{background:none;border:none;color:#D4897A;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline;}
     .success{font-size:13px;color:#059669;font-weight:600;margin-top:8px;}
+    .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:#D4897A;margin-right:6px;animation:pulse 1.5s ease-in-out infinite;}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(0.8);}}
+    .waiting{font-size:12px;color:#7A7C85;margin-top:16px;display:flex;align-items:center;justify-content:center;}
   </style>
 </head>
 <body>
@@ -765,10 +768,29 @@ router.get("/check-your-email", (req, res) => {
       <p style="font-size:13px;color:#7A7C85;margin-bottom:8px;">Didn't get it? Check your spam folder, or</p>
       <button class="resend-btn" type="submit">resend the verification email</button>
     </form>`}
-    <div style="margin-top:28px;padding-top:20px;border-top:1px solid #EDE7E4;">
+    <p class="waiting"><span class="pulse"></span> Waiting for verification…</p>
+    <div style="margin-top:24px;padding-top:20px;border-top:1px solid #EDE7E4;">
       <a href="${SITE_URL}" style="font-size:12px;color:#7A7C85;text-decoration:none;">← Back to MostlyPostly</a>
     </div>
   </div>
+  <script>
+    // Poll every 4 seconds — if the manager has verified on another device/tab, redirect automatically
+    (function() {
+      const managerId = ${JSON.stringify(managerId)};
+      if (!managerId) return;
+      function poll() {
+        fetch('/manager/verify-poll?id=' + encodeURIComponent(managerId))
+          .then(r => r.json())
+          .then(data => {
+            if (data.verified && data.redirect) {
+              window.location.href = data.redirect;
+            }
+          })
+          .catch(() => {});
+      }
+      setInterval(poll, 4000);
+    })();
+  </script>
 </body>
 </html>`);
 });
@@ -791,6 +813,17 @@ router.post("/resend-verification", async (req, res) => {
   });
 
   res.redirect("/manager/check-your-email?resent=1");
+});
+
+/* ─── GET /manager/verify-poll?id= ───────────────────────────────────────────
+   Polled every 4s by the check-your-email page to detect cross-device verification.
+*/
+router.get("/verify-poll", (req, res) => {
+  const { id } = req.query;
+  if (!id) return res.json({ verified: false });
+  const manager = db.prepare("SELECT email_verified, salon_id FROM managers WHERE id = ?").get(id);
+  if (!manager || !manager.email_verified) return res.json({ verified: false });
+  res.json({ verified: true, redirect: `/manager/billing?new=1&salon=${encodeURIComponent(manager.salon_id)}` });
 });
 
 /* ─── GET /manager/verify-email?token= ────────────────────────────────────────*/

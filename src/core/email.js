@@ -43,7 +43,8 @@ function emailWrapper({ preheader, body }) {
         <!-- Header -->
         <tr><td style="padding:0 0 24px 0;text-align:left;">
           <img src="https://mostlypostly.com/logo/MostlyPostly%20Logo%20-%20Primary%20(Trimmed).png"
-               alt="MostlyPostly" height="36" style="display:block;" />
+               alt="MostlyPostly" height="36"
+               style="display:block;border:0;outline:none;text-decoration:none;background:transparent;" />
         </td></tr>
 
         <!-- Card -->
