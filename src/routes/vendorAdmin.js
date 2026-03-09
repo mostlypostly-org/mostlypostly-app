@@ -50,20 +50,75 @@ const CSV_EXAMPLE = [
 ];
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
+
+// Step 1: secret in URL
 function requireSecret(req, res, next) {
   const secret = process.env.INTERNAL_SECRET;
-  if (!secret) {
-    return res.status(503).send("INTERNAL_SECRET env var not set.");
-  }
-  if (req.query.secret !== secret) {
-    return res.status(403).send("Forbidden.");
-  }
+  if (!secret) return res.status(503).send("INTERNAL_SECRET env var not set.");
+  if (req.query.secret !== secret) return res.status(403).send("Forbidden.");
   next();
+}
+
+// Step 2: PIN entered via form, stored in session for duration of browser session
+function requirePin(req, res, next) {
+  const pin = process.env.INTERNAL_PIN;
+  // If no PIN configured, skip second factor
+  if (!pin) return next();
+  if (req.session?.console_authed === true) return next();
+
+  // Show PIN entry form
+  return res.send(`<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8"/><title>Platform Console — Verify</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;
+         display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:40px 36px;
+          max-width:360px;width:100%;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+    .lock{font-size:36px;margin-bottom:16px;}
+    h1{font-size:18px;font-weight:800;color:#111827;margin-bottom:6px;}
+    p{font-size:13px;color:#6b7280;margin-bottom:24px;line-height:1.5;}
+    input{width:100%;border:1px solid #d1d5db;border-radius:10px;padding:12px 16px;
+          font-size:20px;letter-spacing:4px;text-align:center;outline:none;margin-bottom:12px;}
+    input:focus{border-color:#2B2D35;box-shadow:0 0 0 3px rgba(43,45,53,0.1);}
+    button{width:100%;background:#2B2D35;color:#fff;border:none;border-radius:10px;
+           padding:12px;font-size:14px;font-weight:700;cursor:pointer;}
+    button:hover{background:#1a1c22;}
+    .error{font-size:13px;color:#dc2626;margin-bottom:12px;}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="lock">🔐</div>
+    <h1>Platform Console</h1>
+    <p>Enter your access PIN to continue.</p>
+    ${req.query.invalid ? `<p class="error">Incorrect PIN — try again.</p>` : ""}
+    <form method="POST" action="/internal/vendors/verify-pin${qs(req)}">
+      <input type="password" name="pin" autofocus autocomplete="off" placeholder="••••••" maxlength="20" />
+      <button type="submit">Continue →</button>
+    </form>
+  </div>
+</body></html>`);
 }
 
 function qs(req) {
   return `?secret=${encodeURIComponent(req.query.secret || "")}`;
 }
+
+// ── POST /verify-pin ───────────────────────────────────────────────────────────
+router.post("/verify-pin", requireSecret, (req, res) => {
+  const pin = process.env.INTERNAL_PIN;
+  if (!pin) return res.redirect(`/internal/vendors${qs(req)}`);
+
+  if (req.body.pin === pin) {
+    req.session.console_authed = true;
+    req.session.save(() => res.redirect(`/internal/vendors${qs(req)}`));
+  } else {
+    res.redirect(`/internal/vendors${qs(req)}&invalid=1`);
+  }
+});
 
 // ── Simple CSV line parser ─────────────────────────────────────────────────────
 function parseCSVLine(line) {
@@ -86,7 +141,7 @@ function parseCSVLine(line) {
 }
 
 // ── POST /set-plan — Override salon plan for testing ──────────────────────────
-router.post("/set-plan", requireSecret, (req, res) => {
+router.post("/set-plan", requireSecret, requirePin, (req, res) => {
   const { salon_slug, plan, plan_status } = req.body;
   if (!salon_slug || !plan) return res.redirect(`/internal/vendors${qs(req)}`);
 
@@ -106,7 +161,7 @@ router.post("/set-plan", requireSecret, (req, res) => {
 });
 
 // ── GET / — Platform Console ───────────────────────────────────────────────────
-router.get("/", requireSecret, (req, res) => {
+router.get("/", requireSecret, requirePin, (req, res) => {
   const campaigns = db.prepare(`
     SELECT * FROM vendor_campaigns ORDER BY vendor_name ASC, campaign_name ASC
   `).all();
@@ -311,7 +366,7 @@ router.get("/", requireSecret, (req, res) => {
 });
 
 // ── POST /delete-salon ─────────────────────────────────────────────────────────
-router.post("/delete-salon", requireSecret, (req, res) => {
+router.post("/delete-salon", requireSecret, requirePin, (req, res) => {
   const { salon_slug } = req.body;
   if (!salon_slug) return res.redirect(`/internal/vendors${qs(req)}`);
 
@@ -331,7 +386,7 @@ router.post("/delete-salon", requireSecret, (req, res) => {
 });
 
 // ── GET /template — CSV download ──────────────────────────────────────────────
-router.get("/template", requireSecret, (_req, res) => {
+router.get("/template", requireSecret, requirePin, (_req, res) => {
   const lines = [
     CSV_HEADERS.join(","),
     CSV_EXAMPLE.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","),
@@ -342,7 +397,7 @@ router.get("/template", requireSecret, (_req, res) => {
 });
 
 // ── POST /upload — CSV import ─────────────────────────────────────────────────
-router.post("/upload", requireSecret, csvUpload.single("csv"), (req, res) => {
+router.post("/upload", requireSecret, requirePin, csvUpload.single("csv"), (req, res) => {
   if (!req.file) return res.redirect(`/internal/vendors${qs(req)}`);
 
   const text  = req.file.buffer.toString("utf8");
@@ -406,7 +461,7 @@ router.post("/upload", requireSecret, csvUpload.single("csv"), (req, res) => {
 });
 
 // ── POST /delete/:id ──────────────────────────────────────────────────────────
-router.post("/delete/:id", requireSecret, (req, res) => {
+router.post("/delete/:id", requireSecret, requirePin, (req, res) => {
   db.prepare("DELETE FROM vendor_campaigns WHERE id = ?").run(req.params.id);
   res.redirect(`/internal/vendors${qs(req)}`);
 });
