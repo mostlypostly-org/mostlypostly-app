@@ -14,11 +14,23 @@
 import express from "express";
 import multer from "multer";
 import crypto from "crypto";
+import path from "path";
+import fs from "fs";
 import db from "../../db.js";
 
 const router = express.Router();
 
 const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+const PROOF_DIR = path.resolve("public/uploads/vendor-proofs");
+fs.mkdirSync(PROOF_DIR, { recursive: true });
+const proofUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, PROOF_DIR),
+    filename: (_req, file, cb) => cb(null, `proof-${Date.now()}${path.extname(file.originalname)}`),
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+}).single("proof_file");
 
 // CSV column spec
 const CSV_HEADERS = [
@@ -176,6 +188,29 @@ router.get("/", requireSecret, requirePin, (req, res) => {
     ORDER BY s.created_at DESC
   `).all();
 
+  // Vendor approval requests
+  const approvals = db.prepare(`
+    SELECT a.*, s.name AS salon_name
+    FROM salon_vendor_approvals a
+    JOIN salons s ON s.slug = a.salon_id
+    ORDER BY CASE a.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+             a.requested_at DESC
+  `).all();
+  const pendingCount = approvals.filter(a => a.status === "pending").length;
+
+  // All unique vendor names for the approval assignment dropdown
+  const vendorNames = [...new Set(campaigns.map(c => c.vendor_name))].sort();
+
+  // Per-salon approved vendors map
+  const allApprovedFeeds = db.prepare(`
+    SELECT salon_id, vendor_name FROM salon_vendor_approvals WHERE status = 'approved'
+  `).all();
+  const approvedBysalon = {};
+  for (const row of allApprovedFeeds) {
+    if (!approvedBysalon[row.salon_id]) approvedBysalon[row.salon_id] = [];
+    approvedBysalon[row.salon_id].push(row.vendor_name);
+  }
+
   // Stats
   const totalSalons   = salons.length;
   const active        = salons.filter(s => s.plan_status === "active").length;
@@ -262,12 +297,114 @@ router.get("/", requireSecret, requirePin, (req, res) => {
   <div class="max-w-5xl mx-auto px-8 py-8 space-y-8">
 
     <!-- Stats -->
-    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-6 gap-3">
       <div class="stat-card"><div class="stat-val">${totalSalons}</div><div class="stat-lbl">Total Accounts</div></div>
       <div class="stat-card"><div class="stat-val text-green-600">${active}</div><div class="stat-lbl">Active</div></div>
       <div class="stat-card"><div class="stat-val text-blue-600">${trialing}</div><div class="stat-lbl">Trialing</div></div>
       <div class="stat-card"><div class="stat-val text-red-500">${canceled}</div><div class="stat-lbl">Canceled</div></div>
       <div class="stat-card"><div class="stat-val text-purple-600">${totalCampaigns}</div><div class="stat-lbl">Vendor Campaigns</div></div>
+      <div class="stat-card"><div class="stat-val ${pendingCount > 0 ? "text-yellow-500" : "text-gray-400"}">${pendingCount}</div><div class="stat-lbl">Pending Approvals</div></div>
+    </div>
+
+    <!-- Vendor Approvals -->
+    <div class="border rounded-2xl bg-white overflow-hidden">
+      <div class="px-6 py-4 border-b flex items-center justify-between">
+        <div>
+          <h2 class="font-bold">Vendor Partner Approvals
+            ${pendingCount > 0 ? `<span class="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-semibold text-yellow-700">${pendingCount} pending</span>` : ""}
+          </h2>
+          <p class="text-xs text-gray-500 mt-0.5">Review salon requests and manually assign vendor access. Approved vendors unlock the toggle in the salon's Vendor Brands page.</p>
+        </div>
+      </div>
+
+      <!-- Manual assignment: add vendor to any salon -->
+      <div class="px-6 py-4 border-b bg-gray-50">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Manually Assign Vendor Access</p>
+        <form method="POST" action="/internal/vendors/approve-vendor${qs(req)}" class="flex flex-wrap gap-2 items-end">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Salon</label>
+            <select name="salon_slug" class="text-xs border rounded-lg px-2 py-1.5 min-w-[160px]">
+              ${salons.map(s => `<option value="${safe(s.slug)}">${safe(s.name)}</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Vendor</label>
+            <select name="vendor_name" class="text-xs border rounded-lg px-2 py-1.5 min-w-[140px]">
+              ${vendorNames.map(v => `<option value="${safe(v)}">${safe(v)}</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Status</label>
+            <select name="status" class="text-xs border rounded-lg px-2 py-1.5">
+              <option value="approved">Approved</option>
+              <option value="pending">Pending</option>
+              <option value="denied">Denied</option>
+            </select>
+          </div>
+          <button type="submit" class="text-xs bg-gray-900 text-white rounded-lg px-3 py-1.5 hover:bg-gray-700">Save</button>
+        </form>
+      </div>
+
+      <!-- Approval requests list -->
+      ${approvals.length === 0
+        ? `<div class="px-6 py-10 text-center text-sm text-gray-400">No approval requests yet.</div>`
+        : `<div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wide">
+                  <th class="px-4 py-3">Salon</th>
+                  <th class="px-4 py-3">Vendor</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3">Requested</th>
+                  <th class="px-4 py-3">Proof / Notes</th>
+                  <th class="px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${approvals.map(a => {
+                  const statusBadge = { approved: "bg-green-100 text-green-700", pending: "bg-yellow-100 text-yellow-700", denied: "bg-red-100 text-red-600" }[a.status] || "bg-gray-100 text-gray-600";
+                  return `
+                  <tr class="border-b last:border-0 hover:bg-gray-50/50">
+                    <td class="px-4 py-3">
+                      <div class="font-medium text-gray-900">${safe(a.salon_name)}</div>
+                      <div class="text-xs font-mono text-gray-400">${safe(a.salon_id)}</div>
+                    </td>
+                    <td class="px-4 py-3 font-medium">${safe(a.vendor_name)}</td>
+                    <td class="px-4 py-3">
+                      <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadge}">${safe(a.status)}</span>
+                    </td>
+                    <td class="px-4 py-3 text-xs text-gray-400">${safe((a.requested_at || "").slice(0, 10))}</td>
+                    <td class="px-4 py-3">
+                      ${a.proof_file
+                        ? `<a href="/uploads/vendor-proofs/${safe(a.proof_file)}" target="_blank" class="text-xs text-blue-500 hover:underline">View file</a>`
+                        : `<form method="POST" action="/internal/vendors/upload-proof${qs(req)}" enctype="multipart/form-data" class="flex gap-1 items-center">
+                             <input type="hidden" name="approval_id" value="${safe(a.id)}" />
+                             <input type="file" name="proof_file" accept=".pdf,.jpg,.jpeg,.png" class="text-xs w-32" />
+                             <button type="submit" class="text-xs text-gray-600 border rounded px-2 py-0.5 hover:bg-gray-50">Upload</button>
+                           </form>`}
+                      ${a.notes ? `<div class="text-xs text-gray-400 mt-1">${safe(a.notes)}</div>` : ""}
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex gap-2 flex-wrap">
+                        ${a.status !== "approved" ? `
+                        <form method="POST" action="/internal/vendors/approve-vendor${qs(req)}">
+                          <input type="hidden" name="approval_id" value="${safe(a.id)}" />
+                          <input type="hidden" name="status" value="approved" />
+                          <button type="submit" class="text-xs bg-green-600 text-white rounded px-2.5 py-1 hover:bg-green-700">Approve</button>
+                        </form>` : ""}
+                        ${a.status !== "denied" ? `
+                        <form method="POST" action="/internal/vendors/approve-vendor${qs(req)}">
+                          <input type="hidden" name="approval_id" value="${safe(a.id)}" />
+                          <input type="hidden" name="status" value="denied" />
+                          <button type="submit" class="text-xs bg-red-500 text-white rounded px-2.5 py-1 hover:bg-red-600">Deny</button>
+                        </form>` : ""}
+                      </div>
+                    </td>
+                  </tr>`;
+                }).join("")}
+              </tbody>
+            </table>
+           </div>`}
     </div>
 
     <!-- Account Management -->
@@ -378,10 +515,47 @@ router.post("/delete-salon", requireSecret, requirePin, (req, res) => {
   db.prepare("DELETE FROM password_reset_tokens WHERE manager_id IN (SELECT id FROM managers WHERE salon_id = ?)").run(salon_slug);
   db.prepare("DELETE FROM managers WHERE salon_id = ?").run(salon_slug);
   db.prepare("DELETE FROM salon_vendor_feeds WHERE salon_id = ?").run(salon_slug);
+  db.prepare("DELETE FROM salon_vendor_approvals WHERE salon_id = ?").run(salon_slug);
   db.prepare("DELETE FROM stock_photos WHERE salon_id = ?").run(salon_slug);
   db.prepare("DELETE FROM salons WHERE slug = ?").run(salon_slug);
 
   console.log(`[platformConsole] Deleted salon: ${salon_slug}`);
+  res.redirect(`/internal/vendors${qs(req)}`);
+});
+
+// ── POST /approve-vendor — Approve/deny/manually assign vendor to salon ────────
+router.post("/approve-vendor", requireSecret, requirePin, (req, res) => {
+  const { approval_id, salon_slug, vendor_name, status } = req.body;
+  const validStatuses = ["approved", "pending", "denied"];
+  if (!validStatuses.includes(status)) return res.redirect(`/internal/vendors${qs(req)}`);
+
+  if (approval_id) {
+    // Update existing approval record
+    db.prepare(`
+      UPDATE salon_vendor_approvals
+      SET status = ?, reviewed_at = datetime('now')
+      WHERE id = ?
+    `).run(status, approval_id);
+  } else if (salon_slug && vendor_name) {
+    // Manual assignment — upsert
+    db.prepare(`
+      INSERT INTO salon_vendor_approvals (id, salon_id, vendor_name, status, requested_at, reviewed_at)
+      VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+      ON CONFLICT(salon_id, vendor_name) DO UPDATE SET status = excluded.status, reviewed_at = excluded.reviewed_at
+    `).run(crypto.randomUUID(), salon_slug, vendor_name, status);
+  }
+
+  res.redirect(`/internal/vendors${qs(req)}`);
+});
+
+// ── POST /upload-proof — Upload partnership proof file ─────────────────────────
+router.post("/upload-proof", requireSecret, requirePin, proofUpload, (req, res) => {
+  const { approval_id } = req.body;
+  if (!approval_id || !req.file) return res.redirect(`/internal/vendors${qs(req)}`);
+
+  db.prepare("UPDATE salon_vendor_approvals SET proof_file = ? WHERE id = ?")
+    .run(req.file.filename, approval_id);
+
   res.redirect(`/internal/vendors${qs(req)}`);
 });
 
