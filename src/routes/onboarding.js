@@ -253,8 +253,8 @@ router.get("/salon", (req, res) => {
         <div>
           <label class="block text-sm font-medium text-mpMuted mb-1">Website</label>
           <input name="website"
-                 type="url"
-                 placeholder="https://example.com"
+                 type="text"
+                 placeholder="e.g. rejuvesalonspa.com"
                  class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
                  value="${salon.website || ""}" />
         </div>
@@ -262,8 +262,8 @@ router.get("/salon", (req, res) => {
         <div>
           <label class="block text-sm font-medium text-mpMuted mb-1">Booking Link</label>
           <input name="booking_link"
-                 type="url"
-                 placeholder="https://booking.com/your-salon"
+                 type="text"
+                 placeholder="e.g. vagaro.com/your-salon"
                  class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
                  value="${salon.booking_link || ""}" />
         </div>
@@ -335,7 +335,7 @@ router.get("/salon", (req, res) => {
           </select>
         </div>
 
-        <button class="w-full mt-4 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-bold py-3 rounded-full text-sm transition">
+        <button style="width:100%;background:#2B2D35;color:#fff;font-weight:700;padding:12px;border-radius:999px;border:none;font-size:14px;cursor:pointer;margin-top:16px;">
           Continue →
         </button>
       </form>
@@ -349,13 +349,23 @@ router.post("/salon", (req, res) => {
   if (!manager) return res.redirect("/manager/login");
 
   const salon_id = manager.salon_id;
-  const { name, phone, website, booking_link, city, state, industry, timezone } =
+  const { name, phone, booking_link, city, state, industry, timezone } =
     req.body;
+
+  // Normalize website URL — prepend https:// if no protocol given
+  let website = (req.body.website || "").trim();
+  if (website && !website.match(/^https?:\/\//i)) {
+    website = "https://" + website;
+  }
+  let booking_link_normalized = (booking_link || "").trim();
+  if (booking_link_normalized && !booking_link_normalized.match(/^https?:\/\//i)) {
+    booking_link_normalized = "https://" + booking_link_normalized;
+  }
 
   const defaultHashtag = "#" + (name || "").replace(/\s+/g, "");
 
   db.prepare(
-    `UPDATE salons SET 
+    `UPDATE salons SET
       name=?,
       phone=?,
       website=?,
@@ -365,14 +375,14 @@ router.post("/salon", (req, res) => {
       industry=?,
       timezone=?,
       default_hashtags=?,
-      status_step='rules',
+      status_step='brand',
       updated_at=datetime('now')
      WHERE slug=?`
   ).run(
     name,
     phone,
     website,
-    booking_link,
+    booking_link_normalized,
     city,
     state,
     industry,
@@ -448,13 +458,14 @@ function paletteSwatches(palette) {
   ];
   return colors.map(({ key, label }) => `
     <div class="flex items-center gap-3">
-      <div class="w-12 h-12 rounded-xl border border-mpBorder shadow-sm flex-shrink-0"
-           style="background:${palette[key] || '#888'}"></div>
-      <div>
-        <p class="text-sm font-medium text-mpCharcoal">${label}</p>
-        <p class="text-xs text-mpMuted font-mono">${palette[key] || '—'}</p>
+      <div id="swatch-${key}" class="w-12 h-12 rounded-xl border border-mpBorder shadow-sm flex-shrink-0"
+           style="background:${palette[key] || '#cccccc'}"></div>
+      <div class="flex-1">
+        <p class="text-sm font-medium" style="color:#2B2D35;">${label}</p>
+        <input type="text" name="${key}" value="${palette[key] || ''}" placeholder="#000000"
+               style="font-family:monospace;font-size:13px;border:1px solid #EDE7E4;border-radius:8px;padding:4px 10px;width:110px;color:#2B2D35;background:#fff;"
+               oninput="var el=document.getElementById('swatch-${key}');if(this.value.match(/^#[0-9a-fA-F]{6}$/))el.style.background=this.value;" />
       </div>
-      <input type="hidden" name="${key}" value="${palette[key] || ''}" />
     </div>
   `).join("");
 }
@@ -493,24 +504,33 @@ router.get("/brand", async (req, res) => {
       <form method="POST" class="space-y-4">
         ${paletteSwatches(palette)}
         <div class="pt-4 border-t border-mpBorder mt-4">
-          <p class="text-xs text-mpMuted mb-4">These colors will be used on your availability and promotion posts.</p>
-          <button class="w-full bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-bold py-3 rounded-full text-sm transition">
+          <p class="text-xs mb-4" style="color:#7A7C85;">These colors will be used on your availability and promotion posts. Edit any hex value above to adjust.</p>
+          <button type="submit" style="width:100%;background:#2B2D35;color:#fff;font-weight:700;padding:12px;border-radius:999px;border:none;font-size:14px;cursor:pointer;">
             Looks good — Continue →
           </button>
-          <a href="/onboarding/brand?reset=1" class="block text-center text-mpMuted hover:text-mpCharcoal text-sm mt-3 underline">
+          <a href="/onboarding/brand?reset=1" style="display:block;text-align:center;font-size:13px;color:#7A7C85;text-decoration:underline;margin-top:12px;">
             Re-extract colors
           </a>
         </div>
       </form>
     ` : `
-      <p class="text-mpMuted text-sm mb-5">
-        We couldn't automatically extract colors${salon.website ? ` from <span class="font-mono text-mpAccent">${salon.website}</span>` : " (no website set)"}. You can skip this step for now and set colors later in Admin settings.
+      <p class="text-sm mb-5" style="color:#7A7C85;">
+        ${salon.website
+          ? `We couldn't automatically extract colors from <span style="font-family:monospace;color:#D4897A;">${salon.website}</span>.`
+          : `No website set — colors couldn't be auto-extracted.`}
+        Enter your brand colors manually below, or skip to set them later in Admin.
       </p>
       <form method="POST" class="space-y-4">
-        <input type="hidden" name="skip" value="1" />
-        <button class="w-full bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-bold py-3 rounded-full text-sm transition">
-          Skip for now — Continue →
-        </button>
+        ${paletteSwatches({ primary: "", secondary: "", accent: "", accent_light: "", cta: "" })}
+        <div class="pt-4 border-t border-mpBorder mt-2">
+          <p class="text-xs mb-4" style="color:#7A7C85;">These colors will be used on your promotion and availability posts. You can update them anytime in Admin → Brand Colors.</p>
+          <button type="submit" style="width:100%;background:#2B2D35;color:#fff;font-weight:700;padding:12px;border-radius:999px;border:none;font-size:14px;cursor:pointer;">
+            Save Colors — Continue →
+          </button>
+          <button type="submit" name="skip" value="1" style="display:block;width:100%;margin-top:12px;background:transparent;border:none;font-size:13px;color:#7A7C85;text-decoration:underline;cursor:pointer;text-align:center;">
+            Skip for now
+          </button>
+        </div>
       </form>
     `,
   }));
@@ -663,7 +683,7 @@ router.get("/rules", (req, res) => {
           </select>
         </div>
 
-        <button class="w-full mt-4 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-bold py-3 rounded-full text-sm transition">
+        <button style="width:100%;background:#2B2D35;color:#fff;font-weight:700;padding:12px;border-radius:999px;border:none;font-size:14px;cursor:pointer;margin-top:16px;">
           Continue →
         </button>
       </form>
@@ -759,7 +779,7 @@ router.get("/manager", (req, res) => {
                  value="${ms?.phone || salon.manager_phone || ""}">
         </div>
 
-        <button class="w-full mt-4 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-bold py-3 rounded-full text-sm transition">
+        <button style="width:100%;background:#2B2D35;color:#fff;font-weight:700;padding:12px;border-radius:999px;border:none;font-size:14px;cursor:pointer;margin-top:16px;">
           Continue →
         </button>
 
@@ -922,14 +942,14 @@ router.get("/stylists", (req, res) => {
             </p>
           </div>
 
-          <button class="w-full bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-bold py-3 rounded-full text-sm transition">
+          <button style="width:100%;background:#2B2D35;color:#fff;font-weight:700;padding:12px;border-radius:999px;border:none;font-size:14px;cursor:pointer;">
             ${editStylist ? "Save Changes" : "Add Stylist"}
           </button>
 
         </form>
 
         <form method="POST" action="/onboarding/review">
-          <button class="w-full mt-6 bg-mpAccent hover:bg-[#c47060] text-white font-bold py-3 rounded-full text-sm transition">
+          <button style="width:100%;background:#D4897A;color:#fff;font-weight:700;padding:12px;border-radius:999px;border:none;font-size:14px;cursor:pointer;margin-top:24px;">
             Continue to Review →
           </button>
         </form>
@@ -1204,7 +1224,7 @@ router.get("/review", (req, res) => {
         </div>
 
         <form method="POST" action="/onboarding/complete">
-          <button class="w-full mt-6 bg-mpAccent hover:bg-[#c47060] text-white font-bold py-3 rounded-full text-sm transition">
+          <button style="width:100%;background:#D4897A;color:#fff;font-weight:700;padding:12px;border-radius:999px;border:none;font-size:14px;cursor:pointer;margin-top:24px;">
             Finish & Activate Salon →
           </button>
         </form>
@@ -1230,7 +1250,7 @@ router.post("/complete", (req, res) => {
      WHERE slug=?`
   ).run(salon_id);
 
-  res.redirect(`/billing/checkout?plan=starter&cycle=monthly`);
+  res.redirect("/manager");
 });
 
 export default router;

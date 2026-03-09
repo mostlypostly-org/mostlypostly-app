@@ -48,9 +48,6 @@ if (url.startsWith("/inbound/telegram")) {
   // Allow billing management page for new accounts choosing a plan
   if (url.startsWith("/manager/billing")) return next();
 
-  // Allow locations management (accessible at any onboarding state)
-  if (url.startsWith("/manager/locations")) return next();
-
   // Allow internal vendor admin (protected by its own INTERNAL_SECRET check)
   if (url.startsWith("/internal/vendors")) return next();
 
@@ -82,16 +79,19 @@ if (url.startsWith("/inbound/telegram")) {
   }
 
   const stepRedirect = {
-    salon: "/onboarding/salon",
-    rules: "/onboarding/rules",
-    manager: "/onboarding/manager",
+    salon:    "/onboarding/salon",
+    brand:    "/onboarding/brand",
+    rules:    "/onboarding/rules",
+    manager:  "/onboarding/manager",
     stylists: "/onboarding/stylists",
-    review: "/onboarding/review",
+    review:   "/onboarding/review",
   }[status_step];
 
-  if (stepRedirect && !url.startsWith(stepRedirect)) {
-    return res.redirect(stepRedirect);
+  if (stepRedirect) {
+    if (!url.startsWith(stepRedirect)) return res.redirect(stepRedirect);
+    return next();
   }
 
-  return next();
+  // Unknown status_step — fall back to start of onboarding
+  return res.redirect("/onboarding/salon");
 }
