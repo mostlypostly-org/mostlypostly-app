@@ -242,7 +242,11 @@ function restoreManagerSession(req, res, next) {
        FROM managers WHERE id = ?`
     ).get(req.session.manager_id);
 
-    if (mgr) req.manager = mgr;
+    if (mgr) {
+      req.manager = mgr;
+      // If the manager has switched locations, session.salon_id overrides the DB value
+      if (req.session.salon_id) req.manager.salon_id = req.session.salon_id;
+    }
   } catch (err) {
     console.error("restoreManagerSession failed:", err);
   }
