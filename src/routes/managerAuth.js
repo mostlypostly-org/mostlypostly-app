@@ -7,6 +7,7 @@ import crypto from "crypto";
 import multer from "multer";
 import path from "path";
 import { sendViaTwilio } from "../routes/twilio.js";
+import { sendVerificationEmail, sendWelcomeEmail, sendCancellationEmail } from "../core/email.js";
 
 const SITE_URL = process.env.APP_ENV === "staging"
   ? "https://mostlypostly-staging-site.onrender.com"
@@ -316,6 +317,9 @@ router.get("/login", (req, res) => {
 router.get("/signup", (req, res) => {
   const planHint = ["starter","growth","pro"].includes(req.query.plan) ? req.query.plan : "";
   const googleKey = process.env.GOOGLE_PLACES_API_KEY || "";
+  const termsError = req.query.error === "terms"
+    ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 14px;font-size:12px;color:#B91C1C;margin-bottom:16px;">You must agree to the Terms and Privacy Policy to create an account.</div>`
+    : "";
   res.send(`
 <!DOCTYPE html>
 <html lang="en">
@@ -423,7 +427,7 @@ router.get("/signup", (req, res) => {
     <div class="signup-card">
       <h1>Create your account</h1>
       <p class="sub">Get your salon set up in minutes.</p>
-
+      ${termsError}
       <form action="/manager/signup" method="POST" enctype="multipart/form-data">
         <label>Your Name</label>
         <input type="text" name="name" class="input-box" placeholder="Your full name" required />
@@ -459,17 +463,32 @@ router.get("/signup", (req, res) => {
         <input type="text" name="company" style="display:none" />
         <input type="hidden" name="plan" value="${planHint}" />
 
-        <div class="check-row">
-          <input type="checkbox" required />
-          <span>I agree to MostlyPostly's <a href="/legal/terms.html">Terms</a> and <a href="/legal/privacy.html">Privacy Policy</a>.</span>
+        <div id="terms-error" style="display:none;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 14px;font-size:12px;color:#B91C1C;margin-bottom:12px;">
+          You must agree to the Terms and Privacy Policy to create an account.
         </div>
         <div class="check-row">
-          <input type="checkbox" name="marketing_opt_in" value="yes" />
-          <span>Send me product updates and salon marketing tips.</span>
+          <input type="checkbox" id="terms-checkbox" name="terms" value="yes" />
+          <span>I agree to MostlyPostly's <a href="/legal/terms.html" target="_blank">Terms</a> and <a href="/legal/privacy.html" target="_blank">Privacy Policy</a>.</span>
+        </div>
+        <div class="check-row">
+          <input type="checkbox" name="marketing_opt_in" value="yes" checked />
+          <span>Send me product updates and salon marketing tips. <span style="color:#7A7C85;font-size:11px;">(You can unsubscribe anytime.)</span></span>
         </div>
 
-        <button type="submit" class="signup-btn">Get Started →</button>
+        <button type="submit" class="signup-btn" id="signup-btn">Get Started →</button>
       </form>
+
+      <script>
+      document.querySelector('form[action="/manager/signup"]').addEventListener('submit', function(e) {
+        const terms = document.getElementById('terms-checkbox');
+        const errBox = document.getElementById('terms-error');
+        if (!terms.checked) {
+          e.preventDefault();
+          errBox.style.display = 'block';
+          terms.closest('.check-row').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+      </script>
 
       <script>
       // Logo preview
@@ -557,6 +576,14 @@ router.post("/signup", (req, res, next) => salonLogoUpload(req, res, next), asyn
     const state   = body.state?.trim()   || null;
     const zip     = body.zip?.trim()     || null;
 
+    // Terms must be accepted
+    if (!body.terms) {
+      return res.redirect("/manager/signup?error=terms");
+    }
+
+    const marketingOptIn = body.marketing_opt_in === "yes" ? 1 : 0;
+    const termsAcceptedAt = new Date().toISOString();
+
     // Basic required check
     if (!email || !password || !phone || !businessName) {
       console.warn("⚠️ Signup missing fields:", {
@@ -624,19 +651,31 @@ router.post("/signup", (req, res, next) => salonLogoUpload(req, res, next), asyn
     const password_hash = await bcrypt.hash(password, 10);
     const managerId = lowerHex();
 
+    // Generate email verification token (expires 24h)
+    const emailVerifyToken = crypto.randomBytes(32).toString("hex");
+    const emailVerifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
     // Insert MANAGER
     db.prepare(`
       INSERT INTO managers (
-        id, salon_id, name, email, phone, password_hash, role
+        id, salon_id, name, email, phone, password_hash, role,
+        email_verified, email_verify_token, email_verify_expires_at,
+        marketing_opt_in, terms_accepted_at
       )
-      VALUES (@id, @salon_id, @name, @email, @phone, @password_hash, 'manager')
+      VALUES (@id, @salon_id, @name, @email, @phone, @password_hash, 'manager',
+        0, @email_verify_token, @email_verify_expires_at,
+        @marketing_opt_in, @terms_accepted_at)
     `).run({
       id: managerId,
       salon_id: salonSlug,
-      name: name || businessName, // fallback to businessName if name missing
+      name: name || businessName,
       email,
       phone,
       password_hash,
+      email_verify_token: emailVerifyToken,
+      email_verify_expires_at: emailVerifyExpiresAt,
+      marketing_opt_in: marketingOptIn,
+      terms_accepted_at: termsAcceptedAt,
     });
 
     // Create salon group for this account
@@ -651,14 +690,14 @@ router.post("/signup", (req, res, next) => salonLogoUpload(req, res, next), asyn
       db.prepare("UPDATE salons SET logo_url = ? WHERE slug = ?").run(logoUrl, salonSlug);
     }
 
-    req.session.manager_id = managerId;
-    req.session.salon_id = salonSlug;
-    req.session.group_id = groupId;
-    req.session.manager_email = email;
+    console.log("✅ Signup OK → sending verification email:", email);
 
-    console.log("✅ Signup OK → redirecting to onboarding step 1:", salonSlug);
+    // Send verification email (fire-and-forget)
+    sendVerificationEmail({ to: email, name: name || businessName, token: emailVerifyToken }).catch(err => {
+      console.warn("[signup] Verification email failed:", err.message);
+    });
 
-    // Send founder promo code via SMS if configured (fire-and-forget before redirect)
+    // Send founder promo code via SMS if configured (fire-and-forget)
     const promoCode = process.env.FOUNDER_PROMO_CODE;
     if (promoCode && phone) {
       sendViaTwilio(phone, `Welcome to MostlyPostly! Your 14-day free trial starts when you select a plan. As a founding member, use promo code ${promoCode} at checkout to lock in your founder rate. Questions? Reply here anytime.`).catch(smsErr => {
@@ -666,20 +705,150 @@ router.post("/signup", (req, res, next) => salonLogoUpload(req, res, next), asyn
       });
     }
 
-    // Ensure session is persisted before redirect
+    // Store minimal pending state in session (not full auth — pending email verification)
+    req.session.pending_manager_id = managerId;
+    req.session.pending_salon_id = salonSlug;
+    req.session.pending_group_id = groupId;
+    req.session.pending_email = email;
+    req.session.pending_plan_hint = planHint;
+    req.session.pending_salon_name = businessName;
+    req.session.pending_name = name || businessName;
+
     req.session.save((err) => {
-      if (err) {
-        console.error("❌ Error saving session after signup:", err);
-        return res.redirect("/manager/login");
-      }
-      const billingUrl = `/manager/billing?new=1&salon=${encodeURIComponent(salonSlug)}${planHint ? `&plan=${planHint}` : ""}`;
-      return res.redirect(billingUrl);
+      if (err) console.error("❌ Session save error after signup:", err);
+      return res.redirect("/manager/check-your-email");
     });
 
   } catch (err) {
     console.error("Signup error:", err);
     return res.status(500).type("html").send("Signup failed.");
   }
+});
+
+/* ─── GET /manager/check-your-email ───────────────────────────────────────────
+   Shown immediately after signup — tells the user to check their inbox.
+*/
+router.get("/check-your-email", (req, res) => {
+  const email = req.session.pending_email || "";
+  const resent = req.query.resent === "1";
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Check Your Email — MostlyPostly</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Plus Jakarta Sans',sans-serif;background:#FDF8F6;color:#2B2D35;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+    .card{background:#fff;border:1px solid #EDE7E4;border-radius:20px;padding:48px 40px;max-width:460px;width:100%;text-align:center;box-shadow:0 4px 24px rgba(43,45,53,0.07);}
+    .icon{font-size:48px;margin-bottom:20px;}
+    h1{font-size:22px;font-weight:800;margin-bottom:8px;}
+    .sub{font-size:14px;color:#7A7C85;line-height:1.6;margin-bottom:28px;}
+    .email-badge{background:#F2DDD9;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;color:#2B2D35;display:inline-block;margin-bottom:28px;}
+    .btn{display:block;width:100%;background:#2B2D35;color:#fff;font-weight:700;border-radius:999px;padding:13px;font-size:14px;border:none;cursor:pointer;font-family:inherit;text-decoration:none;margin-bottom:12px;}
+    .resend-form{margin-top:8px;}
+    .resend-btn{background:none;border:none;color:#D4897A;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline;}
+    .success{font-size:13px;color:#059669;font-weight:600;margin-top:8px;}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📬</div>
+    <h1>Check your email</h1>
+    <p class="sub">We sent a verification link to:</p>
+    <div class="email-badge">${email}</div>
+    <p class="sub">Click the link in that email to verify your account and continue setup. It expires in 24 hours.</p>
+    ${resent ? `<p class="success">✓ A new verification email has been sent.</p>` : `
+    <form class="resend-form" method="POST" action="/manager/resend-verification">
+      <p style="font-size:13px;color:#7A7C85;margin-bottom:8px;">Didn't get it? Check your spam folder, or</p>
+      <button class="resend-btn" type="submit">resend the verification email</button>
+    </form>`}
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid #EDE7E4;">
+      <a href="${SITE_URL}" style="font-size:12px;color:#7A7C85;text-decoration:none;">← Back to MostlyPostly</a>
+    </div>
+  </div>
+</body>
+</html>`);
+});
+
+/* ─── POST /manager/resend-verification ───────────────────────────────────────*/
+router.post("/resend-verification", async (req, res) => {
+  const managerId = req.session.pending_manager_id;
+  if (!managerId) return res.redirect("/manager/signup");
+
+  const manager = db.prepare("SELECT * FROM managers WHERE id = ?").get(managerId);
+  if (!manager || manager.email_verified) return res.redirect("/manager/login");
+
+  const newToken = crypto.randomBytes(32).toString("hex");
+  const newExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  db.prepare("UPDATE managers SET email_verify_token=?, email_verify_expires_at=? WHERE id=?")
+    .run(newToken, newExpiry, managerId);
+
+  sendVerificationEmail({ to: manager.email, name: manager.name, token: newToken }).catch(err => {
+    console.warn("[resend-verification] Email failed:", err.message);
+  });
+
+  res.redirect("/manager/check-your-email?resent=1");
+});
+
+/* ─── GET /manager/verify-email?token= ────────────────────────────────────────*/
+router.get("/verify-email", async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.redirect("/manager/login");
+
+  const manager = db.prepare(
+    "SELECT * FROM managers WHERE email_verify_token = ? AND email_verified = 0"
+  ).get(token);
+
+  if (!manager) {
+    return res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Verification Failed</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet"/>
+    <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Plus Jakarta Sans',sans-serif;background:#FDF8F6;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
+    .card{background:#fff;border:1px solid #EDE7E4;border-radius:20px;padding:48px 40px;max-width:420px;text-align:center;}
+    h1{font-size:20px;font-weight:800;margin-bottom:12px;}p{font-size:14px;color:#7A7C85;margin-bottom:20px;}
+    a{color:#D4897A;font-weight:600;}</style></head>
+    <body><div class="card"><div style="font-size:40px;margin-bottom:16px;">⚠️</div>
+    <h1>Link expired or already used</h1>
+    <p>This verification link is no longer valid. Please sign in and request a new one.</p>
+    <a href="/manager/login">← Back to login</a></div></body></html>`);
+  }
+
+  // Check expiry
+  if (manager.email_verify_expires_at && new Date(manager.email_verify_expires_at) < new Date()) {
+    return res.redirect("/manager/check-your-email?expired=1");
+  }
+
+  // Mark verified, clear token
+  db.prepare("UPDATE managers SET email_verified=1, email_verify_token=NULL, email_verify_expires_at=NULL WHERE id=?")
+    .run(manager.id);
+
+  // Look up salon for this manager
+  const salon = db.prepare("SELECT slug, group_id, name FROM salons WHERE slug = ?").get(manager.salon_id);
+
+  // Send welcome email (fire-and-forget)
+  sendWelcomeEmail({ to: manager.email, name: manager.name, salonName: salon?.name || manager.salon_id }).catch(() => {});
+
+  // Create full session
+  req.session.manager_id = manager.id;
+  req.session.salon_id = manager.salon_id;
+  req.session.group_id = salon?.group_id || null;
+  req.session.manager_email = manager.email;
+
+  // Clear pending state
+  delete req.session.pending_manager_id;
+  delete req.session.pending_salon_id;
+  delete req.session.pending_group_id;
+  delete req.session.pending_email;
+
+  const planHint = req.session.pending_plan_hint || "";
+  delete req.session.pending_plan_hint;
+
+  req.session.save(() => {
+    const billingUrl = `/manager/billing?new=1&salon=${encodeURIComponent(manager.salon_id)}${planHint ? `&plan=${planHint}` : ""}`;
+    res.redirect(billingUrl);
+  });
 });
 
 /* -------------------------------

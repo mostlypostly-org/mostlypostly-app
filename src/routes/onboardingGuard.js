@@ -1,5 +1,5 @@
 // src/routes/onboardingGuard.js
-import db from "../../db.js";   // <-- REQUIRED
+import db from "../../db.js";
 
 export default function onboardingGuard(req, res, next) {
   const url = req.originalUrl || req.url;
@@ -16,12 +16,15 @@ export default function onboardingGuard(req, res, next) {
     return next();
   }
 
-  // Allow login/signup and password reset
+  // Allow login/signup, email verification, and password reset
   if (
     url.startsWith("/manager/login") ||
     url.startsWith("/manager/signup") ||
     url.startsWith("/manager/forgot-password") ||
-    url.startsWith("/manager/reset-password")
+    url.startsWith("/manager/reset-password") ||
+    url.startsWith("/manager/check-your-email") ||
+    url.startsWith("/manager/verify-email") ||
+    url.startsWith("/manager/resend-verification")
   ) {
     return next();
   }
@@ -60,6 +63,12 @@ if (url.startsWith("/inbound/telegram")) {
   // Not logged in → force login
   if (!manager_id || !salon_id) {
     return res.redirect("/manager/login");
+  }
+
+  // Email not verified → hold at check-your-email
+  const managerRow = db.prepare("SELECT email_verified FROM managers WHERE id = ?").get(manager_id);
+  if (managerRow && managerRow.email_verified === 0) {
+    return res.redirect("/manager/check-your-email");
   }
 
   // Look up current onboarding step using DB IMPORT, not req.db

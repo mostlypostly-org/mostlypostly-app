@@ -3,6 +3,7 @@ import express from "express";
 import Stripe from "stripe";
 import db from "../../db.js";
 import pageShell from "../ui/pageShell.js";
+import { sendCancellationEmail } from "../core/email.js";
 
 const router = express.Router();
 
@@ -536,11 +537,21 @@ export async function stripeWebhookHandler(req, res) {
       }
 
       case "customer.subscription.deleted": {
-        const salon = db.prepare("SELECT slug FROM salons WHERE stripe_customer_id=?").get(obj.customer);
+        const salon = db.prepare("SELECT slug, name FROM salons WHERE stripe_customer_id=?").get(obj.customer);
         if (!salon) break;
+        // Store access end date (current_period_end from the sub object)
+        const accessEndsAt = obj.current_period_end
+          ? new Date(obj.current_period_end * 1000).toISOString()
+          : null;
         db.prepare(`
-          UPDATE salons SET plan_status='suspended', stripe_subscription_id=NULL, updated_at=datetime('now') WHERE slug=?
-        `).run(salon.slug);
+          UPDATE salons SET plan_status='suspended', stripe_subscription_id=NULL,
+            subscription_ends_at=?, updated_at=datetime('now') WHERE slug=?
+        `).run(accessEndsAt, salon.slug);
+        // Send cancellation email to the owner
+        const owner = db.prepare("SELECT name, email FROM managers WHERE salon_id=? AND email_verified=1 ORDER BY rowid LIMIT 1").get(salon.slug);
+        if (owner?.email) {
+          sendCancellationEmail({ to: owner.email, name: owner.name, accessEndsAt }).catch(() => {});
+        }
         console.log(`[Stripe] subscription.deleted: ${salon.slug} → suspended`);
         break;
       }
