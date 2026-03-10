@@ -106,23 +106,29 @@ app.get("/manager/admin/templates", (req, res) => {
 app.use("/public", express.static(path.join(__dirname, "public")));
 
 // =====================================================
-// Persistent Session Store (SQLite)
+// Persistent Session Store (SQLite via better-sqlite3)
 // =====================================================
-import SQLiteStoreFactory from "connect-sqlite3";
-const SQLiteStore = SQLiteStoreFactory(session);
+import createBetterSqlite3SessionStore from "better-sqlite3-session-store";
+import Database from "better-sqlite3";
+const SqliteStore = createBetterSqlite3SessionStore(session);
+
+const APP_ENV = process.env.APP_ENV || "local";
+const sessionDbPath =
+  APP_ENV === "production" ? "/data/sessions.db"
+  : APP_ENV === "staging"  ? "/tmp/sessions.db"
+  : "./sessions.db";
+
+const sessionDb = new Database(sessionDbPath);
 
 app.use(
   session({
-    store: new SQLiteStore({
-      db: "sessions.db",
-      dir: "./",
-    }),
+    store: new SqliteStore({ client: sessionDb }),
     secret: process.env.SESSION_SECRET || "supersecretkey",
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false,
+      secure: APP_ENV === "production",
       maxAge: 1000 * 60 * 60 * 24 * 7,
     },
   })
