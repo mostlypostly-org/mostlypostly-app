@@ -441,14 +441,6 @@ router.get("/signup", (req, res) => {
         <label>Phone Number</label>
         <input type="tel" name="phone" class="input-box" placeholder="Mobile number" required />
 
-        <label>Salon Address</label>
-        <input type="text" id="addressInput" name="address_display" class="input-box"
-               placeholder="Start typing your address…" autocomplete="off" />
-        <input type="hidden" name="address" id="addressStreet" />
-        <input type="hidden" name="city"    id="addressCity" />
-        <input type="hidden" name="state"   id="addressState" />
-        <input type="hidden" name="zip"     id="addressZip" />
-
         <label style="margin-top:14px;">Salon Logo <span style="font-weight:400;color:#7A7C85;">(optional)</span></label>
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
           <div id="logoPreviewWrap" style="display:none;width:52px;height:52px;border-radius:10px;border:1px solid #EDE7E4;overflow:hidden;flex-shrink:0;">
@@ -501,38 +493,6 @@ router.get("/signup", (req, res) => {
         document.getElementById("logoFileLabel").textContent = this.files[0].name;
       });
 
-      // Google Places address autocomplete
-      function initAddressAutocomplete() {
-        if (typeof google === "undefined" || !google.maps?.places) return;
-        const input = document.getElementById("addressInput");
-        const ac = new google.maps.places.Autocomplete(input, {
-          types: ["address"],
-          componentRestrictions: { country: "us" },
-        });
-        ac.addListener("place_changed", () => {
-          const place = ac.getPlace();
-          if (!place.address_components) return;
-          let street = "", city = "", state = "", zip = "";
-          const get = (type) => place.address_components.find(c => c.types.includes(type));
-          const num  = get("street_number");
-          const road = get("route");
-          if (num && road) street = num.short_name + " " + road.long_name;
-          else if (road) street = road.long_name;
-          const cityComp  = get("locality") || get("sublocality");
-          const stateComp = get("administrative_area_level_1");
-          const zipComp   = get("postal_code");
-          if (cityComp)  city  = cityComp.long_name;
-          if (stateComp) state = stateComp.short_name;
-          if (zipComp)   zip   = zipComp.short_name;
-          document.getElementById("addressStreet").value = street || place.formatted_address || "";
-          document.getElementById("addressCity").value   = city;
-          document.getElementById("addressState").value  = state;
-          document.getElementById("addressZip").value    = zip;
-        });
-      }
-      // Try immediately or wait for Google script to load
-      if (typeof google !== "undefined") { initAddressAutocomplete(); }
-      else { window.addEventListener("load", initAddressAutocomplete); }
       </script>
 
       <hr class="divider" />
@@ -571,11 +531,6 @@ router.post("/signup", (req, res, next) => salonLogoUpload(req, res, next), asyn
 
     const phone =
       body.phone || body.phone_number || body.mobile || body.mobile_number || null;
-
-    const address = body.address?.trim() || null;
-    const city    = body.city?.trim()    || null;
-    const state   = body.state?.trim()   || null;
-    const zip     = body.zip?.trim()     || null;
 
     // Terms must be accepted
     if (!body.terms) {
@@ -630,22 +585,18 @@ router.post("/signup", (req, res, next) => salonLogoUpload(req, res, next), asyn
       INSERT INTO salons (
         id, slug, name,
         phone, status, status_step,
-        timezone, address, city, state, zip
+        timezone
       )
       VALUES (
         @id, @slug, @name,
         @phone, 'setup_incomplete', 'salon',
-        'America/New_York', @address, @city, @state, @zip
+        'America/New_York'
       )
     `).run({
       id: salonId,
       slug: salonSlug,
       name: businessName,
       phone,
-      address,
-      city,
-      state,
-      zip,
     });
 
     // Hash password

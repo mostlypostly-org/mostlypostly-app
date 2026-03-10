@@ -283,7 +283,7 @@ router.get("/salon", (req, res) => {
 
           <div>
             <label class="block text-sm font-medium text-mpMuted mb-1">State</label>
-            <select name="state" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent">
+            <select name="state" class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent appearance-none">
               ${[
                 "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
                 "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",

@@ -389,10 +389,8 @@ router.get("/edit/:id/photos", requireAuth, (req, res) => {
           <div>
             <label class="block text-xs font-semibold text-mpMuted mb-1">Category</label>
             <select name="category" class="w-full rounded-xl border border-mpBorder px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mpAccent">
-              <option value="styling">In Chair / Styling</option>
+              <option value="styling">Stylist Work</option>
               <option value="profile">Profile / Headshot</option>
-              <option value="salon">Salon Interior</option>
-              <option value="general">General</option>
             </select>
           </div>
           <div>
@@ -423,7 +421,7 @@ router.post("/:id/photos/upload", requireAuth, libraryUpload.single("photo"), (r
 
   const base = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
   const url = `${base}/uploads/${req.file.filename}`;
-  const category = ["styling", "profile", "salon", "general"].includes(req.body.category) ? req.body.category : "general";
+  const category = ["styling", "profile"].includes(req.body.category) ? req.body.category : "styling";
   const label = (req.body.label || "").trim() || null;
 
   db.prepare(`
@@ -560,7 +558,7 @@ function buildStylistForm({ salon_id, salonTone, stylist, isEdit }) {
       </div>
       ${isEdit ? `
       <a href="/manager/stylists/edit/${safe(s.id)}/photos${qs}"
-         class="inline-flex items-center gap-1.5 rounded-full border border-mpBorder bg-white px-4 py-2 text-xs font-semibold text-mpMuted hover:bg-mpBg hover:text-mpCharcoal transition-colors shadow-sm flex-shrink-0">
+         class="inline-flex items-center gap-1.5 rounded-full bg-mpAccent px-4 py-2 text-xs font-semibold text-white hover:bg-mpCharcoalDark transition-colors flex-shrink-0">
         📷 Photo Library
       </a>` : ""}
     </div>
@@ -592,13 +590,54 @@ function buildStylistForm({ salon_id, salonTone, stylist, isEdit }) {
 
         <!-- Tone Variant -->
         <div>
-          <label class="block text-xs font-semibold text-mpMuted mb-1">Caption Tone</label>
+          <div class="flex items-center gap-2 mb-1">
+            <label class="text-xs font-semibold text-mpMuted">Caption Tone</label>
+            <button type="button" id="tone-help-btn"
+                    class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-mpBorder text-mpMuted text-[10px] font-bold hover:bg-mpAccent hover:text-white transition-colors">?</button>
+          </div>
           <select name="tone_variant"
                   class="w-full rounded-xl border border-mpBorder px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mpAccent">
             ${toneSelectOptions(s.tone_variant || "", salonTone)}
           </select>
           <p class="text-[11px] text-mpMuted mt-0.5">Personalizes AI caption voice for this stylist. Defaults to salon tone if not set.</p>
         </div>
+
+        <!-- Tone reference modal -->
+        <div id="tone-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" id="tone-modal-backdrop"></div>
+          <div class="relative z-10 bg-white rounded-2xl border border-mpBorder shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-mpCharcoal">Caption Tone Reference</h3>
+              <button type="button" id="tone-modal-close" class="text-mpMuted hover:text-mpCharcoal text-lg leading-none">×</button>
+            </div>
+            <div class="space-y-4">
+              ${TONE_GROUPS.map(g => `
+                <div>
+                  <p class="text-xs font-bold text-mpCharcoal mb-1">${safe(g.label)}</p>
+                  <p class="text-[11px] text-mpMuted mb-2">${safe(g.description)}</p>
+                  <ul class="space-y-1">
+                    ${g.variants.map(v => `
+                      <li class="text-[11px] flex gap-2">
+                        <span class="font-semibold text-mpCharcoal min-w-[90px]">${safe(v.label)}</span>
+                        <span class="text-mpMuted">${safe(v.desc)}</span>
+                      </li>`).join("")}
+                  </ul>
+                </div>`).join("")}
+            </div>
+          </div>
+        </div>
+        <script>
+          (function() {
+            const btn = document.getElementById("tone-help-btn");
+            const modal = document.getElementById("tone-modal");
+            const close = document.getElementById("tone-modal-close");
+            const backdrop = document.getElementById("tone-modal-backdrop");
+            if (!btn || !modal) return;
+            btn.addEventListener("click", () => modal.classList.remove("hidden"));
+            close?.addEventListener("click", () => modal.classList.add("hidden"));
+            backdrop?.addEventListener("click", () => modal.classList.add("hidden"));
+          })();
+        </script>
 
         <!-- Birthday -->
         <div>

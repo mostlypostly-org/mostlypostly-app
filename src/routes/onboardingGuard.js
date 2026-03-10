@@ -42,17 +42,9 @@ if (url.startsWith("/inbound/telegram")) {
   // Allow logout
   if (url.startsWith("/manager/logout")) return next();
 
-  // Allow onboarding routes
-  if (url.startsWith("/onboarding")) return next();
-
-  // Allow billing routes (checkout, success — webhook already exempt before guard)
+  // Allow billing routes (choose plan, checkout, success)
   if (url.startsWith("/billing")) return next();
-
-  // Allow billing management page for new accounts choosing a plan
   if (url.startsWith("/manager/billing")) return next();
-
-  // Allow post queue
-  if (url.startsWith("/manager/queue")) return next();
 
   // Allow internal vendor admin (protected by its own INTERNAL_SECRET check)
   if (url.startsWith("/internal/vendors")) return next();
@@ -74,21 +66,30 @@ if (url.startsWith("/inbound/telegram")) {
     return res.redirect("/manager/check-your-email");
   }
 
-  // Look up current onboarding step using DB IMPORT, not req.db
+  // Look up salon for plan status and onboarding step
   const row = db
-    .prepare("SELECT status, status_step FROM salons WHERE slug = ?")
+    .prepare("SELECT status, status_step, plan_status FROM salons WHERE slug = ?")
     .get(salon_id);
 
   if (!row) {
     return res.redirect("/manager/login");
   }
 
-  const { status, status_step } = row;
+  const { status, status_step, plan_status } = row;
+
+  // Plan not selected yet → must choose a plan before anything else
+  if (!plan_status) {
+    return res.redirect("/manager/billing?new=1");
+  }
 
   // Onboarding complete → let them in
   if (status === "active" && status_step === "complete") {
     return next();
   }
+
+  // Allow onboarding and queue routes once plan is selected
+  if (url.startsWith("/onboarding")) return next();
+  if (url.startsWith("/manager/queue")) return next();
 
   const stepRedirect = {
     salon:    "/onboarding/salon",

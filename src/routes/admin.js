@@ -586,8 +586,17 @@ router.get("/", requireAuth, (req, res) => {
             class="w-full text-sm text-mpMuted file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0
                    file:text-xs file:font-semibold file:bg-mpAccentLight file:text-mpAccent
                    hover:file:bg-mpAccent hover:file:text-white transition-colors" />
-          <input name="label" placeholder="Label (e.g. Salon Interior, Spring Backdrop)"
-            class="w-full border border-mpBorder rounded-xl px-3 py-2 text-sm text-mpCharcoal bg-white focus:outline-none focus:ring-2 focus:ring-mpAccent" />
+          <div class="grid grid-cols-2 gap-3">
+            <input name="label" placeholder="Label (optional)"
+              class="w-full border border-mpBorder rounded-xl px-3 py-2 text-sm text-mpCharcoal bg-white focus:outline-none focus:ring-2 focus:ring-mpAccent" />
+            <select name="category" class="w-full border border-mpBorder rounded-xl px-3 py-2 text-sm text-mpCharcoal bg-white focus:outline-none focus:ring-2 focus:ring-mpAccent">
+              <option value="general">General</option>
+              <option value="interior">Interior</option>
+              <option value="exterior">Exterior</option>
+              <option value="education">Education</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
           <div>
             <label class="block text-[11px] text-mpMuted mb-1">Link to a stylist (optional)</label>
             <select name="stylist_id" class="w-full border border-mpBorder rounded-xl px-3 py-2 text-sm text-mpCharcoal bg-white focus:outline-none focus:ring-2 focus:ring-mpAccent">
@@ -1032,7 +1041,7 @@ router.post("/stock-photos/upload", requireAuth, stockPhotoUpload.single("stock_
   const url  = `${base}/uploads/${req.file.filename}`;
   const label      = (req.body.label || "").trim() || null;
   const stylist_id = req.body.stylist_id || null;
-  const category   = ["salon", "profile", "styling", "general"].includes(req.body.category) ? req.body.category : "salon";
+  const category   = ["general", "interior", "exterior", "education", "other"].includes(req.body.category) ? req.body.category : "general";
 
   db.prepare(`
     INSERT INTO stock_photos (id, salon_id, stylist_id, label, url, category)

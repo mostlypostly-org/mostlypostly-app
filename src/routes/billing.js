@@ -97,8 +97,12 @@ router.get("/success", requireAuth, (req, res) => {
   const isNew   = req.query.new === "1";
   const hasTrial = req.query.trial === "1";
 
-  // New accounts: redirect to onboarding to complete setup
+  // New accounts: set pending plan_status so the plan gate passes before webhook fires,
+  // then redirect to onboarding to complete setup
   if (isNew) {
+    db.prepare(
+      "UPDATE salons SET plan_status = COALESCE(plan_status, 'pending') WHERE slug = ?"
+    ).run(salon_id);
     return res.redirect(`/onboarding/salon?salon=${encodeURIComponent(salon_id)}`);
   }
 
