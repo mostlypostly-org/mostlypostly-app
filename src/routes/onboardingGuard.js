@@ -51,6 +51,9 @@ if (url.startsWith("/inbound/telegram")) {
   // Allow billing management page for new accounts choosing a plan
   if (url.startsWith("/manager/billing")) return next();
 
+  // Allow post queue
+  if (url.startsWith("/manager/queue")) return next();
+
   // Allow internal vendor admin (protected by its own INTERNAL_SECRET check)
   if (url.startsWith("/internal/vendors")) return next();
 

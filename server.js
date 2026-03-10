@@ -79,6 +79,7 @@ import vendorFeedsRoute from "./src/routes/vendorFeeds.js";
 import vendorAdminRoute from "./src/routes/vendorAdmin.js";
 import billingRoutes, { stripeWebhookHandler } from "./src/routes/billing.js";
 import locationsRoute from "./src/routes/locations.js";
+import postQueueRoute from "./src/routes/postQueue.js";
 import { lookupStylist } from "./src/core/salonLookup.js";
 
 // Scheduler
@@ -320,6 +321,11 @@ app.use("/manager/locations", locationsRoute);
 // 11. VENDOR FEEDS (salon-facing, Pro plan)
 // -------------------------------------------------------
 app.use("/manager/vendors", vendorFeedsRoute);
+
+// -------------------------------------------------------
+// 12. POST QUEUE (drag-and-drop scheduler)
+// -------------------------------------------------------
+app.use("/manager/queue", postQueueRoute);
 
 // -------------------------------------------------------
 // 12. VENDOR ADMIN (internal MostlyPostly tool)

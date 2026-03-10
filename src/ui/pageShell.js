@@ -129,15 +129,16 @@ export default function pageShell({
 
     <!-- Primary nav -->
     <nav class="flex flex-1 flex-col items-center py-3 gap-0.5">
-      ${navItem("/manager",            ICONS.home,      "Dashboard", "manager")}
-      ${navItem("/dashboard",          ICONS.database,  "Database",  "database")}
-      ${navItem("/analytics",          ICONS.chart,     "Analytics", "analytics")}
-      ${navItem("/manager/stylists",   ICONS.team,      "Team",      "team")}
-      ${navItem("/manager/scheduler",  ICONS.clock,     "Scheduler", "scheduler")}
-      ${navItem("/manager/vendors",    ICONS.tag,       "Vendors",   "vendors")}
-      ${navItem("/manager/locations",  ICONS.building,  "Locations", "locations")}
-      ${navItem("/manager/billing",    ICONS.card,      "Billing",   "billing")}
-      ${navItem("/manager/admin",      ICONS.cog,       "Admin",     "admin")}
+      ${navItem("/manager",            ICONS.home,      "Dashboard",    "manager")}
+      ${navItem("/manager/queue",      ICONS.queue,     "Post Queue",   "queue")}
+      ${navItem("/analytics",          ICONS.chart,     "Analytics",    "analytics")}
+      ${navItem("/manager/stylists",   ICONS.team,      "Team",         "team")}
+      ${navItem("/manager/scheduler",  ICONS.clock,     "Scheduler",    "scheduler")}
+      ${navItem("/dashboard",          ICONS.database,  "Database",     "database")}
+      ${navItem("/manager/vendors",    ICONS.tag,       "Vendors",      "vendors")}
+      ${navItem("/manager/locations",  ICONS.building,  "Locations",    "locations")}
+      ${navItem("/manager/billing",    ICONS.card,      "Billing",      "billing")}
+      ${navItem("/manager/admin",      ICONS.cog,       "Admin",        "admin")}
     </nav>
 
     <!-- Logout at bottom -->
@@ -167,10 +168,11 @@ export default function pageShell({
     </div>
     <nav class="flex-1 px-5 py-4 space-y-0.5 overflow-y-auto">
       ${mobileNavLink("/manager",            "Dashboard",  "manager")}
-      ${mobileNavLink("/dashboard",          "Database",   "database")}
+      ${mobileNavLink("/manager/queue",      "Post Queue", "queue")}
       ${mobileNavLink("/analytics",          "Analytics",  "analytics")}
       ${mobileNavLink("/manager/stylists",   "Team",       "team")}
       ${mobileNavLink("/manager/scheduler",  "Scheduler",  "scheduler")}
+      ${mobileNavLink("/dashboard",          "Database",   "database")}
       ${mobileNavLink("/manager/vendors",    "Vendors",    "vendors")}
       ${mobileNavLink("/manager/locations",  "Locations",  "locations")}
       ${mobileNavLink("/manager/billing",    "Billing",    "billing")}
@@ -249,5 +251,9 @@ const ICONS = {
 
   building: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Z" />
+  </svg>`,
+
+  queue: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
   </svg>`,
 };
