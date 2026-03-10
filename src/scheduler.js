@@ -59,9 +59,54 @@ function toSqliteTimestamp(dt) {
 function withinPostingWindow(now, start, end) {
   const [sH, sM] = start.split(":").map(Number);
   const [eH, eM] = end.split(":").map(Number);
-  const windowStart = now.set({ hour: sH, minute: sM });
-  const windowEnd   = now.set({ hour: eH, minute: eM });
+  const windowStart = now.set({ hour: sH, minute: sM, second: 0, millisecond: 0 });
+  const windowEnd   = now.set({ hour: eH, minute: eM, second: 59, millisecond: 999 });
   return now >= windowStart && now <= windowEnd;
+}
+
+const LUXON_WEEKDAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+
+/**
+ * Check per-day posting schedule. Returns true if `now` falls within today's posting window.
+ * Falls back to simple start/end if no per-day schedule is set.
+ */
+function withinScheduleWindow(now, postingSchedule, fallbackStart, fallbackEnd) {
+  if (!postingSchedule) {
+    return withinPostingWindow(now, fallbackStart, fallbackEnd);
+  }
+  // Luxon weekday: 1=Monday ... 7=Sunday
+  const dayName = LUXON_WEEKDAYS[now.weekday - 1];
+  const dayConfig = postingSchedule[dayName];
+  if (!dayConfig || !dayConfig.enabled) return false;
+  return withinPostingWindow(now, dayConfig.start, dayConfig.end);
+}
+
+/**
+ * Find the next DateTime that falls inside the posting schedule.
+ * Searches up to 7 days ahead. Returns the start of the next valid window.
+ */
+function nextScheduledWindow(now, postingSchedule, fallbackStart, fallbackEnd) {
+  for (let daysAhead = 0; daysAhead <= 7; daysAhead++) {
+    const candidate = now.plus({ days: daysAhead }).startOf("day");
+
+    if (!postingSchedule) {
+      // Use fallback window on same day first, then next day
+      const [sH, sM] = fallbackStart.split(":").map(Number);
+      const windowStart = candidate.set({ hour: sH, minute: sM });
+      if (windowStart > now) return windowStart;
+      continue;
+    }
+
+    const dayName = LUXON_WEEKDAYS[candidate.weekday - 1];
+    const cfg = postingSchedule[dayName];
+    if (!cfg || !cfg.enabled) continue;
+
+    const [sH, sM] = cfg.start.split(":").map(Number);
+    const windowStart = candidate.set({ hour: sH, minute: sM, second: 0, millisecond: 0 });
+    if (windowStart > now) return windowStart;
+  }
+  // Last resort: 24 hours from now
+  return now.plus({ hours: 24 });
 }
 
 function randomDelay(min, max) {
@@ -116,7 +161,7 @@ function getSalonPolicy(salonSlug) {
     .prepare(`
       SELECT
         slug, name, phone, city, state, timezone,
-        posting_start_time, posting_end_time,
+        posting_start_time, posting_end_time, posting_schedule,
         spacing_min, spacing_max,
         ig_feed_daily_max, fb_feed_daily_max, tiktok_daily_max,
         fairness_window_min,
@@ -142,9 +187,15 @@ function getSalonPolicy(salonSlug) {
     if (Array.isArray(parsed) && parsed.length) priorityOrder = parsed;
   } catch {}
 
+  let posting_schedule = null;
+  try {
+    if (row.posting_schedule) posting_schedule = JSON.parse(row.posting_schedule);
+  } catch {}
+
   return {
     ...row,
     posting_window,
+    posting_schedule,
     priorityOrder,
     salon_info: { ...row, posting_window },
   };
@@ -251,9 +302,10 @@ export async function runSchedulerOnce() {
 
       console.log(`⚡ [Scheduler] ${due.length} due for ${salonId}`);
 
-      const tz          = salon.timezone || "America/Indiana/Indianapolis";
-      const windowStart = salon.posting_start_time || "09:00";
-      const windowEnd   = salon.posting_end_time   || "19:00";
+      const tz             = salon.timezone || "America/Indiana/Indianapolis";
+      const windowStart    = salon.posting_start_time || "09:00";
+      const windowEnd      = salon.posting_end_time   || "19:00";
+      const postingSchedule = salon.posting_schedule || null;
 
       // --- Daily cap counters (track within this run) ---
       const fbDailyCap = salon.fb_feed_daily_max ?? 4;
@@ -269,9 +321,12 @@ export async function runSchedulerOnce() {
 
         // --- Posting window check ---
         if (!IGNORE_WINDOW && !FORCE_POST_NOW) {
-          if (!withinPostingWindow(localNow, windowStart, windowEnd)) {
-            const retry = toSqliteTimestamp(nowUtc.plus({ hours: 1 }));
-            console.log(`⏸️ [${post.id}] Outside window → ${retry}`);
+          if (!withinScheduleWindow(localNow, postingSchedule, windowStart, windowEnd)) {
+            const nextWindow = nextScheduledWindow(localNow, postingSchedule, windowStart, windowEnd);
+            // Convert next window back to UTC for DB storage
+            const nextUtc = nextWindow.toUTC();
+            const retry = toSqliteTimestamp(nextUtc);
+            console.log(`⏸️ [${post.id}] Outside window (${localNow.weekdayLong}) → next window ${retry}`);
             db.prepare(
               `UPDATE posts SET scheduled_for=?, status='manager_approved' WHERE id=?`
             ).run(retry, post.id);

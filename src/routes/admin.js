@@ -178,11 +178,35 @@ router.get("/", requireAuth, (req, res) => {
     default_hashtags: defaultHashtags,
   };
 
+  // Parse per-day posting schedule (migration 020)
+  const DEFAULT_DAY_SCHEDULE = (start = "09:00", end = "20:00") => ({
+    monday:    { enabled: true,  start, end },
+    tuesday:   { enabled: true,  start, end },
+    wednesday: { enabled: true,  start, end },
+    thursday:  { enabled: true,  start, end },
+    friday:    { enabled: true,  start, end },
+    saturday:  { enabled: true,  start: "10:00", end: "18:00" },
+    sunday:    { enabled: false, start: "10:00", end: "18:00" },
+  });
+
+  let postingSchedule;
+  try {
+    postingSchedule = salonRow.posting_schedule
+      ? JSON.parse(salonRow.posting_schedule)
+      : DEFAULT_DAY_SCHEDULE(
+          salonRow.posting_start_time || "09:00",
+          salonRow.posting_end_time   || "20:00"
+        );
+  } catch {
+    postingSchedule = DEFAULT_DAY_SCHEDULE();
+  }
+
   const settings = {
     posting_window: {
-      start: salonRow.posting_start_time || "07:00",
+      start: salonRow.posting_start_time || "09:00",
       end: salonRow.posting_end_time || "20:00",
     },
+    posting_schedule: postingSchedule,
     require_manager_approval: !!salonRow.require_manager_approval,
     random_delay_minutes: {
       min: salonRow.spacing_min ?? 20,
@@ -338,14 +362,25 @@ router.get("/", requireAuth, (req, res) => {
       <!-- Scheduler link card -->
       <div class="rounded-2xl border border-mpBorder bg-white px-4 py-4 flex flex-col justify-between">
         <div>
-          <h2 class="text-sm font-semibold text-mpCharcoal mb-1">Posting Schedule</h2>
-          <p class="text-xs text-mpMuted mb-3">Posting window, platform daily caps, content priority order, and stylist fairness rules are managed in the Scheduler.</p>
+          <div class="flex items-center justify-between mb-1">
+            <h2 class="text-sm font-semibold text-mpCharcoal">Posting Availability</h2>
+            <button onclick="window.admin.openPostingRules()" class="text-mpMuted hover:text-mpCharcoal text-xs">✏️</button>
+          </div>
+          <p class="text-xs text-mpMuted mb-3">Days and times when posts can be published, in your salon's timezone.</p>
           <dl class="space-y-1 text-xs text-mpCharcoal mb-4">
-            <div class="flex justify-between">
-              <dt class="text-mpMuted">Window</dt>
-              <dd>${fmtTime(settings.posting_window.start)} – ${fmtTime(settings.posting_window.end)}</dd>
-            </div>
-            <div class="flex justify-between">
+            ${(() => {
+              const days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+              const labels = { monday:"Mon", tuesday:"Tue", wednesday:"Wed", thursday:"Thu", friday:"Fri", saturday:"Sat", sunday:"Sun" };
+              const sched = postingSchedule;
+              return days.map(d => {
+                const cfg = sched[d];
+                if (!cfg || !cfg.enabled) {
+                  return `<div class="flex justify-between"><dt class="text-mpMuted">${labels[d]}</dt><dd class="text-gray-400">Off</dd></div>`;
+                }
+                return `<div class="flex justify-between"><dt class="text-mpMuted">${labels[d]}</dt><dd>${fmtTime(cfg.start)} – ${fmtTime(cfg.end)}</dd></div>`;
+              }).join("");
+            })()}
+            <div class="flex justify-between pt-1 border-t border-mpBorder mt-1">
               <dt class="text-mpMuted">Spacing</dt>
               <dd>${settings.random_delay_minutes.min}–${settings.random_delay_minutes.max} min</dd>
             </div>
@@ -509,6 +544,7 @@ router.get("/", requireAuth, (req, res) => {
           data-tone="${info.tone_profile}"
           data-auto-publish="${info.auto_publish ? "1" : "0"}"
 
+          data-posting-schedule='${JSON.stringify(settings.posting_schedule)}'
           data-posting-start="${settings.posting_window.start}"
           data-posting-end="${settings.posting_window.end}"
           data-spacing-min="${settings.random_delay_minutes.min}"
@@ -704,8 +740,7 @@ router.post("/update-posting-rules", requireAuth, (req, res) => {
   try {
     const {
       salon_id,
-      posting_start_time,
-      posting_end_time,
+      posting_schedule_json,
       spacing_min,
       spacing_max
     } = req.body;
@@ -714,27 +749,43 @@ router.post("/update-posting-rules", requireAuth, (req, res) => {
       return res.status(400).send("Missing salon_id");
     }
 
-    const spacingMinInt = parseInt(spacing_min, 10) || 0;
-    const spacingMaxInt = parseInt(spacing_max, 10) || 0;
+    const spacingMinInt = parseInt(spacing_min, 10) || 20;
+    const spacingMaxInt = parseInt(spacing_max, 10) || 45;
 
-    db.prepare(
-      `
-      UPDATE salons
-      SET 
-        posting_start_time = COALESCE(?, posting_start_time),
-        posting_end_time   = COALESCE(?, posting_end_time),
-        spacing_min        = COALESCE(?, spacing_min),
-        spacing_max        = COALESCE(?, spacing_max),
-        updated_at = datetime('now')
-      WHERE slug = ?
-    `
-    ).run(
-      posting_start_time || null,
-      posting_end_time || null,
-      spacingMinInt,
-      spacingMaxInt,
-      salon_id
-    );
+    // Validate and parse the per-day schedule JSON
+    let scheduleJson = null;
+    if (posting_schedule_json) {
+      try {
+        const parsed = JSON.parse(posting_schedule_json);
+        // Also extract a representative start/end from Monday (or first enabled day) for legacy fallback
+        const days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+        const firstEnabled = days.find(d => parsed[d]?.enabled) || "monday";
+        const legacyStart = parsed[firstEnabled]?.start || "09:00";
+        const legacyEnd   = parsed[firstEnabled]?.end   || "20:00";
+        scheduleJson = JSON.stringify(parsed);
+
+        db.prepare(
+          `UPDATE salons
+           SET posting_schedule    = ?,
+               posting_start_time  = ?,
+               posting_end_time    = ?,
+               spacing_min         = ?,
+               spacing_max         = ?,
+               updated_at          = datetime('now')
+           WHERE slug = ?`
+        ).run(scheduleJson, legacyStart, legacyEnd, spacingMinInt, spacingMaxInt, salon_id);
+      } catch {
+        return res.status(400).send("Invalid posting schedule format");
+      }
+    } else {
+      db.prepare(
+        `UPDATE salons
+         SET spacing_min = ?,
+             spacing_max = ?,
+             updated_at  = datetime('now')
+         WHERE slug = ?`
+      ).run(spacingMinInt, spacingMaxInt, salon_id);
+    }
 
     return res.redirect(`/manager/admin?salon=${encodeURIComponent(salon_id)}`);
   } catch (err) {

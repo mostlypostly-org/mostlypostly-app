@@ -132,7 +132,7 @@ window.admin = {
   },
 
   // -----------------------------------------
-  // Posting Rules Modal
+  // Posting Rules Modal (per-day schedule)
   // -----------------------------------------
   async openPostingRules() {
     const panel = await this.openModal("tpl-posting-rules");
@@ -140,56 +140,87 @@ window.admin = {
 
     const data = window.adminData;
 
-    const fields = [
-      "salon_id",
-      "posting_start_time",
-      "posting_end_time",
-      "spacing_min",
-      "spacing_max",
-    ];
-    fields.forEach((key) => {
+    // Fill spacing
+    ["spacing_min", "spacing_max"].forEach((key) => {
       const el = panel.querySelector(`[data-field='${key}']`);
-      if (!el) return;
-      el.value = data[key] ?? "";
+      if (el) el.value = data[key] ?? "";
     });
 
-    // Fill dropdown with human-readable labels
-    function populateTimeOptions(selectEl) {
-      const times = [
-        ["07:00", "7:00 AM"],
-        ["08:00", "8:00 AM"],
-        ["09:00", "9:00 AM"],
-        ["10:00", "10:00 AM"],
-        ["11:00", "11:00 AM"],
-        ["12:00", "12:00 PM"],
-        ["13:00", "1:00 PM"],
-        ["14:00", "2:00 PM"],
-        ["15:00", "3:00 PM"],
-        ["16:00", "4:00 PM"],
-        ["17:00", "5:00 PM"],
-        ["18:00", "6:00 PM"],
-        ["19:00", "7:00 PM"],
-        ["20:00", "8:00 PM"],
-        ["21:00", "9:00 PM"],
-        ["22:00", "10:00 PM"],
-      ];
-
-      selectEl.innerHTML = times
-        .map(
-          ([val, label]) =>
-            `<option value="${val}" ${
-              val === data.posting_start_time || val === data.posting_end_time
-                ? "selected"
-                : ""
-            }>${label}</option>`
-        )
-        .join("");
+    // Build time options (every 30 min, midnight through 11:30 PM)
+    function buildTimeOptions(selectedVal) {
+      const options = [];
+      for (let h = 0; h < 24; h++) {
+        for (let m = 0; m < 60; m += 30) {
+          const val = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+          const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+          const ampm = h < 12 ? "AM" : "PM";
+          const minStr = m === 0 ? "00" : "30";
+          const label = `${hour12}:${minStr} ${ampm}`;
+          const sel = val === selectedVal ? " selected" : "";
+          options.push(`<option value="${val}"${sel}>${label}</option>`);
+        }
+      }
+      return options.join("");
     }
 
-    populateTimeOptions(
-      panel.querySelector("[data-field='posting_start_time']")
-    );
-    populateTimeOptions(panel.querySelector("[data-field='posting_end_time']"));
+    const DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+    const DAY_LABELS = { monday:"Mon", tuesday:"Tue", wednesday:"Wed", thursday:"Thu", friday:"Fri", saturday:"Sat", sunday:"Sun" };
+    const schedule = data.posting_schedule || {};
+    const grid = panel.querySelector("#posting-days-grid");
+    const hidden = panel.querySelector("#posting-schedule-json");
+    const form = panel.querySelector("#posting-rules-form");
+
+    function syncHidden() {
+      const result = {};
+      DAYS.forEach(day => {
+        const row = grid.querySelector(`[data-day="${day}"]`);
+        if (!row) return;
+        result[day] = {
+          enabled: row.querySelector(".day-toggle").checked,
+          start:   row.querySelector(".day-start").value,
+          end:     row.querySelector(".day-end").value,
+        };
+      });
+      hidden.value = JSON.stringify(result);
+    }
+
+    function renderGrid() {
+      grid.innerHTML = DAYS.map(day => {
+        const cfg = schedule[day] || { enabled: true, start: "09:00", end: "20:00" };
+        const disabledClass = cfg.enabled ? "" : "opacity-40 pointer-events-none";
+        return `
+          <div data-day="${day}" class="flex items-center gap-2 rounded-lg p-2 bg-gray-50 border border-gray-200">
+            <label class="flex items-center gap-1.5 cursor-pointer min-w-[52px]">
+              <input type="checkbox" class="day-toggle accent-mpAccent cursor-pointer" ${cfg.enabled ? "checked" : ""} />
+              <span class="text-xs font-semibold text-mpCharcoal">${DAY_LABELS[day]}</span>
+            </label>
+            <div class="flex items-center gap-1 flex-1 ${disabledClass}">
+              <select class="day-start flex-1 border border-gray-200 bg-white rounded px-2 py-1 text-xs text-mpCharcoal focus:border-mpAccent focus:outline-none">
+                ${buildTimeOptions(cfg.start)}
+              </select>
+              <span class="text-xs text-mpMuted">–</span>
+              <select class="day-end flex-1 border border-gray-200 bg-white rounded px-2 py-1 text-xs text-mpCharcoal focus:border-mpAccent focus:outline-none">
+                ${buildTimeOptions(cfg.end)}
+              </select>
+            </div>
+          </div>`;
+      }).join("");
+
+      // Toggle handler — enable/disable time pickers
+      DAYS.forEach(day => {
+        const row = grid.querySelector(`[data-day="${day}"]`);
+        const toggle = row.querySelector(".day-toggle");
+        const timesDiv = row.querySelector(".flex-1");
+        toggle.addEventListener("change", () => {
+          timesDiv.classList.toggle("opacity-40", !toggle.checked);
+          timesDiv.classList.toggle("pointer-events-none", !toggle.checked);
+        });
+      });
+    }
+
+    renderGrid();
+    syncHidden();
+    form.addEventListener("submit", syncHidden);
   },
 
   // -----------------------------------------
@@ -583,6 +614,9 @@ document.addEventListener("DOMContentLoaded", () => {
     posting_end_time: root.dataset.postingEnd || "",
     spacing_min: parseInt(root.dataset.spacingMin || "20"),
     spacing_max: parseInt(root.dataset.spacingMax || "45"),
+    posting_schedule: (() => {
+      try { return JSON.parse(root.dataset.postingSchedule || "null"); } catch { return null; }
+    })(),
 
     require_manager_approval: root.dataset.requireManagerApproval == "1",
     auto_approval: root.dataset.autoApproval == "1",
