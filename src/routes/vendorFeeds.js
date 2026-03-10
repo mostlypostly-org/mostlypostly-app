@@ -159,15 +159,17 @@ router.get("/", requireAuth, (req, res) => {
             <div>
               <p class="font-bold text-mpCharcoal">${safe(vendorName)}</p>
               <div class="flex items-center gap-2 mt-0.5 flex-wrap">
-                <span class="text-xs text-mpMuted">${nonExpired.length} active campaign${nonExpired.length !== 1 ? "s" : ""}${expired.length ? ` · ${expired.length} expired` : ""}</span>
+                ${isApproved
+                  ? `<span class="text-xs text-mpMuted">${nonExpired.length} active campaign${nonExpired.length !== 1 ? "s" : ""}${expired.length ? ` · ${expired.length} expired` : ""}</span>`
+                  : `<span class="text-xs text-mpMuted">Approved partners can view campaign content</span>`}
                 ${approvalBadge}
               </div>
             </div>
             <div class="flex-shrink-0">${actionArea}</div>
           </div>
 
-          <!-- Campaign previews (collapsible) -->
-          ${nonExpired.length > 0 ? `
+          <!-- Campaign previews — approved only -->
+          ${isApproved && nonExpired.length > 0 ? `
           <div class="border-t border-mpBorder px-5 py-4">
             <button type="button" onclick="togglePreview('${safe(vendorName.replace(/\s+/g, "_"))}')"
                     class="text-xs font-semibold text-mpMuted hover:text-mpCharcoal flex items-center gap-1 mb-3">
