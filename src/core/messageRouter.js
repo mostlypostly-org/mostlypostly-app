@@ -476,7 +476,7 @@ async function processNewImageFlow({
         const baseUrl = process.env.PUBLIC_BASE_URL || "";
         const portalUrl = `${baseUrl}/stylist/${postId}?token=${portalToken}`;
         await sendMessage.sendText(chatId,
-          `Your availability post is ready! Review it here:\n${portalUrl}\n\n(Link expires in 24 hours.)`
+          `Your availability post is ready! Review it here:\n${portalUrl}\n\nOr reply APPROVE to submit now, or CANCEL to discard. (Link expires in 24 hours.)`
         );
       }
     } catch (err) {
@@ -574,7 +574,7 @@ async function processNewImageFlow({
       const portalUrl = `${baseUrl}/stylist/${postId}?token=${portalToken}`;
 
       await sendMessage.sendText(chatId,
-        `Your caption preview is ready! Review and edit it here:\n${portalUrl}\n\n(Link expires in 24 hours. Reply CANCEL to discard.)`
+        `Your caption preview is ready! Review and edit it here:\n${portalUrl}\n\nOr reply APPROVE to submit now, or CANCEL to discard. (Link expires in 24 hours.)`
       );
     } catch (err) {
       console.warn("⚠️ Could not generate portal token, falling back to SMS preview:", err.message);

@@ -156,11 +156,14 @@ router.get("/:id", validateToken, async (req, res) => {
 
   res.send(shell("Review Your Caption", `
     <h1 class="text-xl font-bold mb-1 text-mpCharcoal">Your Post Preview</h1>
-    <p class="text-sm text-mpMuted mb-5">Review your caption below. Add notes and regenerate before submitting.</p>
+    <p class="text-sm text-mpMuted mb-5">${post.post_type === "availability"
+      ? "Review your availability post below. Update the details if needed, then submit."
+      : "Review your caption below. Add notes and regenerate before submitting."}</p>
 
     ${renderImages(displayUrls)}
 
     ${justRegenerated ? `<div class="bg-green-50 border border-green-200 rounded-xl px-4 py-2 text-green-700 text-sm mb-4">Caption regenerated with your input!</div>` : ""}
+    ${req.query.updated === "1" ? `<div class="bg-green-50 border border-green-200 rounded-xl px-4 py-2 text-green-700 text-sm mb-4">Availability updated!</div>` : ""}
     ${justSwapped ? `<div class="bg-green-50 border border-green-200 rounded-xl px-4 py-2 text-green-700 text-sm mb-4">Before/After positions swapped!</div>` : ""}
 
     ${post.post_type === "before_after" ? `
@@ -171,6 +174,28 @@ router.get("/:id", validateToken, async (req, res) => {
       </button>
     </form>` : ""}
 
+    ${post.post_type === "availability" ? `
+    <!-- Availability: no caption, just update option -->
+    <div class="bg-white border border-mpBorder rounded-2xl p-4 mb-6 shadow-sm">
+      <p class="text-xs font-bold text-mpMuted uppercase tracking-widest mb-2">Availability Details</p>
+      <p class="text-sm text-mpCharcoal leading-relaxed whitespace-pre-line">${esc(post.final_caption || post.base_caption || "")}</p>
+    </div>
+
+    <form method="POST" action="/stylist/${esc(post.id)}/update-availability?token=${esc(token)}">
+      <label class="block text-sm font-semibold text-mpCharcoal mb-1">
+        Update availability <span class="text-mpMuted font-normal">(change service type, times, etc.)</span>
+      </label>
+      <textarea
+        name="availability_text"
+        rows="3"
+        placeholder="e.g. Friday 2pm for haircut, Saturday 10am for color…"
+        class="w-full bg-mpBg border border-mpBorder rounded-xl p-3 text-mpCharcoal text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-mpAccent focus:border-mpAccent"
+      ></textarea>
+      <button type="submit"
+        class="w-full bg-mpBg hover:bg-mpAccentLight border border-mpBorder text-mpCharcoal font-semibold py-2.5 rounded-xl text-sm mb-5 transition-colors">
+        Rebuild Availability Post
+      </button>
+    </form>` : `
     <!-- Caption preview -->
     <div class="bg-white border border-mpBorder rounded-2xl p-4 mb-6 shadow-sm">
       <p class="text-xs font-bold text-mpMuted uppercase tracking-widest mb-3">Caption Preview</p>
@@ -194,7 +219,7 @@ router.get("/:id", validateToken, async (req, res) => {
         class="w-full bg-mpBg hover:bg-mpAccentLight border border-mpBorder text-mpCharcoal font-semibold py-2.5 rounded-xl text-sm mb-5 transition-colors">
         Regenerate with AI
       </button>
-    </form>
+    </form>`}
 
     <!-- Submit -->
     <form method="POST" action="/stylist/${esc(post.id)}/submit?token=${esc(token)}">
@@ -246,6 +271,58 @@ router.post("/:id/swap", validateToken, async (req, res) => {
     return res.send(shell("Error", `
       <div class="bg-red-50 border border-red-200 rounded-2xl p-6 mb-4">
         <p class="text-red-700 font-semibold mb-2">Swap failed</p>
+        <p class="text-mpMuted text-sm">${esc(err.message)}</p>
+      </div>
+      <a href="/stylist/${esc(post.id)}?token=${esc(token)}"
+        class="block text-center text-mpAccent text-sm underline">Go back</a>
+    `));
+  }
+});
+
+// -------------------------------------------------------
+// POST /:id/update-availability  — rebuild availability image with new text
+// -------------------------------------------------------
+router.post("/:id/update-availability", validateToken, async (req, res) => {
+  const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(req.params.id);
+  if (!post) return res.status(404).send(errorPage("Post not found."));
+
+  const token = req.query.token;
+  const availabilityText = (req.body.availability_text || "").trim();
+
+  if (!availabilityText) {
+    return res.redirect(`/stylist/${post.id}?token=${token}`);
+  }
+
+  try {
+    const { buildAvailabilityImage } = await import("../core/buildAvailabilityImage.js");
+    const fullSalon = getSalonPolicy(post.salon_id);
+
+    const newImageUrl = await buildAvailabilityImage({
+      text: availabilityText,
+      stylistName: post.stylist_name || "",
+      salonName: fullSalon?.name || "",
+      salonId: post.salon_id,
+      stylistId: post.stylist_id || null,
+      instagramHandle: post.instagram_handle || null,
+      bookingCta: fullSalon?.booking_url || "",
+    });
+
+    db.prepare(`
+      UPDATE posts
+      SET image_url     = ?,
+          image_urls    = ?,
+          final_caption = ?,
+          base_caption  = ?,
+          updated_at    = datetime('now')
+      WHERE id = ?
+    `).run(newImageUrl, JSON.stringify([newImageUrl]), availabilityText, availabilityText, post.id);
+
+    return res.redirect(`/stylist/${post.id}?token=${token}&updated=1`);
+  } catch (err) {
+    console.error("❌ [Portal] update-availability error:", err.message);
+    return res.send(shell("Error", `
+      <div class="bg-red-50 border border-red-200 rounded-2xl p-6 mb-4">
+        <p class="text-red-700 font-semibold mb-2">Could not rebuild availability post</p>
         <p class="text-mpMuted text-sm">${esc(err.message)}</p>
       </div>
       <a href="/stylist/${esc(post.id)}?token=${esc(token)}"
