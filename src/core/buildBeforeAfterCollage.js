@@ -6,9 +6,7 @@ import sharp from "sharp";
 import fetch from "node-fetch";
 import fs from "fs";
 import path from "path";
-
-const PUBLIC_DIR = path.resolve("public/uploads");
-fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+import { UPLOADS_DIR, toUploadUrl } from "./uploadPath.js";
 
 const OUTPUT_WIDTH  = 1080; // Instagram square-friendly
 const OUTPUT_HEIGHT = 1080;
@@ -113,11 +111,10 @@ export async function buildBeforeAfterCollage(imageUrls, salon_id = "") {
     .toBuffer();
 
   const fileName   = `collage-${Date.now()}.jpg`;
-  const filePath   = path.join(PUBLIC_DIR, fileName);
+  const filePath   = path.join(UPLOADS_DIR, fileName);
   fs.writeFileSync(filePath, collage);
 
-  const base      = (process.env.PUBLIC_BASE_URL || "https://localhost:3000").replace(/\/$/, "");
-  const publicUrl = `${base}/uploads/${fileName}`;
+  const publicUrl = toUploadUrl(fileName);
 
   console.log(`[BeforeAfter] Collage saved: ${publicUrl}`);
   return publicUrl;

@@ -12,8 +12,7 @@ import { TONE_GROUPS, TONE_VARIANT_MAP } from "../core/toneVariants.js";
 
 const router = express.Router();
 
-const UPLOADS_DIR = path.resolve("public/uploads");
-fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+import { UPLOADS_DIR } from "../core/uploadPath.js";
 
 const photoUpload = multer({
   storage: multer.diskStorage({
@@ -432,7 +431,7 @@ router.post("/:id/photos/delete", requireAuth, (req, res) => {
       db.prepare("DELETE FROM stock_photos WHERE id = ?").run(photo_id);
       // Remove local file if it's a local upload
       try {
-        const localPath = path.join("public/uploads", path.basename(row.url));
+        const localPath = path.join(UPLOADS_DIR, path.basename(row.url));
         if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
       } catch { /* ignore */ }
     }

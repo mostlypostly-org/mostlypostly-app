@@ -8,8 +8,9 @@ import fs from "fs";
 import path from "path";
 import fetch from "node-fetch";
 import crypto from "crypto";
+import { UPLOADS_DIR, toUploadUrl } from "./uploadPath.js";
 
-const CELEBRATIONS_DIR = path.resolve("public/uploads/celebrations");
+const CELEBRATIONS_DIR = path.join(UPLOADS_DIR, "celebrations");
 fs.mkdirSync(CELEBRATIONS_DIR, { recursive: true });
 
 const CANVAS_SIZE = 1080;
@@ -179,5 +180,5 @@ export async function generateCelebrationImage({
     .jpeg({ quality: 88 })
     .toFile(outputPath);
 
-  return `/uploads/celebrations/${outputFilename}`;
+  return toUploadUrl(`celebrations/${outputFilename}`);
 }

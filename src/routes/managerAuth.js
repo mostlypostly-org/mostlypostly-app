@@ -8,6 +8,7 @@ import multer from "multer";
 import path from "path";
 import { sendViaTwilio } from "../routes/twilio.js";
 import { sendVerificationEmail, sendWelcomeEmail, sendCancellationEmail } from "../core/email.js";
+import { UPLOADS_DIR, toUploadUrl } from "../core/uploadPath.js";
 
 const SITE_URL = process.env.APP_ENV === "staging"
   ? "https://mostlypostly-staging-site.onrender.com"
@@ -17,7 +18,7 @@ const SITE_URL = process.env.APP_ENV === "staging"
 
 const salonLogoUpload = multer({
   storage: multer.diskStorage({
-    destination: "public/uploads",
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
     filename: (_req, file, cb) => {
       const ext = path.extname(file.originalname) || ".jpg";
       cb(null, `salon-logo-${Date.now()}${ext}`);
@@ -685,8 +686,7 @@ router.post("/signup", (req, res, next) => salonLogoUpload(req, res, next), asyn
 
     // Save logo if uploaded
     if (req.file) {
-      const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
-      const logoUrl = `${PUBLIC_BASE_URL}/uploads/${req.file.filename}`;
+      const logoUrl = toUploadUrl(req.file.filename);
       db.prepare("UPDATE salons SET logo_url = ? WHERE slug = ?").run(logoUrl, salonSlug);
     }
 

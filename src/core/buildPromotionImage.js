@@ -9,9 +9,7 @@ import fs from "fs";
 import path from "path";
 import { db } from "../../db.js";
 import { fetchPexelsBackground } from "./pexels.js";
-
-const PUBLIC_DIR = path.resolve("public/uploads");
-fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+import { UPLOADS_DIR, toUploadUrl } from "./uploadPath.js";
 
 const W = 1080;
 const H = 1920;
@@ -237,10 +235,9 @@ export async function buildPromotionImage({ salonId, salonName, product, discoun
     .toBuffer();
 
   const fileName = `promo-${Date.now()}.jpg`;
-  fs.writeFileSync(path.join(PUBLIC_DIR, fileName), finalBuf);
+  fs.writeFileSync(path.join(UPLOADS_DIR, fileName), finalBuf);
 
-  const base = (process.env.PUBLIC_BASE_URL || "https://localhost:3000").replace(/\/$/, "");
-  const publicUrl = `${base}/uploads/${fileName}`;
+  const publicUrl = toUploadUrl(fileName);
   console.log("[Promotion] Image saved:", publicUrl);
   return publicUrl;
 }

@@ -39,6 +39,7 @@ import "./src/core/analyticsDb.js";
 // DB
 // =====================================================
 import { db } from "./db.js";
+import { UPLOADS_DIR } from "./src/core/uploadPath.js";
 
 // =====================================================
 // Middleware imports
@@ -180,7 +181,7 @@ app.use(
 // Public uploads
 app.use(
   "/uploads",
-  express.static(path.join(process.cwd(), "public/uploads"), {
+  express.static(UPLOADS_DIR, {
     setHeaders(res, filePath) {
       if (/\.(jpg|jpeg|png|gif|webp)$/i.test(filePath)) {
         res.setHeader("Cache-Control", "public, max-age=86400");

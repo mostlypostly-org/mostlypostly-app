@@ -8,10 +8,9 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { db } from "../../db.js";
+import { UPLOADS_DIR, toUploadUrl } from "./uploadPath.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PUBLIC_DIR = path.resolve("public/uploads");
-fs.mkdirSync(PUBLIC_DIR, { recursive: true });
 
 // Embed Open Sans ExtraBold (800) as base64 so librsvg/sharp can use it on any server
 const FONT_PATH = path.resolve(__dirname, "../../node_modules/@fontsource/open-sans/files/open-sans-latin-800-normal.woff2");
@@ -311,11 +310,10 @@ export async function buildAvailabilityImage({ text, stylistName, salonName, sal
 
   // 6. Save and return public URL
   const fileName  = `availability-${Date.now()}.jpg`;
-  const filePath  = path.join(PUBLIC_DIR, fileName);
+  const filePath  = path.join(UPLOADS_DIR, fileName);
   fs.writeFileSync(filePath, finalBuf);
 
-  const base = (process.env.PUBLIC_BASE_URL || "https://localhost:3000").replace(/\/$/, "");
-  const publicUrl = `${base}/uploads/${fileName}`;
+  const publicUrl = toUploadUrl(fileName);
   console.log("[Availability] Story image saved:", publicUrl);
   return publicUrl;
 }

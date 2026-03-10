@@ -2,9 +2,7 @@
 import fs from "fs";
 import path from "path";
 import fetch from "node-fetch";
-
-const PUBLIC_DIR = path.resolve("public/uploads");
-fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+import { UPLOADS_DIR, toUploadUrl } from "../core/uploadPath.js";
 
 /**
  * Rehost Twilio media with guaranteed HTTPS public URL
@@ -37,22 +35,10 @@ export async function rehostTwilioMedia(twilioUrl, salon_id = "") {
 
   const buffer = Buffer.from(await response.arrayBuffer());
   const fileName = `twilio-${Date.now()}.jpg`;
-  const filePath = path.join(PUBLIC_DIR, fileName);
+  const filePath = path.join(UPLOADS_DIR, fileName);
   fs.writeFileSync(filePath, buffer);
 
-  // 💡 Public URL Guarantee: Always HTTPS
-  // Preferred: PUBLIC_BASE_URL (ngrok / production)
-  // Fallback: build https://localhost URL
-  let base = process.env.PUBLIC_BASE_URL;
-
-  if (!base) {
-    console.warn(
-      "⚠️ PUBLIC_BASE_URL not set — using https://localhost:3000 (requires local HTTPS server)"
-    );
-    base = "https://localhost:3000"; // local HTTPS assumed
-  }
-
-  const publicUrl = `${base.replace(/\/$/, "")}/uploads/${fileName}`;
+  const publicUrl = toUploadUrl(fileName);
   console.log(`✅ [${salon_id || "global"}] Twilio media rehosted:`, publicUrl);
 
   return publicUrl;

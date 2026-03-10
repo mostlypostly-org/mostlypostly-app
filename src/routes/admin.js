@@ -12,8 +12,7 @@ import { DateTime } from "luxon";
 import crypto from "crypto";
 import { isContentSafe, sanitizeText } from "../../src/utils/moderation.js";
 
-const UPLOADS_DIR = path.resolve("public/uploads");
-fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+import { UPLOADS_DIR } from "../core/uploadPath.js";
 
 const managerPhotoUpload = multer({
   storage: multer.diskStorage({

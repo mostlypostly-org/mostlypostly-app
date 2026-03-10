@@ -5,9 +5,7 @@ import path from "path";
 import multer from "multer";
 import fetch from "node-fetch";
 import db from "../../db.js";
-
-const UPLOADS_DIR = path.resolve("public/uploads");
-fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+import { UPLOADS_DIR, toUploadUrl } from "../core/uploadPath.js";
 
 const stylistPhotoUpload = multer({
   storage: multer.diskStorage({
@@ -1044,10 +1042,7 @@ router.post("/stylists", stylistPhotoUpload.single("stylist_photo"), (req, res) 
   }
 
   // Build public photo URL if a file was uploaded
-  const base = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
-  const photoUrl = req.file
-    ? `${base}/uploads/${req.file.filename}`
-    : null;
+  const photoUrl = req.file ? toUploadUrl(req.file.filename) : null;
 
   if (stylist_id) {
     // UPDATE existing stylist — only overwrite photo if a new one was uploaded

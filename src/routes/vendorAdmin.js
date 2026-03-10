@@ -17,12 +17,13 @@ import crypto from "crypto";
 import path from "path";
 import fs from "fs";
 import db from "../../db.js";
+import { UPLOADS_DIR } from "../core/uploadPath.js";
 
 const router = express.Router();
 
 const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-const PROOF_DIR = path.resolve("public/uploads/vendor-proofs");
+const PROOF_DIR = path.join(UPLOADS_DIR, "vendor-proofs");
 fs.mkdirSync(PROOF_DIR, { recursive: true });
 const proofUpload = multer({
   storage: multer.diskStorage({
