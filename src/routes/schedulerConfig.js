@@ -131,7 +131,7 @@ router.get("/", requireAuth, (req, res) => {
   // --- Content types enabled ---
   const DEFAULT_TYPES_ENABLED = {
     standard_post: true, before_after: true, availability: true,
-    celebration: true, promotions: true, product_education: true, vendor_promotion: true,
+    celebration: true, promotions: true, product_education: true, vendor_promotion: false,
   };
   let contentTypesEnabled = { ...DEFAULT_TYPES_ENABLED };
   try {

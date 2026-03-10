@@ -11,14 +11,16 @@ export default function pageShell({
 }) {
   const qs = salon_id ? `?salon=${encodeURIComponent(salon_id)}` : "";
 
-  // Active location name for sidebar indicator
+  // Active location name + plan for sidebar
   let activeSalonName = "";
+  let salonPlan = "";
   if (salon_id) {
     try {
-      const row = db.prepare("SELECT name FROM salons WHERE slug = ?").get(salon_id);
-      if (row) activeSalonName = row.name;
+      const row = db.prepare("SELECT name, plan FROM salons WHERE slug = ?").get(salon_id);
+      if (row) { activeSalonName = row.name; salonPlan = row.plan || ""; }
     } catch (_) {}
   }
+  const isPro = salonPlan === "pro";
   const locationInitials = activeSalonName
     ? activeSalonName.split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase()
     : "";
@@ -136,7 +138,7 @@ export default function pageShell({
       ${navItem("/manager/scheduler",  ICONS.clock,     "Scheduler",    "scheduler")}
       ${navItem("/dashboard",          ICONS.database,  "Database",     "database")}
       ${navItem("/manager/vendors",       ICONS.tag,          "Vendors",       "vendors")}
-      ${navItem("/manager/integrations", ICONS.integration,  "Integrations",  "integrations")}
+      ${isPro ? navItem("/manager/integrations", ICONS.integration,  "Integrations",  "integrations") : ""}
       ${navItem("/manager/locations",    ICONS.building,     "Locations",     "locations")}
       ${navItem("/manager/billing",      ICONS.card,         "Billing",       "billing")}
       ${navItem("/manager/admin",        ICONS.cog,          "Admin",         "admin")}
@@ -175,7 +177,7 @@ export default function pageShell({
       ${mobileNavLink("/manager/scheduler",  "Scheduler",  "scheduler")}
       ${mobileNavLink("/dashboard",          "Database",   "database")}
       ${mobileNavLink("/manager/vendors",       "Vendors",       "vendors")}
-      ${mobileNavLink("/manager/integrations", "Integrations",  "integrations")}
+      ${isPro ? mobileNavLink("/manager/integrations", "Integrations",  "integrations") : ""}
       ${mobileNavLink("/manager/locations",    "Locations",     "locations")}
       ${mobileNavLink("/manager/billing",      "Billing",       "billing")}
       ${mobileNavLink("/manager/admin",        "Admin",         "admin")}

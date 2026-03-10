@@ -13,6 +13,7 @@ import express from "express";
 import { generateSecret, verifySync, generateURI } from "otplib";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import QRCode from "qrcode";
 import db from "../../db.js";
 import { encrypt, decrypt } from "../core/encrypt.js";
 import { logSecurityEvent } from "../core/auditLog.js";
@@ -84,7 +85,7 @@ function mfaShell(title, content) {
 }
 
 // ─── GET /manager/mfa/setup ─────────────────────────────────────
-router.get("/setup", requireAuth, (req, res) => {
+router.get("/setup", requireAuth, async (req, res) => {
   const managerId = req.manager.id;
 
   // Already enrolled?
@@ -102,8 +103,8 @@ router.get("/setup", requireAuth, (req, res) => {
   const managerEmail = req.manager.email || req.manager.name || "manager";
   const otpAuthUrl = generateURI({ strategy: "totp", label: managerEmail, issuer: APP_NAME, secret });
 
-  // Use Google Charts QR API (no npm package needed)
-  const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(otpAuthUrl)}`;
+  // Generate QR code as base64 data URI (no external service needed)
+  const qrDataUrl = await QRCode.toDataURL(otpAuthUrl, { width: 200, margin: 1 });
 
   const error = req.query.error === "1" ? `<div class="error">Incorrect code — please try again.</div>` : "";
 
@@ -112,7 +113,7 @@ router.get("/setup", requireAuth, (req, res) => {
     <p>Scan this QR code with your authenticator app (Google Authenticator, Authy, or 1Password), then enter the 6-digit code to confirm.</p>
     ${error}
     <div class="qr-wrap">
-      <img src="${qrUrl}" width="200" height="200" alt="QR Code" style="border-radius:12px;border:1px solid #EDE7E4;" />
+      <img src="${qrDataUrl}" width="200" height="200" alt="QR Code" style="border-radius:12px;border:1px solid #EDE7E4;" />
     </div>
     <p style="margin-bottom:4px">Can't scan? Enter this secret manually:</p>
     <div class="secret-box">${secret}</div>

@@ -92,10 +92,12 @@ function fmtTime(val) {
 }
 
 // Serve admin modal templates
+// NOTE: must use res.send (not res.sendFile) so the CSRF middleware can inject
+// the _csrf token into form fields before the content reaches the browser.
 router.get("/templates", requireAuth, (req, res) => {
-  res.sendFile("public/admin-templates.html", {
-    root: process.cwd(),
-  });
+  const filePath = path.join(process.cwd(), "public", "admin-templates.html");
+  const html = fs.readFileSync(filePath, "utf8");
+  res.type("html").send(html);
 });
 
 
