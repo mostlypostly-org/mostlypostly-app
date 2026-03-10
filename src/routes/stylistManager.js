@@ -539,9 +539,8 @@ function buildStylistForm({ salon_id, salonTone, stylist, isEdit }) {
     ? `/manager/stylists/edit/${safe(s.id)}${qs}`
     : `/manager/stylists/add${qs}`;
 
-  const specialties = isEdit
-    ? parseSpecialties(s.specialties).join(", ")
-    : (s.specialties || "");
+  const specialtiesArr = parseSpecialties(s.specialties);
+  const specialtiesJson = JSON.stringify(specialtiesArr);
 
   const fieldRow = (label, name, type = "text", value = "", hint = "") => `
     <div>
@@ -619,13 +618,15 @@ function buildStylistForm({ salon_id, salonTone, stylist, isEdit }) {
           <p class="text-[11px] text-mpMuted mt-0.5">Used to post annual work anniversary celebrations.</p>
         </div>
 
-        <!-- Specialties -->
+        <!-- Specialties tag input -->
         <div>
           <label class="block text-xs font-semibold text-mpMuted mb-1">Specialties / Service Hashtags</label>
-          <input type="text" name="specialties" value="${safe(specialties)}"
-                 placeholder="Balayage, Color Correction, Lived-In Blonde"
+          <div id="spec-tags" class="flex flex-wrap gap-1.5 mb-2"></div>
+          <input type="text" id="spec-input"
+                 placeholder="Type a specialty, press Tab or Enter to add"
                  class="w-full rounded-xl border border-mpBorder px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mpAccent" />
-          <p class="text-[11px] text-mpMuted mt-0.5">Comma-separated. Used to enrich AI captions and add relevant hashtags.</p>
+          <input type="hidden" name="specialties" id="spec-hidden" />
+          <p class="text-[11px] text-mpMuted mt-0.5">Used to enrich AI captions and add relevant hashtags.</p>
         </div>
 
         <!-- Bio -->
@@ -652,6 +653,53 @@ function buildStylistForm({ salon_id, salonTone, stylist, isEdit }) {
           </a>
         </div>
       </div>
+
+      <script>
+        (function() {
+          const input = document.getElementById("spec-input");
+          const container = document.getElementById("spec-tags");
+          const hidden = document.getElementById("spec-hidden");
+          if (!input || !container || !hidden) return;
+
+          let tags = ${specialtiesJson};
+
+          function sync() { hidden.value = tags.join(", "); }
+
+          function renderTags() {
+            container.innerHTML = "";
+            tags.forEach((tag, i) => {
+              const chip = document.createElement("span");
+              chip.className = "inline-flex items-center gap-1 rounded-full bg-mpAccentLight border border-mpBorder px-3 py-1 text-xs text-mpCharcoal";
+              const lbl = document.createElement("span");
+              lbl.textContent = tag;
+              const rm = document.createElement("button");
+              rm.type = "button";
+              rm.textContent = "×";
+              rm.className = "text-mpMuted hover:text-red-400 leading-none";
+              rm.onclick = () => { tags.splice(i, 1); sync(); renderTags(); };
+              chip.appendChild(lbl);
+              chip.appendChild(rm);
+              container.appendChild(chip);
+            });
+          }
+
+          function addTag() {
+            const val = input.value.trim();
+            if (val && !tags.includes(val)) { tags.push(val); sync(); renderTags(); }
+            input.value = "";
+          }
+
+          input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === "Tab") {
+              if (input.value.trim()) { e.preventDefault(); addTag(); }
+            }
+          });
+
+          input.closest("form").addEventListener("submit", sync);
+          sync();
+          renderTags();
+        })();
+      </script>
 
       <!-- Tone reference card -->
       <div class="mt-6 rounded-2xl border border-mpBorder bg-white p-5 max-w-2xl">

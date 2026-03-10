@@ -939,7 +939,7 @@ router.get("/stylists", (req, res) => {
             <input
               type="text"
               id="specialty-input"
-              placeholder="Type a specialty and press Enter"
+              placeholder="Type a specialty, press Tab or Enter to add"
               class="w-full border border-mpBorder bg-white rounded-xl px-4 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent/20 focus:border-mpAccent"
             />
             <input type="hidden" name="specialties_json" id="specialties-json" />
@@ -1000,10 +1000,10 @@ router.get("/stylists", (req, res) => {
           }
 
           input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
+            if (e.key === "Enter" || e.key === "Tab") {
               const value = (input.value || "").trim();
               if (!value) return;
+              e.preventDefault();
               if (!specialties.includes(value)) {
                 specialties.push(value);
                 syncHidden();
