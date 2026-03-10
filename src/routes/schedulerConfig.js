@@ -321,7 +321,96 @@ router.get("/", requireAuth, (req, res) => {
         </div>
       </div>
 
-      <!-- Platform Daily Caps — bounded by plan tier -->
+      <!-- Platform Connections -->
+      <div class="rounded-2xl border border-mpBorder bg-white px-6 py-5 shadow-sm">
+        <h2 class="text-base font-bold text-mpCharcoal mb-1">Platform Connections</h2>
+        <p class="text-xs text-mpMuted mb-5">Active platforms your content publishes to. Connect additional platforms in Admin → Social Connections.</p>
+        <div class="space-y-3">
+
+          <!-- Facebook -->
+          <div class="flex items-center justify-between py-2.5 border-b border-mpBorder">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-[#1877F2]/10 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-[#1877F2]" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-mpCharcoal">Facebook</p>
+                <p class="text-[11px] text-mpMuted">${salon.facebook_page_id ? `Page ID: ${salon.facebook_page_id}` : "Not connected — set up in Admin → Social Connections"}</p>
+              </div>
+            </div>
+            <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold ${salon.facebook_page_id ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-100 text-gray-400 border border-gray-200"}">
+              ${salon.facebook_page_id ? "Connected" : "Not connected"}
+            </span>
+          </div>
+
+          <!-- Instagram -->
+          <div class="flex items-center justify-between py-2.5 border-b border-mpBorder">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-[#E1306C]/10 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-[#E1306C]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-mpCharcoal">Instagram</p>
+                <p class="text-[11px] text-mpMuted">${salon.instagram_handle ? `@${salon.instagram_handle}` : "Not connected — set up in Admin → Social Connections"}</p>
+              </div>
+            </div>
+            <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold ${salon.instagram_business_id ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-100 text-gray-400 border border-gray-200"}">
+              ${salon.instagram_business_id ? "Connected" : "Not connected"}
+            </span>
+          </div>
+
+          <!-- TikTok — Coming Soon -->
+          <div class="flex items-center justify-between py-2.5 border-b border-mpBorder opacity-60">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.95a8.16 8.16 0 004.77 1.52V7.03a4.85 4.85 0 01-1-.34z"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-mpCharcoal">TikTok</p>
+                <p class="text-[11px] text-mpMuted">Short-form video publishing — in development</p>
+              </div>
+            </div>
+            <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold bg-mpAccentLight text-mpAccent border border-mpAccent/20">
+              Coming Soon
+            </span>
+          </div>
+
+          <!-- Google My Business — Coming Soon -->
+          <div class="flex items-center justify-between py-2.5 border-b border-mpBorder opacity-60">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.2-7.27 3.09 0 4.9 1.97 4.9 1.97L19 4.72S16.56 2 12.1 2C6.42 2 2.03 6.8 2.03 12c0 5.05 4.13 10 10.22 10 5.35 0 9.25-3.67 9.25-9.09 0-1.15-.15-1.81-.15-1.81z"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-mpCharcoal">Google My Business</p>
+                <p class="text-[11px] text-mpMuted">Google Business posts — in development</p>
+              </div>
+            </div>
+            <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold bg-mpAccentLight text-mpAccent border border-mpAccent/20">
+              Coming Soon
+            </span>
+          </div>
+
+          <!-- Yelp — Coming Soon -->
+          <div class="flex items-center justify-between py-2.5 opacity-60">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M20.16 12.6l-4.25-1.06a1 1 0 00-1.1.5 1 1 0 00.17 1.18l3.14 2.98a1 1 0 001.48-.17 5.35 5.35 0 00.56-3.43zm-8.07 5.49l-1.5 4.08a1 1 0 00.6 1.28 9.4 9.4 0 003.6.43 1 1 0 00.85-1.08l-.39-4.32a1 1 0 00-.95-.91 1 1 0 00-1.21.52zm-3.12-2.5L4.9 17.47a1 1 0 00-.09 1.45 9.4 9.4 0 002.68 2.01 1 1 0 001.35-.43l2.01-3.8a1 1 0 00-.27-1.24 1 1 0 00-1.61.13zm-.32-4.46L4.4 9.77a1 1 0 00-1.31.58 9.4 9.4 0 00-.28 3.55 1 1 0 001.01.93l4.35-.16a1 1 0 00.94-.83 1 1 0 00-.46-1.21zM12 2a9.4 9.4 0 00-2.86.44 1 1 0 00-.64 1.23l1.38 4.16A1 1 0 0011 8.7a1 1 0 001.08-.33L14.87 4.8A1 1 0 0014.6 3.4 9.4 9.4 0 0012 2z"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-mpCharcoal">Yelp</p>
+                <p class="text-[11px] text-mpMuted">Yelp business updates — in development</p>
+              </div>
+            </div>
+            <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold bg-mpAccentLight text-mpAccent border border-mpAccent/20">
+              Coming Soon
+            </span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Platform Daily Caps — FB + IG only (active platforms) -->
       <div class="rounded-2xl border border-mpBorder bg-white px-6 py-5 shadow-sm">
         <div class="flex items-start justify-between gap-3 mb-1 flex-wrap">
           <h2 class="text-base font-bold text-mpCharcoal">Platform Daily Caps</h2>
@@ -331,10 +420,9 @@ router.get("/", requireAuth, (req, res) => {
         </div>
         <p class="text-xs text-mpMuted mb-5">
           Maximum feed posts per day per platform. You can set these as low as 1 — useful for quality control or slower periods.
-          The <strong>${planDef.label}</strong> plan allows up to ${planDef.max_daily}/day per platform.
           Stories and availability posts don't count against these limits.
         </p>
-        <div class="grid gap-6 sm:grid-cols-3">
+        <div class="grid gap-6 sm:grid-cols-2">
           <div>
             <label class="block text-xs font-semibold text-mpMuted mb-1.5">Instagram Feed (posts/day)</label>
             <input type="number" id="igCapInput" name="ig_feed_daily_max"
@@ -355,16 +443,6 @@ router.get("/", requireAuth, (req, res) => {
             <div class="mt-1.5 flex items-center justify-between text-[11px]">
               <span class="text-mpMuted">Plan max: ${planDef.max_daily}/day</span>
               <span class="text-mpMuted">Rec: 2–4</span>
-            </div>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-mpMuted mb-1.5">TikTok (posts/day)</label>
-            <input type="number" name="tiktok_daily_max"
-              value="${tkCap}" min="1" max="${planDef.max_daily}"
-              class="w-full rounded-lg border border-mpBorder px-3 py-2 text-sm text-mpCharcoal focus:border-mpAccent focus:outline-none" />
-            <div class="mt-1.5 flex items-center justify-between text-[11px]">
-              <span class="text-mpMuted">Plan max: ${planDef.max_daily}/day</span>
-              <span class="text-mpMuted">Rec: 2–3</span>
             </div>
           </div>
         </div>
@@ -620,7 +698,7 @@ router.post("/update", requireAuth, (req, res) => {
       spacing_max         = COALESCE(?, spacing_max),
       ig_feed_daily_max   = ?,
       fb_feed_daily_max   = ?,
-      tiktok_daily_max    = ?,
+      tiktok_daily_max    = COALESCE(?, tiktok_daily_max),
       fairness_window_min = COALESCE(?, fairness_window_min),
       content_priority    = COALESCE(?, content_priority),
       content_mix            = ?,
@@ -634,7 +712,7 @@ router.post("/update", requireAuth, (req, res) => {
     parseInt(spacing_max, 10) || null,
     clampCap(ig_feed_daily_max),
     clampCap(fb_feed_daily_max),
-    clampCap(tiktok_daily_max),
+    tiktok_daily_max != null ? clampCap(tiktok_daily_max) : null,
     parseInt(fairness_window_min, 10) >= 0 ? parseInt(fairness_window_min, 10) : null,
     priorityJson,
     Object.keys(contentMix).length ? JSON.stringify(contentMix) : null,
