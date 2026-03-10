@@ -572,7 +572,7 @@ router.get("/", requireAuth, (req, res) => {
           <h2 class="text-sm font-semibold text-mpCharcoal">Stock Photos</h2>
           <span class="text-[11px] text-mpMuted">${stockPhotos.length} photo${stockPhotos.length !== 1 ? "s" : ""}</span>
         </div>
-        <p class="text-[11px] text-mpMuted mb-4">Background images used for availability and promotion posts. Upload salon-wide photos here. To add photos for a specific stylist, use the <a href="/manager/stylists${qs}" class="text-mpAccent underline">Team → Edit Stylist → Photo Library</a> page.</p>
+        <p class="text-[11px] text-mpMuted mb-4">Background images used for availability and promotion posts. Upload salon-wide photos here. To add photos for a specific stylist, use the <a href="/manager/stylists?salon=${salon_id}" class="text-mpAccent underline">Team → Edit Stylist → Photo Library</a> page.</p>
 
         <div class="space-y-2 mb-5">
           ${photoCards}
