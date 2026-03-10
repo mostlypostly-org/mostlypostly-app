@@ -162,10 +162,11 @@ router.get("/", requireAuth, (req, res) => {
 
       function saveOrder() {
         const ids = [...list.querySelectorAll('.queue-card')].map(el => el.dataset.id);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
         flashStatus('Saving…', false);
         fetch('/manager/queue/reorder', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
           body: JSON.stringify({ ids }),
         })
         .then(r => r.json())

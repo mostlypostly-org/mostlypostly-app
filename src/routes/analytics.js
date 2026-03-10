@@ -329,13 +329,16 @@ router.get("/", (req, res) => {
     <div class="rounded-2xl bg-mpCharcoal text-white px-5 py-3 text-sm font-medium shadow-xl"></div>
   </div>
   <script>
+    const _csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const _postHeaders = { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrf };
+
     async function runBackfill() {
       const toast = document.getElementById('sync-toast');
       const msg = toast.querySelector('div');
       toast.classList.remove('hidden');
       msg.textContent = 'Backfilling FB post IDs...';
       try {
-        const res = await fetch('/analytics/backfill-fb-ids${qs}', { method: 'POST' });
+        const res = await fetch('/analytics/backfill-fb-ids${qs}', { method: 'POST', headers: _postHeaders });
         const data = await res.json();
         msg.textContent = res.ok
           ? 'Matched ' + data.matched + ' of ' + data.scanned + ' posts to FB IDs.'
@@ -356,7 +359,7 @@ router.get("/", (req, res) => {
       toast.classList.remove('hidden');
       msg.textContent = 'Resetting & relinking FB post IDs...';
       try {
-        const res = await fetch('/analytics/reset-and-backfill-fb-ids${qs}', { method: 'POST' });
+        const res = await fetch('/analytics/reset-and-backfill-fb-ids${qs}', { method: 'POST', headers: _postHeaders });
         const data = await res.json();
         msg.textContent = res.ok
           ? 'Cleared ' + data.cleared + ' IDs, fetched ' + data.fb_posts_fetched + ' FB posts, matched ' + data.matched + '.'
@@ -373,7 +376,7 @@ router.get("/", (req, res) => {
       const msg = toast.querySelector('div');
       if (btn) { btn.textContent = 'Syncing...'; btn.disabled = true; }
       try {
-        const res = await fetch('/analytics/sync${qs}', { method: 'POST' });
+        const res = await fetch('/analytics/sync${qs}', { method: 'POST', headers: _postHeaders });
         const data = await res.json();
         if (!res.ok) {
           msg.textContent = 'Error: ' + (data.error || 'unknown');
