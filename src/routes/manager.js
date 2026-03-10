@@ -8,6 +8,7 @@ import { getSalonName } from "../core/salonLookup.js";
 import { handleManagerApproval } from "../core/messageRouter.js";
 import { buildPromotionImage } from "../core/buildPromotionImage.js";
 import { getSalonPolicy } from "../scheduler.js";
+import { sendViaTwilio } from "./twilio.js";
 
 const router = express.Router();
 
@@ -324,18 +325,37 @@ router.get("/approve", requireAuth, async (req, res) => {
     return res.redirect("/manager");
   }
 
-  // 🔑 This does EVERYTHING:s
-  // - status = manager_approved
-  // - scheduled_for = now
-  // - stylist notification
-  // - scheduler eligibility
+  // Look up salon settings for notification prefs
+  const salonSettings = db.prepare(
+    `SELECT notify_on_approval, timezone FROM salons WHERE slug = ?`
+  ).get(pendingPost.salon_id);
+
+  // Approve and enqueue (no-op sendText — we handle notifications below)
   await handleManagerApproval(
     req.manager.phone || "dashboard",
     pendingPost,
-    (to, msg) => {
-      console.log("📤 Dashboard approval notify:", to);
-    }
+    async () => {} // suppress built-in SMS — we send below with correct content
   );
+
+  // Notify stylist if setting is enabled and they have a phone
+  if (salonSettings?.notify_on_approval && pendingPost.stylist_phone) {
+    try {
+      // Read scheduled_for set by enqueuePost
+      const updated = db.prepare(`SELECT scheduled_for FROM posts WHERE id = ?`).get(pendingPost.id);
+      let timeNote = "";
+      if (updated?.scheduled_for) {
+        const tz = salonSettings.timezone || "America/Indiana/Indianapolis";
+        const localTime = DateTime.fromSQL(updated.scheduled_for, { zone: "utc" }).setZone(tz);
+        timeNote = ` Scheduled for ${localTime.toFormat("cccc, MMM d 'at' h:mm a")} (${localTime.offsetNameShort}).`;
+      }
+      await sendViaTwilio(
+        pendingPost.stylist_phone,
+        `✅ Your post was approved by your manager!${timeNote} It will publish automatically during your salon's posting window.`
+      );
+    } catch (err) {
+      console.error("[Manager] Approval notify failed:", err.message);
+    }
+  }
 
   return res.redirect("/manager");
 });
@@ -429,8 +449,10 @@ router.get("/deny", requireAuth, (req, res) => {
 /* -------------------------------------------------------------
    DENY — SAVE
 ------------------------------------------------------------- */
-router.post("/deny", requireAuth, (req, res) => {
+router.post("/deny", requireAuth, async (req, res) => {
   const { post_id, reason } = req.body;
+
+  const post = db.prepare(`SELECT * FROM posts WHERE id = ?`).get(post_id);
 
   db.prepare(
     `UPDATE posts
@@ -438,7 +460,26 @@ router.post("/deny", requireAuth, (req, res) => {
          denial_reason=?,
          updated_at=datetime('now')
      WHERE id=?`
-  ).run(reason.trim(), post_id);
+  ).run((reason || "").trim(), post_id);
+
+  // Notify stylist if setting is enabled and they have a phone
+  if (post?.stylist_phone) {
+    const salonSettings = db.prepare(
+      `SELECT notify_on_denial FROM salons WHERE slug = ?`
+    ).get(post.salon_id);
+
+    if (salonSettings?.notify_on_denial) {
+      try {
+        const reasonText = (reason || "").trim();
+        const msg = reasonText
+          ? `Your post was not approved by your manager. Reason: "${reasonText}". Feel free to send a new photo to try again!`
+          : `Your post was not approved by your manager. Feel free to send a new photo to try again!`;
+        await sendViaTwilio(post.stylist_phone, msg);
+      } catch (err) {
+        console.error("[Manager] Denial notify failed:", err.message);
+      }
+    }
+  }
 
   return res.redirect("/manager");
 });
