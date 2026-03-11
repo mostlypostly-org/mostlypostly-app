@@ -66,7 +66,7 @@ router.get("/checkout", requireAuth, async (req, res) => {
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
     subscription_data: {
-      ...(offerTrial ? { trial_period_days: 14 } : {}),
+      ...(offerTrial ? { trial_period_days: 7 } : {}),
       metadata: { salon_id, plan, cycle },
     },
     success_url: `${PUBLIC_BASE_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}${offerTrial ? "&trial=1" : ""}${salon.status === "setup_incomplete" ? "&new=1" : ""}`,
@@ -107,7 +107,7 @@ router.get("/success", requireAuth, (req, res) => {
   }
 
   const trialMsg = hasTrial
-    ? `Your 14-day free trial is active. No charge until your trial ends.<br/>We'll send a reminder before your first billing date.`
+    ? `Your 7-day free trial is active. No charge until your trial ends.<br/>We'll send a reminder before your first billing date.`
     : `Your subscription is now active. Thank you for choosing MostlyPostly!`;
 
   res.send(pageShell({
@@ -351,7 +351,7 @@ router.get("/manager/billing", requireAuth, async (req, res) => {
           </div>
           <div>
             <p class="text-sm font-bold text-mpCharcoal">Account created! Choose your plan to continue.</p>
-            <p class="text-xs text-mpMuted mt-0.5">Select a plan below and enter your card details. Your 14-day free trial starts immediately — no charge until it ends.</p>
+            <p class="text-xs text-mpMuted mt-0.5">Select a plan below and enter your card details. Your 7-day free trial starts immediately — no charge until it ends.</p>
           </div>
         </div>` : ""}
 
@@ -421,7 +421,7 @@ router.get("/manager/billing", requireAuth, async (req, res) => {
           <div class="grid gap-4 sm:grid-cols-3">
             ${planCards}
           </div>
-          <p class="mt-4 text-xs text-mpMuted">${salon.trial_used ? "Cancel anytime." : "New accounts include a 14-day free trial. Cancel anytime."}</p>
+          <p class="mt-4 text-xs text-mpMuted">${salon.trial_used ? "Cancel anytime." : "New accounts include a 7-day free trial. Cancel anytime."}</p>
         </div>
 
         ${planHint ? `<script>
@@ -495,7 +495,7 @@ export async function stripeWebhookHandler(req, res) {
         } catch {}
 
         const newStatus   = hasTrialFromStripe ? "trialing" : "active";
-        const trialEndSql = hasTrialFromStripe ? `datetime('now', '+14 days')` : "NULL";
+        const trialEndSql = hasTrialFromStripe ? `datetime('now', '+7 days')` : "NULL";
 
         db.prepare(`
           UPDATE salons SET

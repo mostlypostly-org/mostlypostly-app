@@ -652,7 +652,7 @@ router.post("/signup", (req, res, next) => salonLogoUpload(req, res, next), asyn
     // Send founder promo code via SMS if configured (fire-and-forget)
     const promoCode = process.env.FOUNDER_PROMO_CODE;
     if (promoCode && phone) {
-      sendViaTwilio(phone, `Welcome to MostlyPostly! Your 14-day free trial starts when you select a plan. As a founding member, use promo code ${promoCode} at checkout to lock in your founder rate. Questions? Reply here anytime.`).catch(smsErr => {
+      sendViaTwilio(phone, `Welcome to MostlyPostly! Your 7-day free trial starts when you select a plan. As a founding member, use promo code ${promoCode} at checkout to lock in your founder rate. Questions? Reply here anytime.`).catch(smsErr => {
         console.warn("[signup] Promo SMS failed:", smsErr.message);
       });
     }
