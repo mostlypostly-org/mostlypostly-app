@@ -168,8 +168,8 @@ function pageTemplate({ step, stepLabel, content }) {
             colors: {
               mpCharcoal:     "#2B2D35",
               mpCharcoalDark: "#1a1c22",
-              mpAccent:       "#D4897A",
-              mpAccentLight:  "#F2DDD9",
+              mpAccent:       "#3B72B9",
+              mpAccentLight:  "#EBF3FF",
               mpBg:           "#FDF8F6",
               mpCard:         "#FFFFFF",
               mpBorder:       "#EDE7E4",
@@ -200,7 +200,7 @@ function pageTemplate({ step, stepLabel, content }) {
         <div class="mb-4">
           <div style="font-size:12px;font-weight:600;color:#7A7C85;margin-bottom:8px;">Step ${step} of 7</div>
           <div style="width:100%;background:#EDE7E4;height:6px;border-radius:99px;overflow:hidden;">
-            <div style="background:#D4897A;height:6px;border-radius:99px;width:${Math.round((step / 7) * 100)}%;transition:width 0.3s;"></div>
+            <div style="background:#3B72B9;height:6px;border-radius:99px;width:${Math.round((step / 7) * 100)}%;transition:width 0.3s;"></div>
           </div>
         </div>
 
@@ -516,7 +516,7 @@ router.get("/brand", async (req, res) => {
     ` : `
       <p class="text-sm mb-5" style="color:#7A7C85;">
         ${salon.website
-          ? `We couldn't automatically extract colors from <span style="font-family:monospace;color:#D4897A;">${salon.website}</span>.`
+          ? `We couldn't automatically extract colors from <span style="font-family:monospace;color:#3B72B9;">${salon.website}</span>.`
           : `No website set — colors couldn't be auto-extracted.`}
         Enter your brand colors manually below, or skip to set them later in Admin.
       </p>
@@ -949,7 +949,7 @@ router.get("/stylists", (req, res) => {
         </form>
 
         <form method="POST" action="/onboarding/review">
-          <button style="width:100%;background:#D4897A;color:#fff;font-weight:700;padding:12px;border-radius:999px;border:none;font-size:14px;cursor:pointer;margin-top:24px;">
+          <button style="width:100%;background:#3B72B9;color:#fff;font-weight:700;padding:12px;border-radius:999px;border:none;font-size:14px;cursor:pointer;margin-top:24px;">
             Continue to Review →
           </button>
         </form>
@@ -1227,7 +1227,7 @@ router.get("/review", (req, res) => {
         </div>
 
         <form method="POST" action="/onboarding/complete">
-          <button style="width:100%;background:#D4897A;color:#fff;font-weight:700;padding:12px;border-radius:999px;border:none;font-size:14px;cursor:pointer;margin-top:24px;">
+          <button style="width:100%;background:#3B72B9;color:#fff;font-weight:700;padding:12px;border-radius:999px;border:none;font-size:14px;cursor:pointer;margin-top:24px;">
             Finish & Activate Salon →
           </button>
         </form>

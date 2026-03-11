@@ -44,7 +44,7 @@ router.get("/login", (req, res) => {
   const { exists, reset } = req.query || {};
   const banner = exists === "1"
     ? `<div style="background:#FFF0EE;border:1px solid #F2C4BB;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#A0443A;">
-        An account with that email already exists. <a href="/manager/login" style="color:#D4897A;font-weight:700;">Log in instead</a>
+        An account with that email already exists. <a href="/manager/login" style="color:#3B72B9;font-weight:700;">Log in instead</a>
        </div>`
     : reset === "success"
     ? `<div style="background:#EFF9F5;border:1px solid #B2DFC8;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#1E6645;">
@@ -91,7 +91,7 @@ router.get("/login", (req, res) => {
       content: '';
       position: absolute;
       inset: 0;
-      background-image: radial-gradient(circle, rgba(212,137,122,0.18) 1px, transparent 1px);
+      background-image: radial-gradient(circle, rgba(59,114,185,0.18) 1px, transparent 1px);
       background-size: 28px 28px;
       pointer-events: none;
     }
@@ -102,7 +102,7 @@ router.get("/login", (req, res) => {
       position: absolute;
       width: 400px; height: 400px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(212,137,122,0.22) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(59,114,185,0.22) 0%, transparent 70%);
       bottom: -100px; right: -100px;
       pointer-events: none;
     }
@@ -136,7 +136,7 @@ router.get("/login", (req, res) => {
       align-items: center;
       gap: 6px;
     }
-    .stat-dot { width: 6px; height: 6px; border-radius: 50%; background: #D4897A; }
+    .stat-dot { width: 6px; height: 6px; border-radius: 50%; background: #3B72B9; }
 
     /* Activity chart card */
     .chart-card {
@@ -174,10 +174,10 @@ router.get("/login", (req, res) => {
     .bar {
       width: 100%;
       border-radius: 5px 5px 0 0;
-      background: rgba(212,137,122,0.35);
+      background: rgba(59,114,185,0.35);
       transition: background 0.2s;
     }
-    .bar.active { background: #D4897A; }
+    .bar.active { background: #3B72B9; }
     .bar-day {
       font-size: 9px;
       font-weight: 600;
@@ -196,8 +196,8 @@ router.get("/login", (req, res) => {
     .chart-badge {
       font-size: 10px;
       font-weight: 700;
-      background: rgba(212,137,122,0.2);
-      color: #D4897A;
+      background: rgba(59,114,185,0.2);
+      color: #3B72B9;
       border-radius: 999px;
       padding: 4px 10px;
     }
@@ -220,7 +220,7 @@ router.get("/login", (req, res) => {
       border: 1px solid #EDE7E4; background: #FDF8F6;
       font-size: 14px; color: #2B2D35; margin-bottom: 16px; font-family: inherit;
     }
-    .input-box:focus { border-color: #D4897A; outline: none; box-shadow: 0 0 0 3px rgba(212,137,122,0.15); }
+    .input-box:focus { border-color: #3B72B9; outline: none; box-shadow: 0 0 0 3px rgba(59,114,185,0.15); }
     .login-btn {
       background: #2B2D35; color: #fff; font-weight: 700; border-radius: 999px;
       padding: 13px 0; width: 100%; font-size: 14px; border: none;
@@ -229,7 +229,7 @@ router.get("/login", (req, res) => {
     .login-btn:hover { background: #1a1c22; }
     .divider { border: none; border-top: 1px solid #EDE7E4; margin: 22px 0; }
     .footer-links { text-align: center; font-size: 13px; color: #7A7C85; }
-    .footer-links a { color: #D4897A; font-weight: 600; text-decoration: none; }
+    .footer-links a { color: #3B72B9; font-weight: 600; text-decoration: none; }
     .footer-links a:hover { text-decoration: underline; }
     .forgot { display: block; text-align: center; font-size: 12px; color: #7A7C85; margin-top: 12px; }
     .forgot:hover { color: #2B2D35; }
@@ -346,12 +346,12 @@ router.get("/signup", (req, res) => {
     }
     .left-panel::before {
       content: ''; position: absolute; inset: 0;
-      background-image: radial-gradient(circle, rgba(212,137,122,0.18) 1px, transparent 1px);
+      background-image: radial-gradient(circle, rgba(59,114,185,0.18) 1px, transparent 1px);
       background-size: 28px 28px; pointer-events: none;
     }
     .left-panel::after {
       content: ''; position: absolute; width: 400px; height: 400px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(212,137,122,0.22) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(59,114,185,0.22) 0%, transparent 70%);
       bottom: -100px; right: -100px; pointer-events: none;
     }
     .left-logo { width: 320px; height: auto; filter: brightness(0) invert(1); position: relative; z-index: 1; }
@@ -378,10 +378,10 @@ router.get("/signup", (req, res) => {
       border: 1px solid #EDE7E4; background: #FDF8F6;
       font-size: 14px; color: #2B2D35; margin-bottom: 16px; font-family: inherit;
     }
-    .input-box:focus { border-color: #D4897A; outline: none; box-shadow: 0 0 0 3px rgba(212,137,122,0.15); }
+    .input-box:focus { border-color: #3B72B9; outline: none; box-shadow: 0 0 0 3px rgba(59,114,185,0.15); }
     .check-row { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #7A7C85; margin-bottom: 12px; }
-    .check-row input { margin-top: 2px; accent-color: #D4897A; }
-    .check-row a { color: #D4897A; font-weight: 600; text-decoration: none; }
+    .check-row input { margin-top: 2px; accent-color: #3B72B9; }
+    .check-row a { color: #3B72B9; font-weight: 600; text-decoration: none; }
     .check-row a:hover { text-decoration: underline; }
     .signup-btn {
       background: #2B2D35; color: #fff; font-weight: 700; border-radius: 999px;
@@ -391,7 +391,7 @@ router.get("/signup", (req, res) => {
     .signup-btn:hover { background: #1a1c22; }
     .divider { border: none; border-top: 1px solid #EDE7E4; margin: 20px 0; }
     .footer-links { text-align: center; font-size: 13px; color: #7A7C85; }
-    .footer-links a { color: #D4897A; font-weight: 600; text-decoration: none; }
+    .footer-links a { color: #3B72B9; font-weight: 600; text-decoration: none; }
     .footer-links a:hover { text-decoration: underline; }
 
     @media(max-width: 768px) {
@@ -699,11 +699,11 @@ router.get("/check-your-email", (req, res) => {
     .icon{font-size:48px;margin-bottom:20px;}
     h1{font-size:22px;font-weight:800;margin-bottom:8px;}
     .sub{font-size:14px;color:#7A7C85;line-height:1.6;margin-bottom:28px;}
-    .email-badge{background:#F2DDD9;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;color:#2B2D35;display:inline-block;margin-bottom:28px;}
+    .email-badge{background:#EBF3FF;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;color:#2B2D35;display:inline-block;margin-bottom:28px;}
     .resend-form{margin-top:8px;}
-    .resend-btn{background:none;border:none;color:#D4897A;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline;}
+    .resend-btn{background:none;border:none;color:#3B72B9;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline;}
     .success{font-size:13px;color:#059669;font-weight:600;margin-top:8px;}
-    .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:#D4897A;margin-right:6px;animation:pulse 1.5s ease-in-out infinite;}
+    .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:#3B72B9;margin-right:6px;animation:pulse 1.5s ease-in-out infinite;}
     @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(0.8);}}
     .waiting{font-size:12px;color:#7A7C85;margin-top:16px;display:flex;align-items:center;justify-content:center;}
   </style>
@@ -793,7 +793,7 @@ router.get("/verify-email", async (req, res) => {
     <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Plus Jakarta Sans',sans-serif;background:#FDF8F6;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
     .card{background:#fff;border:1px solid #EDE7E4;border-radius:20px;padding:48px 40px;max-width:420px;text-align:center;}
     h1{font-size:20px;font-weight:800;margin-bottom:12px;}p{font-size:14px;color:#7A7C85;margin-bottom:20px;}
-    a{color:#D4897A;font-weight:600;}</style></head>
+    a{color:#3B72B9;font-weight:600;}</style></head>
     <body><div class="card"><div style="font-size:40px;margin-bottom:16px;">⚠️</div>
     <h1>Link expired or already used</h1>
     <p>This verification link is no longer valid. Please sign in and request a new one.</p>
@@ -920,7 +920,7 @@ router.get("/forgot-password", (req, res) => {
 
   const cardContent = sent ? `
     <div style="text-align:center;padding:8px 0 24px;">
-      <div style="width:56px;height:56px;border-radius:50%;background:#F2DDD9;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:26px;">📱</div>
+      <div style="width:56px;height:56px;border-radius:50%;background:#EBF3FF;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:26px;">📱</div>
       <h1 style="font-size:22px;font-weight:800;color:#2B2D35;margin-bottom:8px;">Check your texts</h1>
       <p style="font-size:13px;color:#7A7C85;line-height:1.6;margin-bottom:24px;">If an account exists for that email, we texted a secure reset link to the phone number on file. It expires in 45 minutes.</p>
       <a href="/manager/login" style="display:inline-block;background:#2B2D35;color:#fff;font-weight:700;border-radius:999px;padding:12px 28px;font-size:14px;text-decoration:none;">Back to Login</a>

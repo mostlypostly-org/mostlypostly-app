@@ -318,7 +318,7 @@ router.get("/", (req, res) => {
         <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-2">
           <button
             type="submit"
-            class="inline-flex items-center justify-center rounded-full bg-mpAccent px-4 py-1.5 text-xs font-semibold text-white shadow-md hover:bg-[#c47867]"
+            class="inline-flex items-center justify-center rounded-full bg-mpAccent px-4 py-1.5 text-xs font-semibold text-white shadow-md hover:bg-[#2E5E9E]"
           >
             Apply Filters
           </button>

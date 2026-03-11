@@ -58,7 +58,7 @@ function mfaShell(title, content) {
     p { font-size: 13px; color: #7A7C85; line-height: 1.6; margin-bottom: 16px; }
     label { display: block; font-size: 12px; font-weight: 600; color: #2B2D35; margin-bottom: 5px; }
     input[type=text], input[type=password] { width: 100%; border-radius: 10px; padding: 11px 14px; border: 1px solid #EDE7E4; background: #FDF8F6; font-size: 14px; color: #2B2D35; margin-bottom: 16px; font-family: inherit; }
-    input[type=text]:focus, input[type=password]:focus { outline: none; border-color: #D4897A; }
+    input[type=text]:focus, input[type=password]:focus { outline: none; border-color: #3B72B9; }
     .btn { background: #2B2D35; color: #fff; font-weight: 700; border-radius: 999px; padding: 13px 0; width: 100%; font-size: 14px; border: none; cursor: pointer; font-family: inherit; }
     .btn:hover { background: #1a1c22; }
     .btn-ghost { background: transparent; color: #7A7C85; border: 1px solid #EDE7E4; margin-top: 10px; }
@@ -168,7 +168,7 @@ router.post("/setup", requireAuth, (req, res) => {
       <h1>MFA enabled! ✅</h1>
       <p>Two-factor authentication is now active on your account. Save these backup codes somewhere safe — each can only be used once if you lose access to your authenticator app.</p>
       <div class="backup-grid">${codesHtml}</div>
-      <p style="font-size:11px;color:#D4897A;font-weight:600;">These codes won't be shown again. Screenshot or write them down now.</p>
+      <p style="font-size:11px;color:#3B72B9;font-weight:600;">These codes won't be shown again. Screenshot or write them down now.</p>
       <a href="/manager/admin" class="btn" style="display:block;text-align:center;text-decoration:none;margin-top:16px;">Done — Go to Admin →</a>
     `));
   });

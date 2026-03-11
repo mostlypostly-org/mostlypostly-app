@@ -94,7 +94,7 @@ export async function sendVerificationEmail({ to, name, token }) {
         </p>
         <p style="margin:0;font-size:12px;color:#7A7C85;">
           Or copy this URL into your browser:<br />
-          <a href="${verifyUrl}" style="color:#D4897A;word-break:break-all;">${verifyUrl}</a>
+          <a href="${verifyUrl}" style="color:#3B72B9;word-break:break-all;">${verifyUrl}</a>
         </p>
       `,
     }),
@@ -137,7 +137,7 @@ export async function sendWelcomeEmail({ to, name, salonName }) {
           `).join("")}
         </table>
         <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
-          <tr><td style="background:#D4897A;border-radius:999px;padding:14px 32px;">
+          <tr><td style="background:#3B72B9;border-radius:999px;padding:14px 32px;">
             <a href="${dashUrl}" style="color:#fff;font-size:14px;font-weight:700;text-decoration:none;display:block;">
               Go to my dashboard →
             </a>
@@ -145,7 +145,7 @@ export async function sendWelcomeEmail({ to, name, salonName }) {
         </table>
         <p style="margin:0;font-size:12px;color:#7A7C85;line-height:1.6;">
           Questions? Reply to this email or reach us at
-          <a href="mailto:support@mostlypostly.com" style="color:#D4897A;">support@mostlypostly.com</a> — we're here to help.
+          <a href="mailto:support@mostlypostly.com" style="color:#3B72B9;">support@mostlypostly.com</a> — we're here to help.
         </p>
       `,
     }),
@@ -168,7 +168,7 @@ export async function sendCancellationEmail({ to, name, accessEndsAt }) {
         <p style="margin:0 0 16px;font-size:14px;color:#7A7C85;line-height:1.6;">
           Hi ${name || "there"}, your MostlyPostly subscription has been cancelled.
         </p>
-        <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;background:#F2DDD9;border-radius:12px;">
+        <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;background:#EBF3FF;border-radius:12px;">
           <tr><td style="padding:20px 24px;">
             <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#2B2D35;text-transform:uppercase;letter-spacing:0.05em;">Your access continues until</p>
             <p style="margin:0;font-size:20px;font-weight:800;color:#2B2D35;">${formattedDate}</p>
@@ -186,7 +186,7 @@ export async function sendCancellationEmail({ to, name, accessEndsAt }) {
         </table>
         <p style="margin:0;font-size:12px;color:#7A7C85;line-height:1.6;">
           Changed your mind? You can reactivate anytime from your billing page. Questions? Email us at
-          <a href="mailto:support@mostlypostly.com" style="color:#D4897A;">support@mostlypostly.com</a>.
+          <a href="mailto:support@mostlypostly.com" style="color:#3B72B9;">support@mostlypostly.com</a>.
         </p>
       `,
     }),

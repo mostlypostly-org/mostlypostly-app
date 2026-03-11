@@ -159,7 +159,7 @@ router.get("/callback", async (req, res) => {
   <div style="width:100%;max-width:440px;background:#fff;border-radius:20px;padding:40px 36px;box-shadow:0 4px 32px rgba(43,45,53,0.08);border:1px solid #EDE7E4;text-align:center;">
     <img src="/public/logo/logo-trimmed.png" alt="MostlyPostly" style="width:240px;height:auto;margin-bottom:28px;" />
 
-    <div style="width:60px;height:60px;border-radius:50%;background:#F2DDD9;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:28px;">✓</div>
+    <div style="width:60px;height:60px;border-radius:50%;background:#EBF3FF;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:28px;">✓</div>
 
     <h1 style="font-size:22px;font-weight:800;color:#2B2D35;margin-bottom:8px;">Facebook Connected!</h1>
     <p style="font-size:13px;color:#7A7C85;margin-bottom:24px;line-height:1.6;">Your Facebook page and Instagram account have been linked to your salon.</p>

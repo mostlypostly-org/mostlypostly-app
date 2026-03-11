@@ -54,8 +54,8 @@ function shell(title, body) {
       theme: {
         extend: {
           colors: {
-            mpCharcoal: "#2B2D35", mpAccent: "#D4897A",
-            mpAccentLight: "#F2DDD9", mpBg: "#FDF8F6",
+            mpCharcoal: "#2B2D35", mpAccent: "#3B72B9",
+            mpAccentLight: "#EBF3FF", mpBg: "#FDF8F6",
             mpBorder: "#EDE7E4", mpMuted: "#7A7C85",
           }
         }

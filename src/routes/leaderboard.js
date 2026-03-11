@@ -25,7 +25,7 @@ function esc(s) {
 const medals = ["🥇", "🥈", "🥉"];
 
 // Podium platform colors: 2nd=charcoal, 1st=coral, 3rd=warm gray
-const platColors = ["#2B2D35", "#D4897A", "#A8A09C"];
+const platColors = ["#2B2D35", "#3B72B9", "#A8A09C"];
 
 router.get("/:token", (req, res) => {
   const salon = getSalonByLeaderboardToken(req.params.token);
@@ -62,7 +62,7 @@ router.get("/:token", (req, res) => {
       <div class="flex flex-col items-center gap-2 flex-1">
         <div class="text-4xl">${medal}</div>
         <div class="${nameSz} font-extrabold text-center leading-tight" style="color:#2B2D35">${esc(s.stylist_name)}</div>
-        <div class="${ptSz} font-black" style="color:#D4897A">${s.points}<span class="text-base font-semibold ml-1" style="color:#9CA3AF">pts</span></div>
+        <div class="${ptSz} font-black" style="color:#3B72B9">${s.points}<span class="text-base font-semibold ml-1" style="color:#9CA3AF">pts</span></div>
         <div class="text-xs" style="color:#7A7C85">${s.post_count} post${s.post_count !== 1 ? "s" : ""}${s.streak > 1 ? ` · 🔥 ${s.streak}wk` : ""}</div>
         <div class="w-full ${height} rounded-t-2xl" style="background:${platColor}"></div>
       </div>`;
@@ -73,7 +73,7 @@ router.get("/:token", (req, res) => {
     <div class="flex items-center gap-4 py-3 border-b last:border-0" style="border-color:#E5DCDA">
       <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white" style="background:#2B2D35">${s.rank}</span>
       <span class="flex-1 text-lg font-semibold" style="color:#2B2D35">${esc(s.stylist_name)}</span>
-      <span class="font-bold text-xl" style="color:#D4897A">${s.points} <span class="text-xs font-normal" style="color:#9CA3AF">pts</span></span>
+      <span class="font-bold text-xl" style="color:#3B72B9">${s.points} <span class="text-xs font-normal" style="color:#9CA3AF">pts</span></span>
       <span class="text-sm w-20 text-right" style="color:#7A7C85">${s.post_count} posts</span>
       ${s.streak > 1 ? `<span class="text-sm w-16 text-right" style="color:#7A7C85">🔥 ${s.streak}wk</span>` : `<span class="w-16"></span>`}
     </div>`).join("");
@@ -129,9 +129,9 @@ router.get("/:token", (req, res) => {
     </div>
     <div style="display:flex;align-items:center;gap:1.5rem;">
       ${bonusActive ? `
-      <div class="pulse-slow" style="display:flex;align-items:center;gap:.5rem;border-radius:9999px;border:1px solid rgba(212,137,122,0.4);background:rgba(212,137,122,0.12);padding:.625rem 1.25rem;">
+      <div class="pulse-slow" style="display:flex;align-items:center;gap:.5rem;border-radius:9999px;border:1px solid rgba(59,114,185,0.4);background:rgba(59,114,185,0.12);padding:.625rem 1.25rem;">
         <span style="font-size:1.25rem">🎯</span>
-        <span style="font-size:14px;font-weight:700;color:#D4897A">${multiplier}× DOUBLE POINTS ACTIVE</span>
+        <span style="font-size:14px;font-weight:700;color:#3B72B9">${multiplier}× DOUBLE POINTS ACTIVE</span>
       </div>` : ""}
       <div style="text-align:right;">
         <p style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9CA3AF">Powered by</p>

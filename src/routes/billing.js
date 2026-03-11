@@ -330,7 +330,7 @@ router.get("/manager/billing", requireAuth, async (req, res) => {
                 data-annual="/billing/checkout?plan=${p}&cycle=annual"
                 href="/billing/checkout?plan=${p}&cycle=monthly"
                 class="plan-checkout-btn mt-5 block text-center rounded-full text-xs font-bold py-2.5 transition-colors
-                  ${dark ? "bg-mpAccent text-white hover:bg-[#c47867] shadow-lg" : "border-2 border-mpCharcoal bg-white text-mpCharcoal hover:bg-mpBg"}">
+                  ${dark ? "bg-mpAccent text-white hover:bg-[#2E5E9E] shadow-lg" : "border-2 border-mpCharcoal bg-white text-mpCharcoal hover:bg-mpBg"}">
                 Select ${p.charAt(0).toUpperCase() + p.slice(1)} →
              </a>`
         }
@@ -441,7 +441,7 @@ router.get("/manager/billing", requireAuth, async (req, res) => {
             const la      = document.getElementById('label-annual');
 
             thumb.style.transform  = isAnnual ? 'translateX(1.375rem)' : 'translateX(0.25rem)';
-            toggle.style.background = isAnnual ? '#D4897A' : '';
+            toggle.style.background = isAnnual ? '#3B72B9' : '';
             lm.className = 'text-xs font-semibold ' + (isAnnual ? 'text-mpMuted' : 'text-mpCharcoal');
             la.className = 'text-xs font-semibold ' + (isAnnual ? 'text-mpCharcoal' : 'text-mpMuted');
 

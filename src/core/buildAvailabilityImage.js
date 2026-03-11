@@ -138,8 +138,8 @@ function buildOverlaySvg({ slots, stylistName, salonName, bookingCta, instagramH
   const font = `'Open Sans', Arial, Helvetica, sans-serif`;
 
   // Brand palette with sensible defaults
-  const ACCENT  = palette?.cta    || palette?.accent || "#D4897A";
-  const LIGHT   = palette?.accent_light || "#F2DDD9";
+  const ACCENT  = palette?.cta    || palette?.accent || "#3B72B9";
+  const LIGHT   = palette?.accent_light || "#EBF3FF";
 
   // Layout: glass panel starts at 55% down — photo visible in top half
   const PANEL_Y     = Math.round(H * 0.52);

@@ -81,8 +81,8 @@ export default function pageShell({
           colors: {
             mpCharcoal:     "#2B2D35",
             mpCharcoalDark: "#1a1c22",
-            mpAccent:       "#D4897A",
-            mpAccentLight:  "#F2DDD9",
+            mpAccent:       "#3B72B9",
+            mpAccentLight:  "#EBF3FF",
             mpBg:           "#FDF8F6",
             mpCard:         "#FFFFFF",
             mpBorder:       "#EDE7E4",

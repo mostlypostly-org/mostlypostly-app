@@ -17,7 +17,7 @@ const CANVAS_SIZE = 1080;
 const LOGO_SIZE   = 180;  // logo width in top-right corner
 
 // Brand colors (fallback if salon has no palette)
-const ACCENT_COLOR = "#D4897A";
+const ACCENT_COLOR = "#3B72B9";
 const DARK_COLOR   = "#2B2D35";
 
 /**

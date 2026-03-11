@@ -67,8 +67,8 @@ async function pickBackground(salonId, stylistId) {
 }
 
 function buildOverlaySvg({ salonName, product, discount, specialText, expiresLabel, palette }) {
-  const ACCENT  = palette?.cta    || palette?.accent || "#D4897A";
-  const LIGHT   = palette?.accent_light || "#F2DDD9";
+  const ACCENT  = palette?.cta    || palette?.accent || "#3B72B9";
+  const LIGHT   = palette?.accent_light || "#EBF3FF";
   const DARK    = palette?.primary || "#2B2D35";
 
   // Layout: large photo up top, dark glass panel bottom ~50%
