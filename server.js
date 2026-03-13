@@ -187,12 +187,6 @@ app.use("/manager/reset-password",  resetLimiter);
 app.use("/integrations/webhook",    webhookLimiter);
 app.use("/api",                     apiLimiter);
 
-// Correct Admin modal template loader (must come BEFORE ANY /manager routes)
-app.get("/manager/admin/templates", (req, res) => {
-  const templatePath = path.join(__dirname, "public", "admin-templates.html");
-  console.log("🔥 HIT /manager/admin/templates", templatePath);
-  res.sendFile(templatePath);
-});
 
 
 // Static assets
