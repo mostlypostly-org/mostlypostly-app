@@ -24,7 +24,7 @@ function safe(s) {
 router.get("/", requireAuth, (req, res) => {
   const { manager_id, salon_id } = req.session;
   const mgr = db.prepare(
-    "SELECT id, name, email, phone, role, email_verified FROM managers WHERE id = ? AND salon_id = ?"
+    "SELECT id, name, email, phone, role, email_verified, instagram_handle FROM managers WHERE id = ? AND salon_id = ?"
   ).get(manager_id, salon_id);
   if (!mgr) return res.redirect("/manager/login");
 
@@ -60,15 +60,24 @@ router.get("/", requireAuth, (req, res) => {
 
     <div class="space-y-5 max-w-2xl">
 
-      ${card("Personal Info", "Your name as shown to stylists and in notifications.",`
+      ${card("Personal Info", "Your name and Instagram handle used on posts you send via SMS.",`
         <form method="POST" action="/manager/profile/name">
           <div class="mb-4">
             <label class="${labelCls}">Full Name</label>
             <input type="text" name="name" value="${safe(mgr.name || "")}" required
               class="${inputCls}" />
           </div>
+          <div class="mb-4">
+            <label class="${labelCls}">Instagram Handle</label>
+            <div class="flex items-center gap-1">
+              <span class="text-sm text-mpMuted">@</span>
+              <input type="text" name="instagram_handle" value="${safe((mgr.instagram_handle || "").replace(/^@/, ""))}"
+                placeholder="yourhandle" class="${inputCls}" />
+            </div>
+            <p class="text-[11px] text-mpMuted mt-1">Used as the "Styled by @handle" credit on Instagram posts you submit.</p>
+          </div>
           <button type="submit" class="rounded-full bg-mpCharcoal px-5 py-2 text-xs font-bold text-white hover:bg-mpCharcoalDark transition-colors">
-            Save Name
+            Save
           </button>
         </form>
       `)}
@@ -168,9 +177,10 @@ router.post("/name", requireAuth, (req, res) => {
   const { manager_id, salon_id } = req.session;
   const name = (req.body.name || "").trim();
   if (!name) return res.redirect("/manager/profile?error=Name+cannot+be+empty");
-  db.prepare("UPDATE managers SET name = ?, updated_at = datetime('now') WHERE id = ? AND salon_id = ?")
-    .run(name, manager_id, salon_id);
-  res.redirect("/manager/profile?success=Name+updated");
+  const ig = (req.body.instagram_handle || "").trim().replace(/^@+/, "");
+  db.prepare("UPDATE managers SET name = ?, instagram_handle = ?, updated_at = datetime('now') WHERE id = ? AND salon_id = ?")
+    .run(name, ig || null, manager_id, salon_id);
+  res.redirect("/manager/profile?success=Profile+updated");
 });
 
 // ─── POST /manager/profile/email ─────────────────────────────────────────────

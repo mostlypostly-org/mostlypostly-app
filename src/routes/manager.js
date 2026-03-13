@@ -41,7 +41,6 @@ async function ensurePublicImageUrls(p) {
 
 // Placeholder shown when an image URL is broken/expired
 const BROKEN_IMG_PLACEHOLDER = `
-  style="display:none" onload="this.style.display='';this.nextElementSibling.style.display='none'"
   onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
 `;
 function placeholderDiv(cls) {
