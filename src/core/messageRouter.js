@@ -34,7 +34,6 @@ import { buildBeforeAfterCollage } from "./buildBeforeAfterCollage.js";
 import { buildAvailabilityImage } from "./buildAvailabilityImage.js";
 // 🧠 Import moderation utility directly
 import moderateAIOutput from "../utils/moderation.js";
-import { rehostTwilioMedia } from "../utils/rehostTwilioMedia.js";
 import { sendQuickStart } from "./stylistWelcome.js";
 console.log("[Router Debug] moderateAIOutput type:", typeof moderateAIOutput);
 
@@ -397,28 +396,15 @@ async function processNewImageFlow({
   const imageUrl = imageUrls[0] || null;
   console.log(`📸 [Router] New image(s) received (consented): ${imageUrls.length} image(s)`);
 
-  // 0️⃣ Re-host all Twilio media URLs so OpenAI can access them (Twilio URLs require Basic Auth)
-  const salonSlug = salon?.slug || salon?.salon_id || "";
-  let resolvedImageUrls = imageUrls;
-  try {
-    resolvedImageUrls = await Promise.all(
-      imageUrls.map((url) => rehostTwilioMedia(url, salonSlug))
-    );
-    console.log(`✅ [Router] Rehosted ${resolvedImageUrls.length} image(s)`);
-  } catch (err) {
-    console.warn("⚠️ [Router] rehostTwilioMedia failed, using original URLs:", err.message);
-  }
-  const resolvedImageUrl = resolvedImageUrls[0] || null;
-
-  // 1️⃣ Classify post type from message text
+  // 0️⃣ Classify post type from message text
   const postType = classifyPostType(text || "");
 
-  // 1b️⃣ Before/After: build side-by-side collage, replace image list
-  let activeImageUrls = [...resolvedImageUrls];
-  let activeImageUrl  = resolvedImageUrl;
+  // 0b️⃣ Before/After: build side-by-side collage, replace image list
+  let activeImageUrls = [...imageUrls];
+  let activeImageUrl  = imageUrl;
 
   if (postType === "before_after") {
-    if (resolvedImageUrls.length < 2) {
+    if (imageUrls.length < 2) {
       await sendMessage.sendText(chatId,
         "For a Before/After post please send exactly 2 photos — the Before photo first, then the After photo."
       );
@@ -426,9 +412,9 @@ async function processNewImageFlow({
     }
     try {
       await sendMessage.sendText(chatId, "Building your Before/After collage… hang tight!");
-      const collageUrl = await buildBeforeAfterCollage(resolvedImageUrls.slice(0, 2), salon?.salon_id || "");
-      // Keep resolved URLs in activeImageUrls so swap can rebuild; collage goes in activeImageUrl
-      activeImageUrls  = resolvedImageUrls.slice(0, 2);
+      const collageUrl = await buildBeforeAfterCollage(imageUrls.slice(0, 2), salon?.salon_id || "");
+      // Keep original URLs in activeImageUrls so swap can rebuild; collage goes in activeImageUrl
+      activeImageUrls  = imageUrls.slice(0, 2);
       activeImageUrl   = collageUrl;
       console.log(`[Router] Before/After collage ready: ${collageUrl}`);
     } catch (err) {
@@ -457,7 +443,7 @@ async function processNewImageFlow({
         stylistId: stylist?.stylist_id || stylist?.id || null,
         instagramHandle: stylist?.instagram_handle || null,
         bookingCta,
-        submittedImageUrl: resolvedImageUrls[0] || null,
+        submittedImageUrl: imageUrls[0] || null,
       });
 
       // Save as draft with the story image
