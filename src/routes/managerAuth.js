@@ -615,7 +615,7 @@ router.post("/signup", (req, res, next) => salonLogoUpload(req, res, next), asyn
         email_verified, email_verify_token, email_verify_expires_at,
         marketing_opt_in, terms_accepted_at
       )
-      VALUES (@id, @salon_id, @name, @email, @phone, @password_hash, 'manager',
+      VALUES (@id, @salon_id, @name, @email, @phone, @password_hash, 'owner',
         0, @email_verify_token, @email_verify_expires_at,
         @marketing_opt_in, @terms_accepted_at)
     `).run({

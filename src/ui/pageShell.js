@@ -8,6 +8,7 @@ export default function pageShell({
   current = "",
   salon_id = "",
   manager_phone = "",
+  manager_id = "",
 }) {
   const qs = salon_id ? `?salon=${encodeURIComponent(salon_id)}` : "";
 
@@ -21,6 +22,15 @@ export default function pageShell({
     } catch (_) {}
   }
   const isPro = salonPlan === "pro";
+
+  // Role-based nav visibility
+  let isOwner = true; // default to showing everything when role unknown
+  if (manager_id) {
+    try {
+      const mgr = db.prepare("SELECT role FROM managers WHERE id = ?").get(manager_id);
+      if (mgr) isOwner = mgr.role === "owner";
+    } catch (_) {}
+  }
   const locationInitials = activeSalonName
     ? activeSalonName.split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase()
     : "";
@@ -141,7 +151,7 @@ export default function pageShell({
       ${navItem("/manager/vendors",       ICONS.tag,          "Vendors",       "vendors")}
       ${isPro ? navItem("/manager/integrations", ICONS.integration,  "Integrations",  "integrations") : ""}
       ${navItem("/manager/locations",    ICONS.building,     "Locations",     "locations")}
-      ${navItem("/manager/billing",      ICONS.card,         "Billing",       "billing")}
+      ${isOwner ? navItem("/manager/billing", ICONS.card, "Billing", "billing") : ""}
       ${navItem("/manager/admin",        ICONS.cog,          "Admin",         "admin")}
     </nav>
 
@@ -182,7 +192,7 @@ export default function pageShell({
       ${mobileNavLink("/manager/vendors",       "Vendors",       "vendors")}
       ${isPro ? mobileNavLink("/manager/integrations", "Integrations",  "integrations") : ""}
       ${mobileNavLink("/manager/locations",    "Locations",     "locations")}
-      ${mobileNavLink("/manager/billing",      "Billing",       "billing")}
+      ${isOwner ? mobileNavLink("/manager/billing", "Billing", "billing") : ""}
       ${mobileNavLink("/manager/admin",        "Admin",         "admin")}
       ${mobileNavLink("/manager/profile", "My Profile", "profile")}
       <a href="/manager/logout"

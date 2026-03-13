@@ -42,6 +42,14 @@ function requireAuth(req, res, next) {
   next();
 }
 
+function requireOwner(req, res, next) {
+  const mgr = db.prepare("SELECT role FROM managers WHERE id = ?").get(req.session.manager_id);
+  if (!mgr || mgr.role !== "owner") {
+    return res.redirect("/manager?notice=Billing+is+only+accessible+to+account+owners.");
+  }
+  next();
+}
+
 // ─── GET /billing/checkout?plan=starter&cycle=monthly ─────────────────────
 
 router.get("/checkout", requireAuth, async (req, res) => {
@@ -95,7 +103,7 @@ router.get("/checkout", requireAuth, async (req, res) => {
 // ─── GET /billing/success ──────────────────────────────────────────────────
 
 router.get("/success", requireAuth, (req, res) => {
-  const { salon_id } = req.session;
+  const { salon_id, manager_id } = req.session;
   const isNew   = req.query.new === "1";
   const hasTrial = req.query.trial === "1";
 
@@ -116,6 +124,7 @@ router.get("/success", requireAuth, (req, res) => {
     title: "Subscription Active",
     current: "billing",
     salon_id,
+    manager_id,
     body: `
       <div class="max-w-lg mx-auto text-center py-16">
         <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-6">
@@ -140,7 +149,7 @@ router.get("/success", requireAuth, (req, res) => {
 
 // ─── GET /manager/billing ──────────────────────────────────────────────────
 
-router.get("/manager/billing", requireAuth, async (req, res) => {
+router.get("/manager/billing", requireAuth, requireOwner, async (req, res) => {
   const { manager_id, salon_id } = req.session;
   const isNewAccount = req.query.new === "1";
   const planHint = ["starter","growth","pro"].includes(req.query.plan) ? req.query.plan : null;
@@ -343,6 +352,7 @@ router.get("/manager/billing", requireAuth, async (req, res) => {
     title: "Billing",
     current: "billing",
     salon_id,
+    manager_id: req.session.manager_id,
     body: `
       <div class="space-y-6 max-w-3xl">
 

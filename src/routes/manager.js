@@ -408,6 +408,7 @@ router.get("/", requireAuth, async (req, res) => {
       title: "Manager Dashboard",
       current: "manager",
       salon_id,
+      manager_id: req.manager.id,
       body,
     })
   );

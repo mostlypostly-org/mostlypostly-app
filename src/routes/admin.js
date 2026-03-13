@@ -136,6 +136,12 @@ router.get("/", requireAuth, (req, res) => {
     )
     .all(salon_id);
 
+  // Role check
+  const isOwner = (() => {
+    const mgr = db.prepare("SELECT role FROM managers WHERE id = ?").get(req.manager.id);
+    return !mgr || mgr.role === "owner";
+  })();
+
   // MFA status for this manager
   const mfaEnabled = !!db.prepare("SELECT manager_id FROM manager_mfa WHERE manager_id = ?").get(req.manager.id);
   const mfaError = req.query.mfa_error;
@@ -233,6 +239,14 @@ router.get("/", requireAuth, (req, res) => {
 
   // Build Admin Page HTML
   const body = `
+    ${req.query.notice ? `<div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 mb-4 text-xs text-green-800 font-medium">${req.query.notice}</div>` : ""}
+    ${!isOwner ? `
+    <div class="rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 mb-4 flex items-center gap-2 text-xs text-yellow-800">
+      <svg class="w-4 h-4 flex-shrink-0 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+      <span><strong>Manager view</strong> — Settings below are read-only. Contact your account owner to make changes.</span>
+    </div>
+    ` : ""}
+    <div ${!isOwner ? 'class="opacity-50 pointer-events-none select-none"' : ""}>
     <section class="mb-6">
       <h1 class="text-2xl font-bold mb-2">Admin</h1>
       <p class="text-sm text-mpMuted">Manage social connections, posting rules, and team configuration.</p>
@@ -447,7 +461,7 @@ router.get("/", requireAuth, (req, res) => {
             <h2 class="text-sm font-semibold text-mpCharcoal">Brand Color Palette</h2>
             <p class="text-[11px] text-mpMuted mt-0.5">Extracted from your website during setup. Used in AI-generated promotion images.</p>
           </div>
-          <a href="/onboarding/brand?reset=1"
+          <a href="/manager/admin/extract-brand"
              class="text-xs text-mpAccent hover:text-mpCharcoal underline whitespace-nowrap">
             Re-extract
           </a>
@@ -472,7 +486,7 @@ router.get("/", requireAuth, (req, res) => {
         </div>
         <p class="mt-3 text-[10px] text-mpMuted">
           These colors are automatically applied to promotion image overlays instead of the default gold theme.
-          <a href="/onboarding/brand" class="underline text-mpAccent ml-1">Edit palette</a>
+          <a href="/manager/admin/extract-brand" class="underline text-mpAccent ml-1">Re-extract palette</a>
         </p>
         ` : `
         <div class="flex items-center gap-3 py-3">
@@ -483,7 +497,7 @@ router.get("/", requireAuth, (req, res) => {
           </div>
           <div>
             <p class="text-xs text-mpMuted">No palette extracted yet.</p>
-            <a href="/onboarding/brand" class="text-xs text-mpAccent underline">
+            <a href="/manager/admin/extract-brand" class="text-xs text-mpAccent underline">
               ${salonRow.website ? "Extract colors from your website →" : "Set up brand palette →"}
             </a>
           </div>
@@ -644,6 +658,8 @@ router.get("/", requireAuth, (req, res) => {
           ${fs.readFileSync(path.join(process.cwd(), "public", "admin-templates.html"), "utf8")}
         </div>
 
+  </div><!-- end owner-only sections -->
+
   <!-- ═══════════════════════════════════════════════════════ -->
   <!-- STOCK PHOTOS                                           -->
   <!-- ═══════════════════════════════════════════════════════ -->
@@ -741,9 +757,59 @@ router.get("/", requireAuth, (req, res) => {
       body,
       salon_id,
       manager_phone,
+      manager_id: req.manager.id,
       current: "admin",
     })
   );
+});
+
+// -------------------------------------------------------
+// GET: Re-extract brand palette from website
+// -------------------------------------------------------
+router.get("/extract-brand", requireAuth, async (req, res) => {
+  const salon_id = req.manager.salon_id;
+  const salon = db.prepare("SELECT website FROM salons WHERE slug = ?").get(salon_id);
+  if (!salon?.website) {
+    return res.redirect("/manager/admin?notice=No+website+configured.+Set+a+website+in+Business+Info+first.");
+  }
+
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    const resp = await fetch(salon.website, { headers: { "User-Agent": "Mozilla/5.0" }, timeout: 8000 });
+    const html = await resp.text();
+    const snippet = html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<img[^>]*>/gi, "")
+      .slice(0, 8000);
+
+    const gptResp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0,
+        messages: [
+          {
+            role: "system",
+            content: `You are a brand color extractor. Given website HTML, identify the 5 key brand colors.
+Return ONLY valid JSON with these exact keys:
+{ "primary": "#hex", "secondary": "#hex", "accent": "#hex", "accent_light": "#hex", "cta": "#hex" }
+All values must be hex color codes. No markdown, no explanation.`,
+          },
+          { role: "user", content: snippet },
+        ],
+      }),
+    });
+    const data = await gptResp.json();
+    const raw = data?.choices?.[0]?.message?.content || "{}";
+    const palette = JSON.parse(raw.replace(/```json|```/g, "").trim());
+    db.prepare("UPDATE salons SET brand_palette = ?, updated_at = datetime('now') WHERE slug = ?")
+      .run(JSON.stringify(palette), salon_id);
+    return res.redirect("/manager/admin?notice=Brand+colors+updated.");
+  } catch (err) {
+    console.error("[Admin] Brand extraction failed:", err.message);
+    return res.redirect("/manager/admin?notice=Could+not+extract+colors.+Try+again+or+check+your+website+URL.");
+  }
 });
 
 // -------------------------------------------------------
