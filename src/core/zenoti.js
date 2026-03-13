@@ -6,9 +6,10 @@ const ZENOTI_BASE = 'https://api.zenoti.com/v1';
  * Create a Zenoti API client bound to a specific app_id and api secret.
  * Auth header: Authorization: apikey {apiSecret}
  */
-export function createZenotiClient(appId, apiSecret) {
+export function createZenotiClient(appId, apiKey) {
   const headers = {
-    'Authorization': `apikey ${apiSecret}`,
+    'Authorization': `apikey ${apiKey}`,
+    'application_id': appId,
     'Content-Type': 'application/json',
   };
 

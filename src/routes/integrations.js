@@ -92,7 +92,7 @@ router.get("/", requireAuth, (req, res) => {
         </div>
 
         ${zenoti ? `
-        <!-- Connected state -->
+        <!-- Connected state — show info + actions only, no inline connect form -->
         <div class="mb-4 rounded-xl bg-mpBg border border-mpBorder p-3 text-xs space-y-1.5">
           <div class="flex justify-between">
             <span class="text-mpMuted">Center ID</span>
@@ -173,25 +173,11 @@ router.get("/", requireAuth, (req, res) => {
           <button class="text-xs text-red-400 hover:text-red-600 underline">Disconnect Zenoti</button>
         </form>
         ` : `
-        <!-- Connect form -->
-        <form method="POST" action="/manager/integrations/zenoti/connect" class="space-y-3">
-          <div>
-            <label class="block text-xs font-medium text-mpCharcoal mb-1">Zenoti API Key</label>
-            <input type="text" name="api_key" placeholder="Paste your Zenoti API key" required
-              class="w-full text-sm rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-mpCharcoal placeholder:text-gray-400 focus:outline-none focus:border-mpAccent" />
-            <p class="text-[11px] text-mpMuted mt-1">Found in Zenoti → Admin → API Keys → Generate Key</p>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-mpCharcoal mb-1">Center ID</label>
-            <input type="text" name="center_id" placeholder="Your Zenoti center ID (UUID)"
-              class="w-full text-sm rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-mpCharcoal placeholder:text-gray-400 focus:outline-none focus:border-mpAccent" />
-            <p class="text-[11px] text-mpMuted mt-1">Found in Zenoti → Settings → Organization → Centers</p>
-          </div>
-          <button type="submit"
-            class="rounded-full bg-mpCharcoal px-5 py-2 text-xs font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
-            Connect Zenoti
-          </button>
-        </form>
+        <!-- Not connected — link to setup form -->
+        <a href="/manager/integrations/zenoti"
+           class="inline-flex items-center rounded-full bg-mpCharcoal px-5 py-2 text-xs font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
+          Connect Zenoti
+        </a>
         `}
       </div>
     </section>
@@ -293,18 +279,18 @@ router.get("/zenoti", requireAuth, (req, res) => {
 
           <div>
             <label class="block text-sm font-medium text-mpCharcoal mb-1.5">
-              Application Secret
+              API Key — "Latest Api"
               ${isUpdate ? '<span class="text-mpMuted font-normal">(leave blank to keep existing)</span>' : ''}
             </label>
             <input
               type="password"
               name="app_secret"
-              placeholder="${isUpdate ? '••••••••••••••••' : 'Paste your API secret key'}"
+              placeholder="${isUpdate ? '••••••••••••••••' : 'Paste the Latest Api value from Zenoti'}"
               ${isUpdate ? '' : 'required'}
               autocomplete="new-password"
               class="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm text-mpCharcoal placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-mpAccent focus:border-transparent"
             />
-            <p class="mt-1 text-xs text-mpMuted">Encrypted at rest. Never stored in plain text.</p>
+            <p class="mt-1 text-xs text-mpMuted">Use the <strong>Latest Api</strong> value (not the Application Secret). Encrypted before storage.</p>
           </div>
 
           <div>
@@ -434,9 +420,9 @@ router.post("/zenoti/test", requireAuth, async (req, res) => {
   let secret;
   try {
     secret = decrypt(row.api_key);
-  } catch (e) {
-    console.error('[Integrations] decrypt error:', e.message);
-    return res.redirect(`/manager/integrations?tested=fail&error=${encodeURIComponent('Failed to decrypt credentials')}`);
+  } catch {
+    // Legacy rows stored plain text before encryption was added — use as-is
+    secret = row.api_key;
   }
 
   try {
@@ -466,9 +452,8 @@ router.post("/zenoti/sync", requireAuth, async (req, res) => {
   let secret;
   try {
     secret = decrypt(row.api_key);
-  } catch (e) {
-    console.error('[Integrations] decrypt error:', e.message);
-    return res.redirect('/manager/integrations?synced=1&found=0');
+  } catch {
+    secret = row.api_key; // legacy plain-text fallback
   }
 
   try {
