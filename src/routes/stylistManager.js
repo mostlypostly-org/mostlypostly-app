@@ -157,8 +157,9 @@ router.get("/", requireAuth, (req, res) => {
   // Plan limits
   const planLimits = PLAN_LIMITS[salon.plan] || PLAN_LIMITS.trial;
   const stylistLimit = planLimits.stylists; // null = unlimited (Pro)
+  // Manager seats: only counts role='manager' — coordinators are always unlimited
   const managerSeatLimit = planLimits.managers; // null = unlimited
-  const usedManagerSeats = portalMembers.length;
+  const usedManagerSeats = portalMembers.filter(m => m.role === 'manager').length;
   const managerSeatsAvailable = managerSeatLimit === null || usedManagerSeats < managerSeatLimit;
   const atLimit = stylistLimit !== null && stylists.length >= stylistLimit;
   const nearLimit = stylistLimit !== null && !atLimit && stylists.length >= stylistLimit - 1;
@@ -167,9 +168,10 @@ router.get("/", requireAuth, (req, res) => {
     ? `${stylists.length} / ${stylistLimit} stylists`
     : `${stylists.length} stylists`;
 
+  const usedCoordinatorSeats = portalMembers.filter(m => m.role === 'coordinator').length;
   const managerSeatLabel = managerSeatLimit === null
-    ? `${usedManagerSeats} portal seats (unlimited)`
-    : `${usedManagerSeats} / ${managerSeatLimit} portal seat${managerSeatLimit !== 1 ? "s" : ""}`;
+    ? `${usedManagerSeats} manager${usedManagerSeats !== 1 ? "s" : ""} · ${usedCoordinatorSeats} coordinator${usedCoordinatorSeats !== 1 ? "s" : ""}`
+    : `${usedManagerSeats} / ${managerSeatLimit} manager seat${managerSeatLimit !== 1 ? "s" : ""} · ${usedCoordinatorSeats} coordinator${usedCoordinatorSeats !== 1 ? "s" : ""}`;
 
   const cards = stylists.map(s => {
     const displayName = [s.first_name, s.last_name].filter(Boolean).join(" ") || s.name;
@@ -177,7 +179,7 @@ router.get("/", requireAuth, (req, res) => {
     const hasPortal = stylistsWithPortal.has(s.id);
     const portalMember = portalMembers.find(m => m.stylist_id === s.id);
     const roleBadge = hasPortal
-      ? `<span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-mpAccentLight text-mpAccent">${portalMember?.role === 'staff' ? 'Staff' : 'Manager'}</span>`
+      ? `<span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-mpAccentLight text-mpAccent">${portalMember?.role === 'coordinator' ? 'Coordinator' : 'Manager'}</span>`
       : "";
 
     return `
@@ -219,7 +221,7 @@ router.get("/", requireAuth, (req, res) => {
                   <label class="block text-[10px] font-semibold text-mpMuted mb-0.5">Role</label>
                   <select name="portal_role" class="w-full rounded-lg border border-mpBorder px-2 py-1.5 text-xs text-mpCharcoal bg-white focus:outline-none focus:ring-1 focus:ring-mpAccent">
                     ${managerSeatsAvailable ? `<option value="manager">Manager</option>` : `<option value="manager" disabled>Manager (no seats)</option>`}
-                    ${managerSeatsAvailable ? `<option value="staff">Staff</option>` : `<option value="staff" disabled>Staff (no seats)</option>`}
+                    <option value="coordinator">Coordinator</option>
                   </select>
                 </div>
                 <div>
@@ -231,7 +233,7 @@ router.get("/", requireAuth, (req, res) => {
                 <label class="block text-[10px] font-semibold text-mpMuted mb-0.5">Temp Password</label>
                 <input type="text" name="temp_password" required class="w-full rounded-lg border border-mpBorder px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-mpAccent" placeholder="They can change after first login" />
               </div>
-              <button type="submit" ${!managerSeatsAvailable ? "disabled" : ""} class="rounded-full bg-mpCharcoal px-4 py-1.5 text-[11px] font-semibold text-white hover:bg-mpCharcoalDark transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <button type="submit" class="rounded-full bg-mpCharcoal px-4 py-1.5 text-[11px] font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
                 Grant Access
               </button>
             </form>
@@ -244,8 +246,8 @@ router.get("/", requireAuth, (req, res) => {
     .filter(m => !m.stylist_id)
     .map(m => {
       const initials = (m.name || "?").split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
-      const roleLabel = m.role === "staff" ? "Staff" : "Manager";
-      const roleBg = m.role === "staff" ? "bg-purple-100 text-purple-700" : "bg-mpAccentLight text-mpAccent";
+      const roleLabel = m.role === "coordinator" ? "Coordinator" : "Manager";
+      const roleBg = m.role === "coordinator" ? "bg-purple-100 text-purple-700" : "bg-mpAccentLight text-mpAccent";
       return `
         <div class="rounded-2xl border border-mpBorder bg-white p-4 flex gap-3 items-start">
           <div class="h-12 w-12 rounded-full bg-mpAccentLight flex items-center justify-center text-mpAccent font-bold text-sm border-2 border-mpBorder flex-shrink-0">${safe(initials)}</div>
@@ -375,7 +377,7 @@ router.get("/add", requireAuth, (req, res) => {
   const salon = db.prepare("SELECT tone, plan FROM salons WHERE slug = ?").get(salon_id);
   const planLimits = PLAN_LIMITS[salon?.plan] || PLAN_LIMITS.trial;
   const managerSeatLimit = planLimits.managers;
-  const usedSeats = db.prepare("SELECT COUNT(*) as c FROM managers WHERE salon_id = ? AND role NOT IN ('owner')").get(salon_id)?.c || 0;
+  const usedSeats = db.prepare("SELECT COUNT(*) as c FROM managers WHERE salon_id = ? AND role = 'manager'").get(salon_id)?.c || 0;
   const managerSeatsAvailable = managerSeatLimit === null || usedSeats < managerSeatLimit;
 
   res.send(pageShell({
@@ -396,10 +398,10 @@ router.post("/add", requireAuth, photoUpload.single("photo"), async (req, res) =
 
   const qs = `?salon=${encodeURIComponent(salon_id)}`;
 
-  if (role === "manager" || role === "staff") {
+  if (role === "manager" || role === "coordinator") {
     // Create portal account
     if (!email || !temp_password) {
-      return res.redirect(`/manager/stylists/add${qs}&error=Email+and+password+required+for+Manager+and+Staff`);
+      return res.redirect(`/manager/stylists/add${qs}&error=Email+and+password+required+for+Manager+and+Coordinator`);
     }
     try {
       const password_hash = await bcrypt.hash(temp_password, 10);
@@ -471,7 +473,7 @@ router.post("/add", requireAuth, photoUpload.single("photo"), async (req, res) =
     console.error("[stylistManager] add error:", err);
     const planLimits = PLAN_LIMITS[salon?.plan] || PLAN_LIMITS.trial;
     const managerSeatLimit = planLimits.managers;
-    const usedSeats = db.prepare("SELECT COUNT(*) as c FROM managers WHERE salon_id = ? AND role NOT IN ('owner')").get(salon_id)?.c || 0;
+    const usedSeats = db.prepare("SELECT COUNT(*) as c FROM managers WHERE salon_id = ? AND role = 'manager'").get(salon_id)?.c || 0;
     const managerSeatsAvailable = managerSeatLimit === null || usedSeats < managerSeatLimit;
     res.send(pageShell({
       title: "Add Team Member",
@@ -1070,7 +1072,7 @@ router.post("/grant-access/:stylistId", requireAuth, async (req, res) => {
   const stylist = db.prepare("SELECT * FROM stylists WHERE id = ? AND salon_id = ?").get(req.params.stylistId, salon_id);
   if (!stylist) return res.redirect(`/manager/stylists${qs}`);
 
-  const { portal_role = "staff", email, temp_password } = req.body;
+  const { portal_role = "coordinator", email, temp_password } = req.body;
   if (!email || !temp_password) return res.redirect(`/manager/stylists${qs}`);
 
   try {
@@ -1121,7 +1123,7 @@ router.get("/managers/edit/:id", requireAuth, (req, res) => {
           <label class="block text-xs font-semibold text-mpMuted mb-1">Role</label>
           <select name="role" class="${inputCls}">
             <option value="manager" ${mgr.role === "manager" ? "selected" : ""}>Manager</option>
-            <option value="staff" ${mgr.role === "staff" ? "selected" : ""}>Staff</option>
+            <option value="coordinator" ${mgr.role === "coordinator" ? "selected" : ""}>Coordinator</option>
           </select>
         </div>
         <div>
@@ -1204,15 +1206,13 @@ function buildTeamMemberForm({ salon_id, salonTone, managerSeatsAvailable }) {
               ${!managerSeatsAvailable ? 'disabled title="No manager seats available on your plan"' : ""}>
               Manager ${!managerSeatsAvailable ? "(No seats)" : ""}
             </button>
-            <button type="button" data-role="staff"
-              class="role-btn rounded-full px-4 py-2 text-xs font-semibold border-2 transition-colors
-              ${managerSeatsAvailable ? "border-mpBorder bg-white text-mpMuted hover:border-mpCharcoal hover:text-mpCharcoal" : "border-mpBorder bg-mpBg text-gray-300 cursor-not-allowed"}"
-              ${!managerSeatsAvailable ? 'disabled title="No manager seats available on your plan"' : ""}>
-              Staff ${!managerSeatsAvailable ? "(No seats)" : ""}
+            <button type="button" data-role="coordinator"
+              class="role-btn rounded-full px-4 py-2 text-xs font-semibold border-2 border-mpBorder bg-white text-mpMuted hover:border-mpCharcoal hover:text-mpCharcoal transition-colors">
+              Coordinator
             </button>
           </div>
           <p class="text-[11px] text-mpMuted mt-1.5">
-            <strong>Stylist</strong> — posts via SMS/text. <strong>Manager</strong> — approves posts via the web portal. <strong>Staff</strong> — portal access with limited views.
+            <strong>Stylist</strong> — posts via SMS/text. <strong>Manager</strong> — manages team and approves posts (seat-limited). <strong>Coordinator</strong> — approves posts and views analytics (unlimited).
           </p>
           <input type="hidden" name="role" id="selectedRole" value="stylist" />
         </div>
@@ -1231,7 +1231,7 @@ function buildTeamMemberForm({ salon_id, salonTone, managerSeatsAvailable }) {
         <div>
           <label class="block text-xs font-semibold text-mpMuted mb-1">Phone Number</label>
           <input type="tel" name="phone" class="${inputCls}" placeholder="+13175550100" />
-          <p class="text-[11px] text-mpMuted mt-0.5">Required for Stylists (they text photos to this number). Optional for Manager/Staff.</p>
+          <p class="text-[11px] text-mpMuted mt-0.5">Required for Stylists (they text photos to this number). Optional for Manager/Coordinator.</p>
         </div>
 
         <!-- Stylist-specific fields -->

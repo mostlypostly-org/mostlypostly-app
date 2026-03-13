@@ -15,7 +15,7 @@ const router = express.Router();
 // full control to tune DOWN as low as they want.
 // ─────────────────────────────────────────────────────────
 const PLAN_LIMITS = {
-  trial:   { label: "Trial",   posts_per_month: 20,  max_daily: 1  },
+  trial:   { label: "Trial",   posts_per_month: 20,  max_daily: 3  },
   starter: { label: "Starter", posts_per_month: 60,  max_daily: 4  },
   growth:  { label: "Growth",  posts_per_month: 200, max_daily: 8  },
   pro:     { label: "Pro",     posts_per_month: 500, max_daily: 20 },
@@ -111,14 +111,18 @@ router.get("/", requireAuth, (req, res) => {
 
   // Effective daily = min(ig, fb) since one post publishes to both
   const effectiveDailyCap   = Math.min(igCap, fbCap);
-  const capImpliedMonthly   = effectiveDailyCap * daysInMonth;
+  const rawImpliedMonthly   = effectiveDailyCap * daysInMonth;
+  // Cap display at plan limit — showing more than the plan allows is misleading
+  const capImpliedMonthly   = Math.min(rawImpliedMonthly, planDef.posts_per_month);
   const planPct             = Math.min(100, Math.round((capImpliedMonthly / planDef.posts_per_month) * 100));
   const actualPct           = Math.min(100, Math.round((postsThisCycle / planDef.posts_per_month) * 100));
+  // Separately track whether caps actually exceed the plan ceiling (for the warning message)
+  const capsExceedPlan      = rawImpliedMonthly > planDef.posts_per_month;
 
-  const paceColor = planPct >= 100 ? "text-red-500" : planPct >= 80 ? "text-yellow-600" : "text-green-600";
-  const paceBarBg = planPct >= 100 ? "bg-red-400"   : planPct >= 80 ? "bg-yellow-400"   : "bg-green-400";
-  const paceMsg   = planPct >= 100
-    ? `Your caps allow more posts than your plan includes. The scheduler will stop at your plan limit.`
+  const paceColor = planPct >= 100 ? "text-yellow-600" : planPct >= 80 ? "text-yellow-600" : "text-green-600";
+  const paceBarBg = planPct >= 100 ? "bg-yellow-400"   : planPct >= 80 ? "bg-yellow-400"   : "bg-green-400";
+  const paceMsg   = capsExceedPlan
+    ? `Your daily caps could produce up to ${rawImpliedMonthly} posts/month, but your plan includes ${planDef.posts_per_month}. The scheduler will stop at your plan limit.`
     : planPct >= 80
     ? `You're using most of your plan quota. Consider upgrading if you want more posting headroom.`
     : `You have room to increase your posting frequency if your team has more content.`;
@@ -545,7 +549,9 @@ router.get("/", requireAuth, (req, res) => {
 
         // One post publishes to both FB and IG — effective daily = lower of the two
         const effectiveDaily = Math.min(igVal, fbVal);
-        const impliedMonthly = effectiveDaily * 30;
+        const rawMonthly = effectiveDaily * 30;
+        const capsExceedPlan = rawMonthly > PLAN_POSTS_PER_MONTH;
+        const impliedMonthly = Math.min(rawMonthly, PLAN_POSTS_PER_MONTH);
         const pct = Math.min(100, Math.round((impliedMonthly / PLAN_POSTS_PER_MONTH) * 100));
 
         const paceNum = document.getElementById('paceNumber');
@@ -557,17 +563,17 @@ router.get("/", requireAuth, (req, res) => {
         if (paceBar) {
           paceBar.style.width = pct + '%';
           paceBar.className = 'h-2.5 rounded-full transition-all ' +
-            (pct >= 100 ? 'bg-red-400' : pct >= 80 ? 'bg-yellow-400' : 'bg-green-400');
+            (pct >= 80 ? 'bg-yellow-400' : 'bg-green-400');
         }
 
         if (paceNum) {
           paceNum.className = 'text-sm font-bold ' +
-            (pct >= 100 ? 'text-red-500' : pct >= 80 ? 'text-yellow-600' : 'text-green-600');
+            (pct >= 80 ? 'text-yellow-600' : 'text-green-600');
         }
 
         if (paceMsg) {
-          if (pct >= 100) {
-            paceMsg.textContent = 'Your caps allow more posts than your plan includes (' + PLAN_POSTS_PER_MONTH + '/month). The scheduler will stop at your plan limit.';
+          if (capsExceedPlan) {
+            paceMsg.textContent = 'Your daily caps could produce up to ' + rawMonthly + ' posts/month, but your plan includes ' + PLAN_POSTS_PER_MONTH + '. The scheduler will stop at your plan limit.';
           } else if (pct >= 80) {
             paceMsg.textContent = 'You\\'re using most of your ' + PLAN_LABEL + ' plan quota. Consider upgrading if you want more posting headroom.';
           } else {

@@ -201,6 +201,39 @@ function getSalonPolicy(salonSlug) {
   };
 }
 
+// ===================== Draft Expiry =====================
+
+/**
+ * Mark stale draft and manager_pending posts as expired.
+ * Drafts: stylist never approved → expire after 24h
+ * Manager pending: manager never acted → expire after 48h
+ * This preserves salon_post_number integrity (no gaps from deletes).
+ */
+function expireStalePosts() {
+  try {
+    const expiredDrafts = db.prepare(`
+      UPDATE posts
+      SET status = 'expired'
+      WHERE status = 'draft'
+        AND datetime(created_at) < datetime('now', '-24 hours')
+    `).run();
+
+    const expiredPending = db.prepare(`
+      UPDATE posts
+      SET status = 'expired'
+      WHERE status = 'manager_pending'
+        AND datetime(created_at) < datetime('now', '-48 hours')
+    `).run();
+
+    const total = expiredDrafts.changes + expiredPending.changes;
+    if (total > 0) {
+      console.log(`🗑️ [Expiry] Expired ${expiredDrafts.changes} draft(s) + ${expiredPending.changes} pending post(s)`);
+    }
+  } catch (err) {
+    console.error("❌ [Expiry] Failed:", err);
+  }
+}
+
 // ===================== Recovery =====================
 
 async function recoverMissedPosts() {
@@ -251,6 +284,8 @@ async function recoverMissedPosts() {
 // ===================== Core Run =====================
 
 export async function runSchedulerOnce() {
+  expireStalePosts();
+
   try {
     const tenants = db
       .prepare(`
@@ -533,6 +568,7 @@ export function getSchedulerStats(salonId) {
 export function startScheduler() {
   log("SCHEDULER_START", { mode: "db-only" });
 
+  expireStalePosts();
   recoverMissedPosts();
 
   const intervalSeconds = Number(process.env.SCHEDULER_INTERVAL_SECONDS) || 60;

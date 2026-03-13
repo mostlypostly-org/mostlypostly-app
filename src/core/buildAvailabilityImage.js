@@ -130,101 +130,159 @@ async function fetchBuffer(url) {
 }
 
 // ─────────────────────────────────────────────────────────
-// Build the availability story image — photo-first design
-// Large background photo shows through, text lives in a
-// frosted glass panel at the bottom. Clean and editorial.
+// Parse a hex color to {r,g,b}
+// ─────────────────────────────────────────────────────────
+function hexToRgb(hex) {
+  const h = (hex || "#2B2D35").replace(/^#/, "");
+  return {
+    r: parseInt(h.slice(0, 2), 16) || 0,
+    g: parseInt(h.slice(2, 4), 16) || 0,
+    b: parseInt(h.slice(4, 6), 16) || 0,
+  };
+}
+
+// ─────────────────────────────────────────────────────────
+// Build the availability story image — torn paper design
+//
+// Photo shows through fully in the top half (just a light
+// vignette at edges). Lower half has an artistic torn-paper
+// panel in the salon's brand color. The top edge of the panel
+// is ragged/torn — sharp zigzag polygon points, not a smooth
+// gradient rectangle. Text lives on the panel.
 // ─────────────────────────────────────────────────────────
 function buildOverlaySvg({ slots, stylistName, salonName, bookingCta, instagramHandle, palette }) {
   const font = `'Open Sans', Arial, Helvetica, sans-serif`;
 
-  // Brand palette with sensible defaults
-  const ACCENT  = palette?.cta    || palette?.accent || "#3B72B9";
-  const LIGHT   = palette?.accent_light || "#EBF3FF";
+  // Brand palette — panel uses primary or a dark fallback
+  const panelHex = palette?.primary || palette?.secondary || "#2B2D35";
+  const { r, g, b } = hexToRgb(panelHex);
+  const ACCENT   = palette?.cta || palette?.accent || "#D4897A";
+  const ACCENT2  = palette?.accent_light || "rgba(255,255,255,0.18)";
 
-  // Layout: glass panel starts at 55% down — photo visible in top half
-  const PANEL_Y     = Math.round(H * 0.52);
-  const PANEL_H     = H - PANEL_Y;
-  const SLOT_H      = 88;
-  const SLOTS_START = PANEL_Y + 230;
-  const slotCount   = Math.min(slots.length, 5);
+  // Torn edge base Y — panel starts around 54% down so photo dominates
+  const TEAR_BASE = Math.round(H * 0.54);
+
+  // Torn paper top edge — irregular zigzag points (fixed, not random)
+  // Each point: [x, y-offset-from-TEAR_BASE] — positive = lower (into panel)
+  // Sharp angles create the torn/ripped paper look
+  const tearEdge = [
+    [0,    38],
+    [68,    8],
+    [135,  55],
+    [215,  16],
+    [295,  68],
+    [370,  22],
+    [445,  58],
+    [520,   6],
+    [600,  62],
+    [680,  24],
+    [755,  52],
+    [840,  10],
+    [920,  48],
+    [1000, 18],
+    [1080, 42],
+  ];
+
+  // Build the torn panel SVG path
+  // Start top-left below the tear, trace the jagged edge, fill down to bottom
+  const edgePts = tearEdge.map(([x, dy]) => `${x},${TEAR_BASE + dy}`).join(" L ");
+  const panelPath = `M 0,${TEAR_BASE + 38} L ${edgePts} L ${W},${H} L 0,${H} Z`;
+
+  // Shadow layer behind torn edge — gives paper the lifted/layered look
+  // Same path shifted down 12px and slightly darker, lower opacity
+  const shadowEdge = tearEdge.map(([x, dy]) => `${x},${TEAR_BASE + dy + 12}`).join(" L ");
+  const shadowPath = `M 0,${TEAR_BASE + 50} L ${shadowEdge} L ${W},${H} L 0,${H} Z`;
+
+  // Text layout within the panel
+  const TEXT_Y     = TEAR_BASE + 95;   // first text element baseline
+  const SLOT_START = TEXT_Y + 230;     // where slot rows begin
+  const SLOT_H     = 76;
+  const SLOT_GAP   = 10;
+  const slotCount  = Math.min(slots.length, 4);
 
   const slotRows = slots.slice(0, slotCount).map((slot, i) => {
-    const y = SLOTS_START + i * (SLOT_H + 12);
-    const isFirst = i === 0;
+    const rowY = SLOT_START + i * (SLOT_H + SLOT_GAP);
     return `
-      <rect x="60" y="${y}" width="${W - 120}" height="${SLOT_H}" rx="16"
-        fill="white" fill-opacity="${isFirst ? "0.18" : "0.12"}" />
-      <line x1="84" y1="${y + 18}" x2="84" y2="${y + SLOT_H - 18}"
-        stroke="${ACCENT}" stroke-width="4" stroke-linecap="round"/>
-      <text x="112" y="${y + 56}"
-        font-family="${font}" font-size="36" font-weight="800"
-        fill="white">${escSvg(slot)}</text>
+      <!-- Accent mark — short vertical bar, left of slot text -->
+      <rect x="68" y="${rowY + 8}" width="5" height="${SLOT_H - 16}" rx="2"
+        fill="${ACCENT}" />
+      <text x="92" y="${rowY + SLOT_H * 0.68}"
+        font-family="${font}" font-size="38" font-weight="800"
+        fill="white" fill-opacity="0.95">${escSvg(slot)}</text>
     `;
   }).join("");
-
-  // Thin accent line above "NOW BOOKING"
-  const accentLineY = PANEL_Y + 100;
 
   return Buffer.from(`
     <svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <style>${FONT_FACE}</style>
-        <!-- Subtle vignette — darkens edges, barely touches center -->
-        <radialGradient id="vign" cx="50%" cy="40%" r="75%">
-          <stop offset="0%"   stop-color="black" stop-opacity="0" />
-          <stop offset="100%" stop-color="black" stop-opacity="0.55" />
+        <!-- Very light vignette — photo breathes in the top half -->
+        <radialGradient id="vign" cx="50%" cy="35%" r="72%">
+          <stop offset="0%"   stop-color="black" stop-opacity="0"/>
+          <stop offset="85%"  stop-color="black" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="black" stop-opacity="0.38"/>
         </radialGradient>
-        <!-- Bottom panel: dark frosted glass feel -->
-        <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stop-color="black" stop-opacity="0.55" />
-          <stop offset="100%" stop-color="black" stop-opacity="0.82" />
+        <!-- Top edge gradient so photo fades into torn panel naturally -->
+        <linearGradient id="fadeToPanel" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stop-color="black" stop-opacity="0"/>
+          <stop offset="70%" stop-color="black" stop-opacity="0"/>
+          <stop offset="100%" stop-color="rgb(${r},${g},${b})" stop-opacity="0.6"/>
         </linearGradient>
       </defs>
 
-      <!-- Vignette over entire image -->
-      <rect width="${W}" height="${H}" fill="url(#vign)" />
+      <!-- Light vignette over whole photo — keeps photo vivid -->
+      <rect width="${W}" height="${H}" fill="url(#vign)"/>
 
-      <!-- Frosted bottom panel -->
-      <rect x="0" y="${PANEL_Y}" width="${W}" height="${PANEL_H}" fill="url(#panel)" />
+      <!-- Soft fade from photo into torn panel — avoids hard seam -->
+      <rect x="0" y="${TEAR_BASE - 200}" width="${W}" height="260"
+        fill="url(#fadeToPanel)"/>
 
-      <!-- Thin accent line -->
-      <rect x="60" y="${accentLineY}" width="80" height="5" rx="2.5" fill="${ACCENT}" />
+      <!-- Shadow layer — gives torn edge depth/lift -->
+      <path d="${shadowPath}" fill="rgb(${Math.max(0,r-30)},${Math.max(0,g-30)},${Math.max(0,b-30)})" fill-opacity="0.45"/>
 
-      <!-- Salon name — small, elegant, above headline -->
-      <text x="60" y="${PANEL_Y + 76}"
-        font-family="${font}" font-size="28" font-weight="800"
-        fill="${LIGHT}" letter-spacing="5">
+      <!-- Torn paper panel — salon brand color -->
+      <path d="${panelPath}" fill="rgba(${r},${g},${b},0.90)"/>
+
+      <!-- Salon name — spaced caps, accent color, above headline -->
+      <text x="68" y="${TEXT_Y + 42}"
+        font-family="${font}" font-size="24" font-weight="800"
+        fill="${ACCENT}" letter-spacing="7" fill-opacity="0.95">
         ${escSvg(salonName.toUpperCase())}
       </text>
 
-      <!-- "NOW BOOKING" headline -->
-      <text x="60" y="${PANEL_Y + 170}"
-        font-family="${font}" font-size="86" font-weight="800"
-        fill="white" letter-spacing="-1">
-        NOW BOOKING
+      <!-- NOW BOOKING — large, punchy headline -->
+      <text x="68" y="${TEXT_Y + 148}"
+        font-family="${font}" font-size="100" font-weight="800"
+        fill="white" letter-spacing="-3" fill-opacity="0.97">
+        NOW
+      </text>
+      <text x="68" y="${TEXT_Y + 248}"
+        font-family="${font}" font-size="100" font-weight="800"
+        fill="white" letter-spacing="-3" fill-opacity="0.97">
+        BOOKING
       </text>
 
       <!-- Slot rows -->
       ${slotRows}
 
-      <!-- Stylist credit + Instagram at very bottom -->
-      <text x="${W / 2}" y="${H - 120}"
+      <!-- Stylist name -->
+      <text x="${W / 2}" y="${H - 136}"
         font-family="${font}" font-size="34" font-weight="700"
-        fill="white" text-anchor="middle" fill-opacity="0.9">
+        fill="white" text-anchor="middle" fill-opacity="0.88">
         ${escSvg(stylistName)}
       </text>
 
       ${instagramHandle ? `
-      <text x="${W / 2}" y="${H - 76}"
+      <text x="${W / 2}" y="${H - 94}"
         font-family="${font}" font-size="28" font-weight="600"
-        fill="${ACCENT}" text-anchor="middle">
+        fill="${ACCENT}" text-anchor="middle" fill-opacity="0.95">
         @${escSvg(instagramHandle.replace(/^@/, ""))}
       </text>` : ""}
 
-      <!-- Booking CTA pill -->
-      <rect x="60" y="${H - 52}" width="${W - 120}" height="44" rx="22"
-        fill="${ACCENT}" fill-opacity="0.92" />
-      <text x="${W / 2}" y="${H - 22}"
+      <!-- CTA bar — slightly rounded rectangle, not a full pill — less corporate -->
+      <rect x="68" y="${H - 66}" width="${W - 136}" height="48" rx="6"
+        fill="${ACCENT}" fill-opacity="0.95"/>
+      <text x="${W / 2}" y="${H - 34}"
         font-family="${font}" font-size="26" font-weight="800"
         fill="white" text-anchor="middle">
         ${escSvg(bookingCta || "Book via link in bio")}
@@ -264,12 +322,15 @@ export async function buildAvailabilityImage({ text, stylistName, salonName, sal
   const bgUrl = submittedImageUrl || await pickBackground(stylistId, salonId);
 
   // 3. Fetch and resize background to story dimensions
+  // Slight modulate: keep saturation vivid (photo should feel present)
+  // but reduce brightness a touch so the torn panel text pops
   let bgLayer;
   if (bgUrl) {
     try {
       const bgBuf = await fetchBuffer(bgUrl);
       bgLayer = await sharp(bgBuf)
         .resize(W, H, { fit: "cover", position: "center" })
+        .modulate({ brightness: 0.88, saturation: 1.05 })
         .toBuffer();
     } catch (err) {
       console.warn("[Availability] Background fetch failed, trying Pexels:", err.message);

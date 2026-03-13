@@ -2,7 +2,6 @@
 // Public breakroom TV leaderboard — /leaderboard/:token
 // No login required. Secured by an opaque random token.
 // Auto-refreshes every 60 seconds. Designed for landscape TV display.
-// Light-mode design: white header ensures all salon logos are visible.
 
 import express from "express";
 import {
@@ -22,72 +21,171 @@ function esc(s) {
     .replace(/"/g, "&quot;");
 }
 
-const medals = ["🥇", "🥈", "🥉"];
+// Avatar initials from a display name
+function initials(name) {
+  const parts = String(name || "?").trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
-// Podium platform colors: 2nd=charcoal, 1st=coral, 3rd=warm gray
-const platColors = ["#2B2D35", "#3B72B9", "#A8A09C"];
+// Rank ring / glow color
+const RANK_COLORS = {
+  1: { ring: "#F59E0B", glow: "rgba(245,158,11,0.35)", label: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
+  2: { ring: "#94A3B8", glow: "rgba(148,163,184,0.25)", label: "#CBD5E1", bg: "rgba(148,163,184,0.10)" },
+  3: { ring: "#CD7C4E", glow: "rgba(205,124,78,0.25)",  label: "#D4A27A", bg: "rgba(205,124,78,0.10)" },
+};
+
+const CROWN  = ["👑", "🥈", "🥉"];
+const RANK_LABEL = ["1st", "2nd", "3rd"];
 
 router.get("/:token", (req, res) => {
   const salon = getSalonByLeaderboardToken(req.params.token);
   if (!salon) {
     return res.status(404).send(`
       <!DOCTYPE html><html><head><meta charset="UTF-8"><title>Not Found</title></head>
-      <body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F8FAFC;color:#6B7280">
+      <body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#0F172A;color:#94A3B8">
         <p>Leaderboard not found. Ask your manager to share the correct link.</p>
       </body></html>
     `);
   }
 
-  const period = "month"; // TV always shows current month
+  const period      = "month";
   const leaderboard = getLeaderboard(salon.slug, period);
   const bonusActive = isBonusActive(salon.slug);
   const multiplier  = getBonusMultiplier(salon.slug);
 
   const top3 = leaderboard.slice(0, 3);
-  const rest  = leaderboard.slice(3, 10);
+  const rest  = leaderboard.slice(3, 12);
+  const maxPts = top3[0]?.points || 1; // for progress bar scaling
 
-  // ── Top 3 podium ─────────────────────────────────────────────────────────
-  // Display order: 2nd, 1st, 3rd for visual podium effect
-  const podiumOrder   = [top3[1], top3[0], top3[2]].filter(Boolean);
-  const podiumHeights = top3[1] ? ["h-32", "h-44", "h-24"] : ["", "h-44", ""];
+  // ── Logo ─────────────────────────────────────────────────────────────────
+  const logoHtml = salon.logo_url
+    ? `<img src="${esc(salon.logo_url)}" alt="${esc(salon.name)}" style="height:44px;width:auto;object-fit:contain;" />`
+    : `<span style="font-size:1.25rem;font-weight:800;color:#fff;letter-spacing:-0.02em">${esc(salon.name)}</span>`;
+
+  // ── Bonus banner ─────────────────────────────────────────────────────────
+  const bonusBanner = bonusActive ? `
+    <div class="pulse-slow" style="display:flex;align-items:center;gap:.625rem;border-radius:9999px;background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.5);padding:.5rem 1.25rem;">
+      <span style="font-size:1.1rem">🎯</span>
+      <span style="font-size:.8rem;font-weight:800;color:#F59E0B;letter-spacing:.06em;text-transform:uppercase">${multiplier}× DOUBLE POINTS ACTIVE</span>
+    </div>` : "";
+
+  // ── Hero: top 3 podium ───────────────────────────────────────────────────
+  // Order: 2nd (left) · 1st (center, tallest) · 3rd (right)
+  const podiumOrder = [top3[1], top3[0], top3[2]];
+  const podiumSizes = [
+    { avatar: 88,  nameSz: "1.1rem", ptSz: "1.6rem", labelSz: ".7rem",  mt: "3.5rem" },  // 2nd
+    { avatar: 112, nameSz: "1.4rem", ptSz: "2.2rem", labelSz: ".75rem", mt: "0" },        // 1st
+    { avatar: 80,  avatar: 80, nameSz: "1rem",  ptSz: "1.4rem", labelSz: ".7rem",  mt: "5rem" },  // 3rd
+  ];
 
   const podiumCards = podiumOrder.map((s, i) => {
+    if (!s) return `<div style="flex:1"></div>`;
+    const rankIdx = s.rank - 1; // 0=1st,1=2nd,2=3rd
+    const rc = RANK_COLORS[s.rank] || RANK_COLORS[3];
+    const sz = podiumSizes[i];
+    const av = sz.avatar || 88;
+    const ini = initials(s.stylist_name);
     const isCenter = i === 1;
-    const platColor = platColors[i];
-    const nameSz    = isCenter ? "text-2xl" : "text-lg";
-    const ptSz      = isCenter ? "text-4xl" : "text-2xl";
-    const medal     = medals[s.rank - 1] || "";
-    const height    = podiumHeights[i];
+
+    // Post type breakdown — small dots
+    const typeBreakdown = Object.entries(s.by_type || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([type, cnt]) => {
+        const label = type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        return `<span style="font-size:.65rem;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.7);padding:.2rem .55rem;border-radius:9999px;white-space:nowrap">${label} ×${cnt}</span>`;
+      }).join("");
+
     return `
-      <div class="flex flex-col items-center gap-2 flex-1">
-        <div class="text-4xl">${medal}</div>
-        <div class="${nameSz} font-extrabold text-center leading-tight" style="color:#2B2D35">${esc(s.stylist_name)}</div>
-        <div class="${ptSz} font-black" style="color:#3B72B9">${s.points}<span class="text-base font-semibold ml-1" style="color:#9CA3AF">pts</span></div>
-        <div class="text-xs" style="color:#6B7280">${s.post_count} post${s.post_count !== 1 ? "s" : ""}${s.streak > 1 ? ` · 🔥 ${s.streak}wk` : ""}</div>
-        <div class="w-full ${height} rounded-t-2xl" style="background:${platColor}"></div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:.625rem;margin-top:${sz.mt};padding:.75rem .5rem;">
+        <!-- Rank badge + Avatar -->
+        <div style="position:relative;display:inline-flex;">
+          <!-- Glow ring -->
+          <div style="position:absolute;inset:-4px;border-radius:50%;box-shadow:0 0 0 3px ${rc.ring},0 0 20px 4px ${rc.glow};border-radius:50%;"></div>
+          <!-- Avatar circle -->
+          <div style="width:${av}px;height:${av}px;border-radius:50%;background:linear-gradient(135deg,#1e293b,#0f172a);border:3px solid ${rc.ring};display:flex;align-items:center;justify-content:center;font-size:${Math.round(av * 0.34)}px;font-weight:900;color:${rc.ring};letter-spacing:-.02em;position:relative;z-index:1;">
+            ${ini}
+          </div>
+          <!-- Rank badge -->
+          <div style="position:absolute;bottom:-6px;right:-6px;width:26px;height:26px;border-radius:50%;background:#0F172A;border:2px solid ${rc.ring};display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:900;color:${rc.ring};z-index:2;">
+            ${s.rank}
+          </div>
+        </div>
+
+        <!-- Crown / medal -->
+        <div style="font-size:${isCenter ? "1.6rem" : "1.1rem"};line-height:1;">${CROWN[rankIdx] || ""}</div>
+
+        <!-- Name -->
+        <div style="font-size:${sz.nameSz};font-weight:800;color:#fff;text-align:center;line-height:1.2;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          ${esc(s.stylist_name)}
+        </div>
+
+        <!-- Points -->
+        <div style="display:flex;align-items:baseline;gap:.3rem;">
+          <span style="font-size:${sz.ptSz};font-weight:900;color:${rc.label};line-height:1;">${s.points}</span>
+          <span style="font-size:.75rem;font-weight:600;color:rgba(255,255,255,0.4);">pts</span>
+        </div>
+
+        <!-- Post count + streak -->
+        <div style="display:flex;align-items:center;gap:.5rem;font-size:.72rem;color:rgba(255,255,255,0.5);">
+          <span>${s.post_count} post${s.post_count !== 1 ? "s" : ""}</span>
+          ${s.streak > 1 ? `<span style="color:#F59E0B;font-weight:700;">🔥 ${s.streak}wk streak</span>` : ""}
+        </div>
+
+        <!-- Post type breakdown -->
+        ${typeBreakdown ? `<div style="display:flex;flex-wrap:wrap;gap:.3rem;justify-content:center;max-width:180px;">${typeBreakdown}</div>` : ""}
+
+        <!-- Podium platform bar -->
+        <div style="width:100%;height:${isCenter ? "56px" : s.rank === 2 ? "40px" : "28px"};background:${rc.bg};border:1px solid ${rc.ring}22;border-radius:.75rem .75rem 0 0;margin-top:.25rem;"></div>
       </div>`;
   }).join("");
 
-  // ── Rest of leaderboard ───────────────────────────────────────────────────
-  const restRows = rest.map(s => `
-    <div class="flex items-center gap-4 py-3 border-b last:border-0" style="border-color:#E5DCDA">
-      <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white" style="background:#2B2D35">${s.rank}</span>
-      <span class="flex-1 text-lg font-semibold" style="color:#2B2D35">${esc(s.stylist_name)}</span>
-      <span class="font-bold text-xl" style="color:#3B72B9">${s.points} <span class="text-xs font-normal" style="color:#9CA3AF">pts</span></span>
-      <span class="text-sm w-20 text-right" style="color:#6B7280">${s.post_count} posts</span>
-      ${s.streak > 1 ? `<span class="text-sm w-16 text-right" style="color:#6B7280">🔥 ${s.streak}wk</span>` : `<span class="w-16"></span>`}
-    </div>`).join("");
+  // ── Ranked list (4th–12th) ────────────────────────────────────────────────
+  const restRows = rest.map((s, idx) => {
+    const pct = Math.round((s.points / maxPts) * 100);
+    const ini = initials(s.stylist_name);
+    const isEven = idx % 2 === 0;
+    return `
+      <div style="display:flex;align-items:center;gap:1rem;padding:.75rem 1.25rem;background:${isEven ? "#fff" : "#F8FAFC"};border-bottom:1px solid #E2E8F0;">
+        <!-- Rank circle -->
+        <div style="width:32px;height:32px;border-radius:50%;background:#F1F5F9;border:1.5px solid #E2E8F0;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;color:#475569;flex-shrink:0;">
+          ${s.rank}
+        </div>
+        <!-- Avatar -->
+        <div style="width:40px;height:40px;border-radius:50%;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:800;color:#94A3B8;flex-shrink:0;">
+          ${ini}
+        </div>
+        <!-- Name + progress -->
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.95rem;font-weight:700;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(s.stylist_name)}</div>
+          <div style="margin-top:.3rem;height:5px;background:#E2E8F0;border-radius:9999px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#3B72B9,#60A5FA);border-radius:9999px;transition:width .6s ease;"></div>
+          </div>
+        </div>
+        <!-- Streak -->
+        <div style="width:80px;text-align:center;flex-shrink:0;">
+          ${s.streak > 1
+            ? `<span style="font-size:.75rem;font-weight:700;color:#F59E0B;">🔥 ${s.streak}wk</span>`
+            : `<span style="font-size:.75rem;color:#CBD5E1;">—</span>`}
+        </div>
+        <!-- Posts -->
+        <div style="width:60px;text-align:right;font-size:.8rem;color:#64748B;flex-shrink:0;">${s.post_count} post${s.post_count !== 1 ? "s" : ""}</div>
+        <!-- Points -->
+        <div style="width:80px;text-align:right;flex-shrink:0;">
+          <span style="font-size:1.1rem;font-weight:900;color:#3B72B9;">${s.points}</span>
+          <span style="font-size:.65rem;color:#94A3B8;"> pts</span>
+        </div>
+      </div>`;
+  }).join("");
 
+  // ── Empty state ───────────────────────────────────────────────────────────
   const emptyState = !leaderboard.length ? `
-    <div class="col-span-full flex flex-col items-center justify-center py-20" style="color:#6B7280">
-      <p class="text-2xl font-bold">No posts yet this month</p>
-      <p class="text-lg mt-2">Text a photo to get started!</p>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;color:rgba(255,255,255,0.3);padding:4rem;">
+      <div style="font-size:4rem;">📸</div>
+      <p style="font-size:1.5rem;font-weight:800;color:rgba(255,255,255,0.5);">No posts yet this month</p>
+      <p style="font-size:1rem;">Text a photo to get on the board!</p>
     </div>` : "";
-
-  // ── Logo — white header means any logo color is visible ───────────────────
-  const logoHtml = salon.logo_url
-    ? `<img src="${esc(salon.logo_url)}" alt="${esc(salon.name)}" class="h-12 w-auto object-contain" />`
-    : `<span class="text-xl font-extrabold" style="color:#2B2D35">${esc(salon.name)}</span>`;
 
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -98,75 +196,121 @@ router.get("/:token", (req, res) => {
   <meta http-equiv="refresh" content="60" />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
       background: #F8FAFC;
-      color: #2B2D35;
-      min-height: 100vh;
+      color: #0F172A;
+      height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
-    @keyframes pulse-slow { 0%,100% { opacity:1; } 50% { opacity:.6; } }
-    .pulse-slow { animation: pulse-slow 2s ease-in-out infinite; }
-    .h-32 { height: 8rem; }
-    .h-44 { height: 11rem; }
-    .h-24 { height: 6rem; }
-    .rounded-t-2xl { border-radius: 1rem 1rem 0 0; }
+    @keyframes pulse-slow { 0%,100%{opacity:1} 50%{opacity:.55} }
+    .pulse-slow { animation: pulse-slow 2.2s ease-in-out infinite; }
+    @keyframes shimmer {
+      0%   { background-position: -400px 0; }
+      100% { background-position: 400px 0; }
+    }
+    .shimmer {
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+      background-size: 400px 100%;
+      animation: shimmer 3s infinite;
+    }
   </style>
 </head>
 <body>
 
-  <!-- Header — pure white so any salon logo reads clearly -->
-  <header style="background:#fff;border-bottom:1px solid #E5DCDA;box-shadow:0 1px 4px rgba(43,45,53,0.06);display:flex;align-items:center;justify-content:space-between;padding:1.25rem 2.5rem;">
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <header style="
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+    flex-shrink: 0;
+  ">
     <div style="display:flex;align-items:center;gap:1rem;">
       ${logoHtml}
-      <div style="width:1px;height:2rem;background:#E5DCDA"></div>
+      <div style="width:1px;height:2rem;background:rgba(255,255,255,0.12)"></div>
       <div>
-        <p style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6B7280">Team Leaderboard</p>
-        <p style="font-size:14px;font-weight:700;color:#2B2D35">This Month</p>
+        <p style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,0.4)">Team Leaderboard</p>
+        <p style="font-size:.9rem;font-weight:700;color:rgba(255,255,255,0.85)">This Month</p>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:1.5rem;">
-      ${bonusActive ? `
-      <div class="pulse-slow" style="display:flex;align-items:center;gap:.5rem;border-radius:9999px;border:1px solid rgba(59,114,185,0.4);background:rgba(59,114,185,0.12);padding:.625rem 1.25rem;">
-        <span style="font-size:1.25rem">🎯</span>
-        <span style="font-size:14px;font-weight:700;color:#3B72B9">${multiplier}× DOUBLE POINTS ACTIVE</span>
-      </div>` : ""}
+    <div style="display:flex;align-items:center;gap:1.25rem;">
+      ${bonusBanner}
       <div style="text-align:right;">
-        <p style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9CA3AF">Powered by</p>
-        <p style="font-size:14px;font-weight:700;color:#2B2D35">MostlyPostly</p>
+        <p style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,0.3)">Powered by</p>
+        <p style="font-size:.8rem;font-weight:800;color:rgba(255,255,255,0.6)">MostlyPostly</p>
       </div>
     </div>
   </header>
 
-  <!-- Main content -->
-  <main style="flex:1;display:flex;gap:2rem;padding:2rem 2.5rem;overflow:hidden;">
+  <!-- ── Main ───────────────────────────────────────────────────────────── -->
+  <main style="flex:1;display:flex;overflow:hidden;">
 
-    <div style="flex:1;display:flex;flex-direction:column;gap:2rem;">
+    <!-- Left: dark hero with podium -->
+    <div style="
+      width: ${rest.length ? "52%" : "100%"};
+      background: linear-gradient(175deg, #0F172A 0%, #1a2744 60%, #0d1f3c 100%);
+      display: flex;
+      flex-direction: column;
+      padding: 1.5rem 2rem 0;
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    ">
+      <!-- Subtle texture shimmer -->
+      <div class="shimmer" style="position:absolute;inset:0;pointer-events:none;"></div>
 
       ${emptyState}
 
       ${top3.length ? `
+      <!-- Section label -->
+      <p style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,0.3);text-align:center;margin-bottom:.5rem;position:relative;">
+        Top Performers
+      </p>
+
       <!-- Podium -->
-      <div style="display:flex;align-items:flex-end;justify-content:center;gap:1.5rem;padding-bottom:1rem;">
+      <div style="display:flex;align-items:flex-end;justify-content:center;gap:1rem;flex:1;position:relative;">
         ${podiumCards}
       </div>` : ""}
-
-      ${rest.length ? `
-      <!-- 4th–10th -->
-      <div style="background:#fff;border:1px solid #E5DCDA;border-radius:1rem;padding:.5rem 1.5rem;box-shadow:0 1px 4px rgba(43,45,53,0.06);">
-        ${restRows}
-      </div>` : ""}
-
     </div>
+
+    <!-- Right: ranked list -->
+    ${rest.length ? `
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid #E2E8F0;">
+      <!-- List header -->
+      <div style="display:flex;align-items:center;gap:1rem;padding:.625rem 1.25rem;background:#F1F5F9;border-bottom:2px solid #E2E8F0;flex-shrink:0;">
+        <div style="width:32px;"></div>
+        <div style="width:40px;"></div>
+        <div style="flex:1;font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;">Stylist</div>
+        <div style="width:80px;text-align:center;font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;">Streak</div>
+        <div style="width:60px;text-align:right;font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;">Posts</div>
+        <div style="width:80px;text-align:right;font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;">Points</div>
+      </div>
+      <!-- Rows -->
+      <div style="flex:1;overflow-y:auto;">
+        ${restRows}
+      </div>
+    </div>` : ""}
 
   </main>
 
-  <!-- Footer -->
-  <footer style="background:#fff;border-top:1px solid #E5DCDA;padding:1rem 2.5rem;display:flex;align-items:center;justify-content:space-between;">
-    <p style="font-size:12px;color:#6B7280">Auto-refreshes every 60 seconds</p>
-    <p style="font-size:12px;color:#6B7280">Points based on published posts · Streaks = consecutive weeks with a post</p>
+  <!-- ── Footer ─────────────────────────────────────────────────────────── -->
+  <footer style="
+    background: #fff;
+    border-top: 1px solid #E2E8F0;
+    padding: .625rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  ">
+    <p style="font-size:.7rem;color:#94A3B8;">Auto-refreshes every 60 seconds</p>
+    <p style="font-size:.7rem;color:#94A3B8;">Points based on published posts &nbsp;·&nbsp; 🔥 = consecutive weeks with a post</p>
   </footer>
 
 </body>

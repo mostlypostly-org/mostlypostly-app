@@ -170,7 +170,9 @@ router.get("/", (req, res) => {
 
   const params = [salon_id, fromUtc, toUtc];
 
-  if (statusParam !== "all") {
+  if (statusParam === "all") {
+    sql += ` AND status != 'expired'`;
+  } else {
     sql += ` AND LOWER(status) = ?`;
     params.push(statusParam);
   }
@@ -254,7 +256,7 @@ router.get("/", (req, res) => {
         <div class="flex flex-col gap-1">
           <label class="text-[11px] uppercase tracking-wide text-mpMuted">Status</label>
           <select name="status" class="rounded-md border border-mpBorder bg-white px-2 py-1.5 text-xs focus:border-mpAccent focus:outline-none focus:ring-1 focus:ring-mpAccent">
-            ${["all","manager_pending","approved","queued","published","denied"]
+            ${["all","manager_pending","approved","queued","published","denied","expired"]
               .map(
                 (s) =>
                   `<option value="${s}" ${
