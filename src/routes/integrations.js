@@ -3,8 +3,11 @@
 
 import express from "express";
 import crypto from "crypto";
+import { v4 as uuidv4 } from "uuid";
 import db from "../../db.js";
 import pageShell from "../ui/pageShell.js";
+import { encrypt, decrypt } from "../core/encryption.js";
+import { createZenotiClient } from "../core/zenoti.js";
 import { handleZenotiEvent, handleVagaroEvent } from "../core/integrationHandlers.js";
 
 const router = express.Router();
@@ -13,9 +16,7 @@ const router = express.Router();
 // Auth guard (same pattern used across all manager routes)
 // ─────────────────────────────────────────────────────────────────
 function requireAuth(req, res, next) {
-  if (!req.manager || !req.manager.manager_phone) {
-    return res.redirect("/manager/login");
-  }
+  if (!req.manager) return res.redirect("/manager/login");
   next();
 }
 
@@ -44,11 +45,36 @@ router.get("/", requireAuth, (req, res) => {
   const BASE_URL = process.env.PUBLIC_BASE_URL || process.env.BASE_URL || "";
   const zenotiWebhookUrl = `${BASE_URL}/integrations/webhook/zenoti/${salon_id}`;
 
+  // Alert banners for test/sync results
+  const testedOk   = req.query.tested === 'ok';
+  const testedFail = req.query.tested === 'fail';
+  const testError  = req.query.error ? decodeURIComponent(req.query.error) : '';
+  const centersCount = req.query.centers ? parseInt(req.query.centers, 10) : 0;
+  const synced     = req.query.synced === '1';
+  const syncFound  = req.query.found  ? parseInt(req.query.found, 10) : 0;
+
+  let alertHtml = '';
+  if (testedOk) {
+    alertHtml = `<div class="mb-6 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 font-medium">
+      Connection successful — found ${centersCount} center${centersCount !== 1 ? 's' : ''}.
+    </div>`;
+  } else if (testedFail) {
+    alertHtml = `<div class="mb-6 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">
+      Connection test failed: ${testError || 'Unknown error'}
+    </div>`;
+  } else if (synced) {
+    alertHtml = `<div class="mb-6 rounded-xl bg-mpAccentLight border border-mpBorder px-4 py-3 text-sm text-mpAccent font-medium">
+      Sync complete — found ${syncFound} employee${syncFound !== 1 ? 's' : ''} with open availability.
+    </div>`;
+  }
+
   const body = `
     <section class="mb-6">
       <h1 class="text-2xl font-bold mb-1">Integrations</h1>
       <p class="text-sm text-mpMuted">Connect your salon booking software to unlock automatic content nudges, richer AI captions, and utilization-aware posting.</p>
     </section>
+
+    ${alertHtml}
 
     <!-- ZENOTI -->
     <section class="mb-6">
@@ -122,6 +148,26 @@ router.get("/", requireAuth, (req, res) => {
           })()}
         </div>
 
+        <!-- Test + Sync actions -->
+        <div class="mb-4 flex flex-wrap gap-2">
+          <form method="POST" action="/manager/integrations/zenoti/test">
+            <button type="submit"
+              class="px-4 py-2 rounded-lg border border-mpBorder text-xs font-semibold text-mpCharcoal hover:bg-mpBg transition-colors">
+              Test Connection
+            </button>
+          </form>
+          <form method="POST" action="/manager/integrations/zenoti/sync">
+            <button type="submit"
+              class="px-4 py-2 rounded-lg bg-mpAccent text-white text-xs font-semibold hover:opacity-90 transition-opacity">
+              Sync Now
+            </button>
+          </form>
+          <a href="/manager/integrations/zenoti"
+             class="px-4 py-2 rounded-lg border border-mpBorder text-xs font-semibold text-mpCharcoal hover:bg-mpBg transition-colors inline-flex items-center">
+            Update Credentials
+          </a>
+        </div>
+
         <!-- Disconnect -->
         <form method="POST" action="/manager/integrations/zenoti/disconnect" onsubmit="return confirm('Disconnect Zenoti integration?')">
           <button class="text-xs text-red-400 hover:text-red-600 underline">Disconnect Zenoti</button>
@@ -184,33 +230,316 @@ router.get("/", requireAuth, (req, res) => {
       body,
       salon_id,
       manager_phone,
+      manager_id: req.manager?.id,
       current: "integrations",
     })
   );
 });
 
 // ─────────────────────────────────────────────────────────────────
+// GET /manager/integrations/zenoti — Zenoti setup / update form
+// ─────────────────────────────────────────────────────────────────
+router.get("/zenoti", requireAuth, (req, res) => {
+  const salon_id      = req.manager?.salon_id;
+  const manager_phone = req.manager?.manager_phone;
+  const manager_id    = req.manager?.id;
+
+  const existing = db.prepare(
+    `SELECT * FROM salon_integrations WHERE salon_id = ? AND platform = 'zenoti'`
+  ).get(salon_id);
+  const isUpdate = !!(existing && existing.api_key);
+  const saved    = req.query.saved === '1';
+
+  const savedAlert = saved
+    ? `<div class="mb-6 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 font-medium">
+        Zenoti credentials saved successfully.
+       </div>`
+    : '';
+
+  const heading = isUpdate ? 'Update Zenoti Credentials' : 'Connect Zenoti';
+
+  const body = `
+    <div class="mb-8 flex items-center gap-3">
+      <a href="/manager/integrations" class="text-mpMuted hover:text-mpCharcoal transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+        </svg>
+      </a>
+      <h1 class="text-2xl font-bold text-mpCharcoal">${heading}</h1>
+    </div>
+
+    ${savedAlert}
+
+    <div class="max-w-lg">
+      <div class="bg-white rounded-2xl border border-mpBorder p-6">
+        <p class="text-sm text-mpMuted mb-6">
+          Enter your Zenoti API credentials. You can find these in your Zenoti account under
+          <strong>Settings &rarr; API Access</strong>. Your application secret is encrypted before storage and never displayed again.
+        </p>
+
+        <form method="POST" action="/manager/integrations/zenoti/connect" class="space-y-5">
+          <div>
+            <label class="block text-sm font-medium text-mpCharcoal mb-1.5">Application ID</label>
+            <input
+              type="text"
+              name="app_id"
+              value="${existing?.app_id ? String(existing.app_id).replace(/"/g, '&quot;') : ''}"
+              placeholder="e.g. your-app-id"
+              required
+              class="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm text-mpCharcoal placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-mpAccent focus:border-transparent"
+            />
+            <p class="mt-1 text-xs text-mpMuted">Your Zenoti application identifier.</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-mpCharcoal mb-1.5">
+              Application Secret
+              ${isUpdate ? '<span class="text-mpMuted font-normal">(leave blank to keep existing)</span>' : ''}
+            </label>
+            <input
+              type="password"
+              name="app_secret"
+              placeholder="${isUpdate ? '••••••••••••••••' : 'Paste your API secret key'}"
+              ${isUpdate ? '' : 'required'}
+              autocomplete="new-password"
+              class="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm text-mpCharcoal placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-mpAccent focus:border-transparent"
+            />
+            <p class="mt-1 text-xs text-mpMuted">Encrypted at rest. Never stored in plain text.</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-mpCharcoal mb-1.5">
+              Center ID <span class="text-mpMuted font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              name="center_id"
+              value="${existing?.center_id ? String(existing.center_id).replace(/"/g, '&quot;') : ''}"
+              placeholder="e.g. center-uuid-here"
+              class="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm text-mpCharcoal placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-mpAccent focus:border-transparent"
+            />
+            <p class="mt-1 text-xs text-mpMuted">
+              Your Zenoti center UUID. You can retrieve this after connecting — the Test Connection
+              button will list all available centers for your account.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3 pt-2">
+            <button type="submit"
+              class="px-5 py-2.5 rounded-lg bg-mpAccent text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+              ${isUpdate ? 'Update Credentials' : 'Save &amp; Connect'}
+            </button>
+            <a href="/manager/integrations"
+               class="px-5 py-2.5 rounded-lg border border-mpBorder text-sm font-medium text-mpCharcoal hover:bg-mpBg transition-colors">
+              Cancel
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  res.send(pageShell({
+    title: 'Zenoti Setup',
+    body,
+    salon_id,
+    manager_phone,
+    manager_id,
+    current: 'integrations',
+  }));
+});
+
+// ─────────────────────────────────────────────────────────────────
 // POST /manager/integrations/zenoti/connect
+// Saves app_id + encrypted secret + center_id
 // ─────────────────────────────────────────────────────────────────
 router.post("/zenoti/connect", requireAuth, (req, res) => {
   const salon_id = req.manager?.salon_id;
-  const { api_key, center_id } = req.body;
+  const { app_id, app_secret, api_key, center_id } = req.body;
 
-  if (!api_key) return res.redirect("/manager/integrations?error=missing_key");
+  // Support legacy plain api_key field from the existing connect form on the main page
+  const isLegacyForm = !app_id && !!api_key;
 
-  const id = crypto.randomUUID();
-  db.prepare(
-    `INSERT INTO salon_integrations (id, salon_id, platform, api_key, center_id, sync_enabled, connected_at)
-     VALUES (?, ?, 'zenoti', ?, ?, 1, datetime('now'))
-     ON CONFLICT(salon_id, platform) DO UPDATE SET
-       api_key = excluded.api_key,
-       center_id = excluded.center_id,
-       sync_enabled = 1,
-       connected_at = excluded.connected_at`
-  ).run(id, salon_id, api_key.trim(), (center_id || "").trim());
+  if (isLegacyForm) {
+    // Legacy path — plain api_key from the inline form, no encryption
+    if (!api_key) return res.redirect("/manager/integrations?error=missing_key");
+    const id = crypto.randomUUID();
+    db.prepare(
+      `INSERT INTO salon_integrations (id, salon_id, platform, api_key, center_id, sync_enabled, connected_at)
+       VALUES (?, ?, 'zenoti', ?, ?, 1, datetime('now'))
+       ON CONFLICT(salon_id, platform) DO UPDATE SET
+         api_key = excluded.api_key,
+         center_id = excluded.center_id,
+         sync_enabled = 1,
+         connected_at = excluded.connected_at`
+    ).run(id, salon_id, api_key.trim(), (center_id || "").trim());
+    console.log(`[Integrations] Zenoti connected (legacy) for salon=${salon_id}`);
+    return res.redirect("/manager/integrations?connected=zenoti");
+  }
 
-  console.log(`[Integrations] Zenoti connected for salon=${salon_id}`);
-  res.redirect("/manager/integrations?connected=zenoti");
+  // New path — app_id + encrypted secret
+  if (!app_id || !app_id.trim()) {
+    return res.redirect('/manager/integrations/zenoti?error=missing_app_id');
+  }
+
+  const existing = db.prepare(
+    `SELECT * FROM salon_integrations WHERE salon_id = ? AND platform = 'zenoti'`
+  ).get(salon_id);
+
+  let encryptedSecret;
+  if (app_secret && app_secret.trim()) {
+    try {
+      encryptedSecret = encrypt(app_secret.trim());
+    } catch (e) {
+      console.error('[Integrations] encrypt error:', e.message);
+      return res.redirect('/manager/integrations/zenoti?error=encrypt_failed');
+    }
+  } else if (existing && existing.api_key) {
+    encryptedSecret = existing.api_key;
+  } else {
+    return res.redirect('/manager/integrations/zenoti?error=missing_secret');
+  }
+
+  const now = new Date().toISOString();
+  const id  = existing ? existing.id : uuidv4();
+
+  db.prepare(`
+    INSERT INTO salon_integrations (id, salon_id, platform, api_key, app_id, center_id, sync_enabled, connected_at)
+    VALUES (?, ?, 'zenoti', ?, ?, ?, 1, ?)
+    ON CONFLICT(salon_id, platform) DO UPDATE SET
+      api_key      = excluded.api_key,
+      app_id       = excluded.app_id,
+      center_id    = excluded.center_id,
+      sync_enabled = 1,
+      connected_at = excluded.connected_at
+  `).run(id, salon_id, encryptedSecret, app_id.trim(), center_id?.trim() || null, now);
+
+  console.log(`[Integrations] Zenoti connected (encrypted) for salon=${salon_id}`);
+  res.redirect('/manager/integrations/zenoti?saved=1');
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /manager/integrations/zenoti/test — test API connectivity
+// ─────────────────────────────────────────────────────────────────
+router.post("/zenoti/test", requireAuth, async (req, res) => {
+  const salon_id = req.manager?.salon_id;
+  const row = db.prepare(
+    `SELECT * FROM salon_integrations WHERE salon_id = ? AND platform = 'zenoti'`
+  ).get(salon_id);
+
+  if (!row || !row.api_key) {
+    return res.redirect('/manager/integrations?error=not_connected');
+  }
+
+  let secret;
+  try {
+    secret = decrypt(row.api_key);
+  } catch (e) {
+    console.error('[Integrations] decrypt error:', e.message);
+    return res.redirect(`/manager/integrations?tested=fail&error=${encodeURIComponent('Failed to decrypt credentials')}`);
+  }
+
+  try {
+    const client = createZenotiClient(row.app_id, secret);
+    const result = await client.testConnection();
+    const count  = Array.isArray(result.centers) ? result.centers.length : 0;
+    res.redirect(`/manager/integrations?tested=ok&centers=${count}`);
+  } catch (e) {
+    console.error('[Integrations] Zenoti test failed:', e.message);
+    res.redirect(`/manager/integrations?tested=fail&error=${encodeURIComponent(e.message || 'Connection failed')}`);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /manager/integrations/zenoti/sync — manual availability sync
+// ─────────────────────────────────────────────────────────────────
+router.post("/zenoti/sync", requireAuth, async (req, res) => {
+  const salon_id = req.manager?.salon_id;
+  const row = db.prepare(
+    `SELECT * FROM salon_integrations WHERE salon_id = ? AND platform = 'zenoti'`
+  ).get(salon_id);
+
+  if (!row || !row.api_key) {
+    return res.redirect('/manager/integrations?error=not_connected');
+  }
+
+  let secret;
+  try {
+    secret = decrypt(row.api_key);
+  } catch (e) {
+    console.error('[Integrations] decrypt error:', e.message);
+    return res.redirect('/manager/integrations?synced=1&found=0');
+  }
+
+  try {
+    const client = createZenotiClient(row.app_id, secret);
+
+    // Resolve center ID
+    let centerId = row.center_id;
+    if (!centerId) {
+      const centers = await client.getCenters();
+      centerId = centers[0]?.id || null;
+    }
+
+    if (!centerId) {
+      console.warn('[Integrations] Zenoti sync: no center ID configured or found');
+      return res.redirect('/manager/integrations?synced=1&found=0');
+    }
+
+    // Update last_event_at
+    db.prepare(
+      `UPDATE salon_integrations SET last_event_at = ? WHERE salon_id = ? AND platform = 'zenoti'`
+    ).run(new Date().toISOString(), salon_id);
+
+    const employees = await client.getEmployees(centerId);
+    console.log(`[Integrations] Zenoti sync: found ${employees.length} employees for center ${centerId}`);
+
+    // Next 7 days as YYYY-MM-DD strings
+    const today = new Date();
+    const dates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() + i);
+      return d.toISOString().slice(0, 10);
+    });
+
+    let employeesWithSlots = 0;
+
+    for (const emp of employees) {
+      let hasSlots = false;
+      for (const dateStr of dates) {
+        try {
+          const slots = await client.getAvailableSlots(centerId, emp.id, dateStr);
+          if (slots.length > 0) {
+            hasSlots = true;
+            console.log(`[Integrations] ${emp.name} has ${slots.length} slot(s) on ${dateStr}`);
+          }
+        } catch (e) {
+          console.warn(`[Integrations] getAvailableSlots failed for ${emp.name} on ${dateStr}:`, e.message);
+        }
+      }
+
+      if (hasSlots) {
+        employeesWithSlots++;
+        try {
+          const stylist = db.prepare(
+            `SELECT id, name FROM stylists WHERE salon_id = ? AND integration_employee_id = ? LIMIT 1`
+          ).get(salon_id, emp.id);
+          if (stylist) {
+            console.log(`[Integrations] Matched employee ${emp.name} → stylist: ${stylist.name}`);
+          } else {
+            console.log(`[Integrations] No stylist match for employee ${emp.name} (id=${emp.id})`);
+          }
+        } catch (e) {
+          console.warn('[Integrations] stylist lookup skipped:', e.message);
+        }
+      }
+    }
+
+    res.redirect(`/manager/integrations?synced=1&found=${employeesWithSlots}`);
+  } catch (e) {
+    console.error('[Integrations] Zenoti sync error:', e.message);
+    res.redirect('/manager/integrations?synced=1&found=0');
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────
