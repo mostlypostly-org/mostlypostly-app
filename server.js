@@ -165,7 +165,7 @@ const webhookLimiter = rateLimit({
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.params?.salon_id || ipKeyGenerator(req),
+  keyGenerator: (req) => req.params?.salon_id || ipKeyGenerator(req.ip),
   skip: (req) => APP_ENV === "local",
 });
 
