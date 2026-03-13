@@ -16,7 +16,7 @@ import session from "express-session";
 import path from "path";
 import { fileURLToPath } from "url";
 import helmet from "helmet";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import rateLimit from "express-rate-limit";
 import csrfProtection from "./src/middleware/csrf.js";
 // teamsRoute disabled until botbuilder dependency is added to package.json
 // import teamsRoute from "./src/routes/teams.js";
@@ -160,12 +160,13 @@ const resetLimiter = rateLimit({
 });
 
 // Webhook endpoint — allow bursts but cap sustained abuse
+// Signature verification (Twilio/Stripe/Telegram) is the primary protection here;
+// rate limit by IP as a secondary backstop.
 const webhookLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.params?.salon_id || ipKeyGenerator(req.ip),
   skip: (req) => APP_ENV === "local",
 });
 
