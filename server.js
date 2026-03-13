@@ -86,6 +86,7 @@ import locationsRoute from "./src/routes/locations.js";
 import postQueueRoute from "./src/routes/postQueue.js";
 import integrationsRoute from "./src/routes/integrations.js";
 import mfaRoute from "./src/routes/mfa.js";
+import managerProfileRoute from "./src/routes/managerProfile.js";
 import helpRoute from "./src/routes/help.js";
 import teamPerformanceRoute from "./src/routes/teamPerformance.js";
 import leaderboardRoute from "./src/routes/leaderboard.js";
@@ -443,6 +444,7 @@ app.use("/internal/vendors", vendorAdminRoute);
 // 13. MFA (TOTP setup, verify, disable)
 // -------------------------------------------------------
 app.use("/manager/mfa", mfaRoute);
+app.use("/manager/profile", managerProfileRoute);
 app.use("/help", helpRoute);
 app.use("/manager/performance", teamPerformanceRoute);
 app.use("/leaderboard", leaderboardRoute);
