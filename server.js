@@ -90,6 +90,7 @@ import managerProfileRoute from "./src/routes/managerProfile.js";
 import helpRoute from "./src/routes/help.js";
 import teamPerformanceRoute from "./src/routes/teamPerformance.js";
 import leaderboardRoute from "./src/routes/leaderboard.js";
+import internalRouter from "./src/routes/internal.js";
 import { lookupStylist } from "./src/core/salonLookup.js";
 
 // Scheduler
@@ -450,6 +451,11 @@ app.use("/leaderboard", leaderboardRoute);
 app.use("/manager/integrations", integrationsRoute);
 // Public webhook endpoint (no session auth — uses secret verification)
 app.use("/integrations", integrationsRoute);
+
+// =====================================================
+// Internal API (used by ChairlyOS to sync stylist data)
+// =====================================================
+app.use('/api/internal', internalRouter);
 
 // =====================================================
 // Analytics API (public JSON endpoints for dashboard)
