@@ -155,17 +155,12 @@ function parseDayFromSlot(slot) {
 }
 
 // ─────────────────────────────────────────────────────────
-// Build the availability story image
-//
-// Design inspired by real salon Instagram story examples:
-// - Full photo fills entire frame (photo breathes, minimal overlay)
-// - Torn-paper white header card at top contains "NOW BOOKING" + salon name
-//   (torn bottom edge = artistic, custom salon feel — not corporate)
-// - Individual floating pill cards per time slot (accent badge + service text)
-//   inspired by the date-badge + slot-text layout from real stylist posts
-// - Bottom: stylist @handle + CTA pill on subtle dark gradient
+// TEMPLATE 1 — tornCard
+// White torn-paper card at top + accent badge pill cards.
+// Inspired by IMG_5064: torn card houses headline, slots float
+// independently over the photo below it.
 // ─────────────────────────────────────────────────────────
-function buildOverlaySvg({ slots, stylistName, salonName, bookingCta, instagramHandle, palette }) {
+function buildOverlaySvg_tornCard({ slots, stylistName, salonName, bookingCta, instagramHandle, palette }) {
   const font = `'Open Sans', Arial, Helvetica, sans-serif`;
 
   // Brand colors
@@ -350,6 +345,374 @@ function buildOverlaySvg({ slots, stylistName, salonName, bookingCta, instagramH
       </text>
     </svg>
   `);
+}
+
+// ─────────────────────────────────────────────────────────
+// TEMPLATE 2 — verticalLabel
+// Large ghost "AVAILABILITY" watermark rotated along the left edge.
+// Slot cards are rectangles (not pills) starting mid-frame.
+// Thin accent bar runs full height on left edge.
+// Inspired by IMG_5065 (urbanjonnys) vertical text treatment.
+// ─────────────────────────────────────────────────────────
+function buildOverlaySvg_verticalLabel({ slots, stylistName, salonName, bookingCta, instagramHandle, palette }) {
+  const font   = `'Open Sans', Arial, Helvetica, sans-serif`;
+  const ACCENT = palette?.cta || palette?.accent || "#3B72B9";
+  const DARK   = palette?.primary || "#1a1c22";
+  const { r: dr, g: dg, b: db } = hexToRgb(DARK);
+
+  const CARD_L  = 110;
+  const CARD_W  = W - CARD_L - 50;
+  const SLOT_START = 430;
+  const SLOT_H     = 112;
+  const SLOT_GAP   = 18;
+  const slotCount  = Math.min(slots.length, 5);
+  const BADGE_W    = 162;
+
+  const slotCards = slots.slice(0, slotCount).map((slot, i) => {
+    const y  = SLOT_START + i * (SLOT_H + SLOT_GAP);
+    const cy = y + SLOT_H / 2;
+    const rx = 14;
+    const { day, rest } = parseDayFromSlot(slot);
+    const label = day || String(i + 1);
+    const text  = rest.length > 34 ? rest.slice(0, 33) + "…" : rest;
+    return `
+      <defs>
+        <clipPath id="vcard${i}">
+          <rect x="${CARD_L}" y="${y}" width="${CARD_W}" height="${SLOT_H}" rx="${rx}"/>
+        </clipPath>
+      </defs>
+      <rect x="${CARD_L + 4}" y="${y + 5}" width="${CARD_W}" height="${SLOT_H}" rx="${rx}"
+        fill="black" fill-opacity="0.15"/>
+      <rect x="${CARD_L}" y="${y}" width="${CARD_W}" height="${SLOT_H}" rx="${rx}"
+        fill="white" fill-opacity="0.93"/>
+      <g clip-path="url(#vcard${i})">
+        <rect x="${CARD_L}" y="${y}" width="${BADGE_W}" height="${SLOT_H}" fill="${ACCENT}"/>
+      </g>
+      <text x="${CARD_L + BADGE_W / 2}" y="${cy}"
+        font-family="${font}" font-size="36" font-weight="800"
+        fill="white" text-anchor="middle" dominant-baseline="middle">
+        ${escSvg(label)}
+      </text>
+      <text x="${CARD_L + BADGE_W + 24}" y="${cy}"
+        font-family="${font}" font-size="33" font-weight="700"
+        fill="rgba(${dr},${dg},${db},0.92)" dominant-baseline="middle">
+        ${escSvg(text)}
+      </text>`;
+  }).join("");
+
+  const BOT_Y = H - 320;
+  return Buffer.from(`
+    <svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <style>${FONT_FACE}</style>
+        <radialGradient id="vign_vl" cx="55%" cy="45%" r="70%">
+          <stop offset="0%"   stop-color="black" stop-opacity="0"/>
+          <stop offset="80%"  stop-color="black" stop-opacity="0.12"/>
+          <stop offset="100%" stop-color="black" stop-opacity="0.35"/>
+        </radialGradient>
+        <linearGradient id="topFade_vl" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="black" stop-opacity="0.60"/>
+          <stop offset="100%" stop-color="black" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="botFade_vl" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="black" stop-opacity="0"/>
+          <stop offset="100%" stop-color="black" stop-opacity="0.80"/>
+        </linearGradient>
+      </defs>
+
+      <rect width="${W}" height="${H}" fill="url(#vign_vl)"/>
+      <rect x="0" y="0" width="${W}" height="400" fill="url(#topFade_vl)"/>
+      <rect x="0" y="${BOT_Y}" width="${W}" height="${H - BOT_Y}" fill="url(#botFade_vl)"/>
+
+      <!-- Ghost watermark rotated on left -->
+      <text transform="translate(76, ${H / 2}) rotate(-90)"
+        font-family="${font}" font-size="130" font-weight="800"
+        fill="white" fill-opacity="0.07" text-anchor="middle" letter-spacing="16">
+        AVAILABILITY
+      </text>
+
+      <!-- Thin accent bar, full left edge -->
+      <rect x="0" y="0" width="8" height="${H}" fill="${ACCENT}"/>
+
+      <!-- Salon name — top right -->
+      <text x="${W - 56}" y="88"
+        font-family="${font}" font-size="20" font-weight="800"
+        fill="white" text-anchor="end" letter-spacing="5" fill-opacity="0.90">
+        ${escSvg(salonName.toUpperCase())}
+      </text>
+
+      <!-- NOW BOOKING — top left area -->
+      <text x="${CARD_L}" y="196"
+        font-family="${font}" font-size="108" font-weight="800"
+        fill="white" letter-spacing="-3">NOW</text>
+      <text x="${CARD_L}" y="314"
+        font-family="${font}" font-size="108" font-weight="800"
+        fill="white" letter-spacing="-3">BOOKING</text>
+      <rect x="${CARD_L}" y="326" width="260" height="7" rx="3.5" fill="${ACCENT}"/>
+
+      ${slotCards}
+
+      <text x="${W / 2}" y="${H - 178}"
+        font-family="${font}" font-size="38" font-weight="700"
+        fill="white" text-anchor="middle">${escSvg(stylistName)}</text>
+
+      ${instagramHandle ? `
+      <text x="${W / 2}" y="${H - 124}"
+        font-family="${font}" font-size="30" font-weight="600"
+        fill="${ACCENT}" text-anchor="middle">
+        @${escSvg(instagramHandle.replace(/^@/, ""))}</text>` : ""}
+
+      <rect x="180" y="${H - 90}" width="720" height="66" rx="33"
+        fill="${ACCENT}" fill-opacity="0.95"/>
+      <text x="${W / 2}" y="${H - 47}"
+        font-family="${font}" font-size="28" font-weight="800"
+        fill="white" text-anchor="middle">
+        ${escSvg(bookingCta || "Book via link in bio")}</text>
+    </svg>
+  `);
+}
+
+// ─────────────────────────────────────────────────────────
+// TEMPLATE 3 — ghostPills
+// Consistent dark overlay over full photo. Big "NOW BOOKING"
+// headline sits directly on the photo (no card). Slots are
+// transparent outlined pills with accent circle badges.
+// Inspired by IMG_5066 (manesby.tayla) — text on photo aesthetic.
+// ─────────────────────────────────────────────────────────
+function buildOverlaySvg_ghostPills({ slots, stylistName, salonName, bookingCta, instagramHandle, palette }) {
+  const font   = `'Open Sans', Arial, Helvetica, sans-serif`;
+  const ACCENT = palette?.cta || palette?.accent || "#3B72B9";
+
+  const SLOT_START = 580;
+  const SLOT_H     = 104;
+  const SLOT_GAP   = 18;
+  const slotCount  = Math.min(slots.length, 5);
+  const BADGE_R    = 40;
+
+  const slotCards = slots.slice(0, slotCount).map((slot, i) => {
+    const y  = SLOT_START + i * (SLOT_H + SLOT_GAP);
+    const cy = y + SLOT_H / 2;
+    const { day, rest } = parseDayFromSlot(slot);
+    const label = day || String(i + 1);
+    const text  = rest.length > 32 ? rest.slice(0, 31) + "…" : rest;
+    return `
+      <rect x="60" y="${y}" width="960" height="${SLOT_H}" rx="${SLOT_H / 2}"
+        fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
+      <circle cx="${60 + SLOT_H / 2}" cy="${cy}" r="${BADGE_R}" fill="${ACCENT}" fill-opacity="0.95"/>
+      <text x="${60 + SLOT_H / 2}" y="${cy}"
+        font-family="${font}" font-size="28" font-weight="800"
+        fill="white" text-anchor="middle" dominant-baseline="middle">
+        ${escSvg(label)}</text>
+      <text x="${60 + SLOT_H + 18}" y="${cy}"
+        font-family="${font}" font-size="34" font-weight="700"
+        fill="white" dominant-baseline="middle">
+        ${escSvg(text)}</text>`;
+  }).join("");
+
+  const BOT_Y = H - 320;
+  return Buffer.from(`
+    <svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <style>${FONT_FACE}</style>
+        <filter id="txtShadow_gp">
+          <feDropShadow dx="0" dy="2" stdDeviation="6"
+            flood-color="black" flood-opacity="0.72"/>
+        </filter>
+        <linearGradient id="topFade_gp" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="black" stop-opacity="0.65"/>
+          <stop offset="100%" stop-color="black" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="botFade_gp" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="black" stop-opacity="0"/>
+          <stop offset="100%" stop-color="black" stop-opacity="0.82"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Consistent dark overlay — photo still shows, feels cinematic -->
+      <rect width="${W}" height="${H}" fill="black" fill-opacity="0.36"/>
+      <rect x="0" y="0" width="${W}" height="520" fill="url(#topFade_gp)"/>
+      <rect x="0" y="${BOT_Y}" width="${W}" height="${H - BOT_Y}" fill="url(#botFade_gp)"/>
+
+      <!-- Salon name -->
+      <text x="${W / 2}" y="86"
+        font-family="${font}" font-size="20" font-weight="800"
+        fill="${ACCENT}" text-anchor="middle" letter-spacing="7"
+        filter="url(#txtShadow_gp)">
+        ${escSvg(salonName.toUpperCase())}</text>
+
+      <!-- Large headline directly on photo -->
+      <text x="68" y="234"
+        font-family="${font}" font-size="120" font-weight="800"
+        fill="white" letter-spacing="-4" filter="url(#txtShadow_gp)">NOW</text>
+      <text x="68" y="366"
+        font-family="${font}" font-size="120" font-weight="800"
+        fill="white" letter-spacing="-4" filter="url(#txtShadow_gp)">BOOKING</text>
+      <rect x="68" y="382" width="320" height="7" rx="3.5" fill="${ACCENT}"/>
+
+      <!-- "with stylistName" subline -->
+      <text x="68" y="442"
+        font-family="${font}" font-size="30" font-weight="600"
+        fill="rgba(255,255,255,0.78)" filter="url(#txtShadow_gp)">
+        with ${escSvg(stylistName)}</text>
+
+      ${slotCards}
+
+      ${instagramHandle ? `
+      <text x="${W / 2}" y="${H - 124}"
+        font-family="${font}" font-size="30" font-weight="600"
+        fill="${ACCENT}" text-anchor="middle" filter="url(#txtShadow_gp)">
+        @${escSvg(instagramHandle.replace(/^@/, ""))}</text>` : `
+      <text x="${W / 2}" y="${H - 124}"
+        font-family="${font}" font-size="30" font-weight="600"
+        fill="rgba(255,255,255,0.80)" text-anchor="middle">
+        ${escSvg(stylistName)}</text>`}
+
+      <rect x="180" y="${H - 90}" width="720" height="66" rx="33"
+        fill="${ACCENT}" fill-opacity="0.95"/>
+      <text x="${W / 2}" y="${H - 47}"
+        font-family="${font}" font-size="28" font-weight="800"
+        fill="white" text-anchor="middle">
+        ${escSvg(bookingCta || "Book via link in bio")}</text>
+    </svg>
+  `);
+}
+
+// ─────────────────────────────────────────────────────────
+// TEMPLATE 4 — sideStrip
+// Accent-colored vertical strip on the left (salon name inside,
+// rotated). "NOW BOOKING" on the photo at top right. Slot cards
+// are white with a small accent circle badge — a structured,
+// editorial-meets-editorial salon feel.
+// ─────────────────────────────────────────────────────────
+function buildOverlaySvg_sideStrip({ slots, stylistName, salonName, bookingCta, instagramHandle, palette }) {
+  const font   = `'Open Sans', Arial, Helvetica, sans-serif`;
+  const ACCENT = palette?.cta || palette?.accent || "#3B72B9";
+  const DARK   = palette?.primary || "#1a1c22";
+  const { r: dr, g: dg, b: db } = hexToRgb(DARK);
+
+  const STRIP_W = 188;
+  const CARD_L  = STRIP_W + 28;
+  const CARD_W  = W - CARD_L - 48;
+  const SLOT_START = 500;
+  const SLOT_H     = 112;
+  const SLOT_GAP   = 20;
+  const slotCount  = Math.min(slots.length, 5);
+  const BADGE_R    = 38;
+
+  const slotCards = slots.slice(0, slotCount).map((slot, i) => {
+    const y  = SLOT_START + i * (SLOT_H + SLOT_GAP);
+    const cy = y + SLOT_H / 2;
+    const rx = 16;
+    const { day, rest } = parseDayFromSlot(slot);
+    const label = day || String(i + 1);
+    const text  = rest.length > 30 ? rest.slice(0, 29) + "…" : rest;
+    const badgeCx = CARD_L + BADGE_R + 16;
+    return `
+      <rect x="${CARD_L + 4}" y="${y + 5}" width="${CARD_W}" height="${SLOT_H}" rx="${rx}"
+        fill="black" fill-opacity="0.15"/>
+      <rect x="${CARD_L}" y="${y}" width="${CARD_W}" height="${SLOT_H}" rx="${rx}"
+        fill="white" fill-opacity="0.93"/>
+      <circle cx="${badgeCx}" cy="${cy}" r="${BADGE_R}" fill="${ACCENT}"/>
+      <text x="${badgeCx}" y="${cy}"
+        font-family="${font}" font-size="28" font-weight="800"
+        fill="white" text-anchor="middle" dominant-baseline="middle">
+        ${escSvg(label)}</text>
+      <text x="${badgeCx + BADGE_R + 22}" y="${cy}"
+        font-family="${font}" font-size="32" font-weight="700"
+        fill="rgba(${dr},${dg},${db},0.92)" dominant-baseline="middle">
+        ${escSvg(text)}</text>`;
+  }).join("");
+
+  const BOT_Y = H - 310;
+  const centerX = (STRIP_W + W) / 2;
+  return Buffer.from(`
+    <svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <style>${FONT_FACE}</style>
+        <radialGradient id="vign_ss" cx="62%" cy="45%" r="62%">
+          <stop offset="0%"   stop-color="black" stop-opacity="0"/>
+          <stop offset="80%"  stop-color="black" stop-opacity="0.08"/>
+          <stop offset="100%" stop-color="black" stop-opacity="0.28"/>
+        </radialGradient>
+        <linearGradient id="topFade_ss" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="black" stop-opacity="0.62"/>
+          <stop offset="100%" stop-color="black" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="botFade_ss" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="black" stop-opacity="0"/>
+          <stop offset="100%" stop-color="black" stop-opacity="0.80"/>
+        </linearGradient>
+      </defs>
+
+      <rect width="${W}" height="${H}" fill="url(#vign_ss)"/>
+      <rect x="${STRIP_W}" y="0" width="${W - STRIP_W}" height="480"
+        fill="url(#topFade_ss)"/>
+      <rect x="${STRIP_W}" y="${BOT_Y}" width="${W - STRIP_W}" height="${H - BOT_Y}"
+        fill="url(#botFade_ss)"/>
+
+      <!-- Accent side strip — photo shows through slightly -->
+      <rect x="0" y="0" width="${STRIP_W}" height="${H}"
+        fill="${ACCENT}" fill-opacity="0.90"/>
+      <!-- Subtle inner highlight on strip right edge -->
+      <rect x="${STRIP_W - 6}" y="0" width="6" height="${H}"
+        fill="white" fill-opacity="0.15"/>
+
+      <!-- Salon name rotated inside strip -->
+      <text transform="translate(${STRIP_W / 2}, ${H / 2}) rotate(-90)"
+        font-family="${font}" font-size="26" font-weight="800"
+        fill="white" fill-opacity="0.90" text-anchor="middle" letter-spacing="8">
+        ${escSvg(salonName.toUpperCase())}</text>
+
+      <!-- Small white rule in strip, top area -->
+      <rect x="32" y="130" width="${STRIP_W - 64}" height="4" rx="2"
+        fill="white" fill-opacity="0.45"/>
+
+      <!-- NOW BOOKING on the photo side -->
+      <text x="${CARD_L}" y="234"
+        font-family="${font}" font-size="108" font-weight="800"
+        fill="white" letter-spacing="-3">NOW</text>
+      <text x="${CARD_L}" y="352"
+        font-family="${font}" font-size="108" font-weight="800"
+        fill="white" letter-spacing="-3">BOOKING</text>
+      <rect x="${CARD_L}" y="366" width="240" height="7" rx="3.5" fill="white" fill-opacity="0.70"/>
+
+      ${slotCards}
+
+      <text x="${centerX}" y="${H - 178}"
+        font-family="${font}" font-size="36" font-weight="700"
+        fill="white" text-anchor="middle">${escSvg(stylistName)}</text>
+
+      ${instagramHandle ? `
+      <text x="${centerX}" y="${H - 124}"
+        font-family="${font}" font-size="28" font-weight="600"
+        fill="white" fill-opacity="0.82" text-anchor="middle">
+        @${escSvg(instagramHandle.replace(/^@/, ""))}</text>` : ""}
+
+      <!-- CTA pill — white with accent text (inverted for contrast on dark strip) -->
+      <rect x="${STRIP_W + 40}" y="${H - 90}" width="${W - STRIP_W - 88}" height="66" rx="33"
+        fill="white" fill-opacity="0.95"/>
+      <text x="${centerX}" y="${H - 47}"
+        font-family="${font}" font-size="26" font-weight="800"
+        fill="${ACCENT}" text-anchor="middle">
+        ${escSvg(bookingCta || "Book via link in bio")}</text>
+    </svg>
+  `);
+}
+
+// ─────────────────────────────────────────────────────────
+// Dispatcher — picks a random template each time
+// ─────────────────────────────────────────────────────────
+const OVERLAY_TEMPLATES = ["tornCard", "verticalLabel", "ghostPills", "sideStrip"];
+
+function buildOverlaySvg(opts) {
+  const template = OVERLAY_TEMPLATES[Math.floor(Math.random() * OVERLAY_TEMPLATES.length)];
+  console.log(`[Availability] Using layout template: ${template}`);
+  switch (template) {
+    case "verticalLabel": return buildOverlaySvg_verticalLabel(opts);
+    case "ghostPills":    return buildOverlaySvg_ghostPills(opts);
+    case "sideStrip":     return buildOverlaySvg_sideStrip(opts);
+    default:              return buildOverlaySvg_tornCard(opts);
+  }
 }
 
 function escSvg(str) {
