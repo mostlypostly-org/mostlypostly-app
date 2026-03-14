@@ -147,7 +147,6 @@ export function createZenotiClient(appId, apiKey) {
 
         // Infer category from service name via keyword matching.
         // Zenoti doesn't expose category_name in this endpoint so we derive it.
-        // Returns the broadest useful category label for the available block.
         function inferCategory(name) {
           const n = (name || '').toLowerCase();
           if (n.includes('highlight') || n.includes('balayage') || n.includes('ombre')
@@ -165,17 +164,25 @@ export function createZenotiClient(appId, apiKey) {
           return null;
         }
 
-        // Category thresholds — minimum block needed to reasonably offer that service.
-        // Uses the minimum duration of any matching service in the catalog.
+        // Practical minimum block sizes per category — what a client actually needs
+        // to book that type of service. Catalog minimums are too low (15min toners, etc.)
+        // and don't reflect realistic booking windows worth advertising.
+        const PRACTICAL_MINS = {
+          'Extensions': 180,
+          'Highlights':  90,
+          'Color':       60,
+          'Haircut':     45,
+          'Blowout':     30,
+          'Treatment':   30,
+        };
+
+        // Build category map using practical thresholds, not catalog minimums.
+        // We still use the catalog to know which categories this salon offers.
         const categoryMap = {};
         for (const svc of raw) {
           const cat = inferCategory(svc.name);
-          if (!cat) continue;
-          const dur = svc.duration ?? 0;
-          if (dur <= 0) continue;
-          if (!categoryMap[cat] || dur < categoryMap[cat].minDurationMin) {
-            categoryMap[cat] = { categoryName: cat, minDurationMin: dur };
-          }
+          if (!cat || categoryMap[cat]) continue; // first match per category is enough
+          categoryMap[cat] = { categoryName: cat, minDurationMin: PRACTICAL_MINS[cat] ?? 30 };
         }
 
         const categories = Object.values(categoryMap).filter(c => c.minDurationMin > 0);
