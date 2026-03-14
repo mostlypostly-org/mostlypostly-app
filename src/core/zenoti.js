@@ -130,9 +130,9 @@ export function createZenotiClient(appId, apiKey) {
      */
     async getServiceCatalog(centerId) {
       try {
-        // Fetch up to 200 services (paginate if needed)
+        // Fetch up to 200 services with category expansion
         const data = await apiFetch(
-          `/Centers/${encodeURIComponent(centerId)}/services?size=200`
+          `/Centers/${encodeURIComponent(centerId)}/services?size=200&expand=category_id`
         );
         console.log('[Zenoti] services raw keys:', Object.keys(data || {}));
         const raw = Array.isArray(data.services) ? data.services
@@ -140,27 +140,43 @@ export function createZenotiClient(appId, apiKey) {
                   : [];
         console.log(`[Zenoti] services: ${raw.length} total`);
         if (raw.length) {
-          console.log('[Zenoti] services sample:', JSON.stringify(raw[0]).slice(0, 300));
+          // Log all keys of first service so we can see the exact field names
+          console.log('[Zenoti] service[0] keys:', Object.keys(raw[0]));
+          console.log('[Zenoti] service[0] sample:', JSON.stringify(raw[0]).slice(0, 400));
         }
 
         // Build category map: categoryName → min duration across all services in that category
+        // Try every plausible Zenoti category field name
         const categoryMap = {};
         for (const svc of raw) {
-          const cat = svc.category_name || svc.category?.name || 'Other';
-          const dur = svc.duration ?? svc.time ?? 0;
+          const cat = svc.category_name
+                   || svc.category?.name
+                   || svc.service_category
+                   || svc.category_info?.name
+                   || svc.type
+                   || null;
+          if (!cat) continue; // skip uncategorized
+          const dur = svc.duration ?? svc.time ?? svc.duration_mins ?? 0;
           if (!categoryMap[cat] || dur < categoryMap[cat].minDurationMin) {
             categoryMap[cat] = { categoryName: cat, minDurationMin: dur };
           }
         }
 
         const categories = Object.values(categoryMap).filter(c => c.minDurationMin > 0);
-        console.log('[Zenoti] service categories:', categories.map(c => `${c.categoryName}(${c.minDurationMin}min)`).join(', '));
+        console.log('[Zenoti] service categories:', categories.length
+          ? categories.map(c => `${c.categoryName}(${c.minDurationMin}min)`).join(', ')
+          : '(none found — check service[0] keys above)');
 
         // Also return a name→category lookup for mapping appointment service names
         const serviceNameToCategory = {};
         for (const svc of raw) {
-          const cat = svc.category_name || svc.category?.name || 'Other';
-          if (svc.name) serviceNameToCategory[svc.name.toLowerCase()] = cat;
+          const cat = svc.category_name
+                   || svc.category?.name
+                   || svc.service_category
+                   || svc.category_info?.name
+                   || svc.type
+                   || null;
+          if (svc.name && cat) serviceNameToCategory[svc.name.toLowerCase()] = cat;
         }
 
         return { categories, serviceNameToCategory };
