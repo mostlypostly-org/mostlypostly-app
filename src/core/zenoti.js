@@ -206,27 +206,50 @@ export function createZenotiClient(appId, apiKey) {
 
     /**
      * Get booked appointments for an employee over a date range.
+     * Zenoti caps queries at 10 days — automatically splits longer ranges into
+     * sequential 10-day chunks and merges results.
      * Returns raw appointment array — calculateOpenBlocks handles normalization.
      */
     async getAppointments(centerId, employeeId, startDate, endDate) {
-      const path = `/appointments`
-        + `?center_id=${encodeURIComponent(centerId)}`
-        + `&therapist_id=${encodeURIComponent(employeeId)}`
-        + `&start_date=${startDate}&end_date=${endDate}`;
-      try {
-        const data = await apiFetch(path);
-        console.log('[Zenoti] getAppointments raw keys:', Object.keys(data || {}));
-        console.log('[Zenoti] getAppointments sample:', JSON.stringify(data).slice(0, 400));
-        const raw = Array.isArray(data.appointments) ? data.appointments
-                  : Array.isArray(data.bookings)     ? data.bookings
-                  : Array.isArray(data)              ? data
-                  : [];
-        console.log(`[Zenoti] getAppointments found ${raw.length} appointments`);
-        return raw;
-      } catch (e) {
-        console.warn('[Zenoti] getAppointments failed:', e.message);
-        return [];
+      const MAX_DAYS = 10;
+
+      // Split date range into ≤10-day chunks
+      const chunks = [];
+      let cursor = new Date(startDate);
+      const end  = new Date(endDate);
+      while (cursor <= end) {
+        const chunkEnd = new Date(cursor);
+        chunkEnd.setDate(chunkEnd.getDate() + MAX_DAYS - 1);
+        if (chunkEnd > end) chunkEnd.setTime(end.getTime());
+        chunks.push({
+          start: cursor.toISOString().slice(0, 10),
+          end:   chunkEnd.toISOString().slice(0, 10),
+        });
+        cursor = new Date(chunkEnd);
+        cursor.setDate(cursor.getDate() + 1);
       }
+
+      const all = [];
+      for (const chunk of chunks) {
+        const path = `/appointments`
+          + `?center_id=${encodeURIComponent(centerId)}`
+          + `&therapist_id=${encodeURIComponent(employeeId)}`
+          + `&start_date=${chunk.start}&end_date=${chunk.end}`;
+        try {
+          const data = await apiFetch(path);
+          const raw = Array.isArray(data.appointments) ? data.appointments
+                    : Array.isArray(data.bookings)     ? data.bookings
+                    : Array.isArray(data)              ? data
+                    : [];
+          console.log(`[Zenoti] getAppointments ${chunk.start}→${chunk.end}: ${raw.length} appointments`);
+          all.push(...raw);
+        } catch (e) {
+          console.warn(`[Zenoti] getAppointments chunk ${chunk.start}→${chunk.end} failed:`, e.message);
+        }
+      }
+
+      console.log(`[Zenoti] getAppointments total: ${all.length} appointments`);
+      return all;
     },
   };
 }
