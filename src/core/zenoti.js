@@ -70,48 +70,51 @@ export function createZenotiClient(appId, apiKey) {
     },
 
     /**
-     * Get an employee's working hours for a date range.
+     * Get an employee's working hours for a date range using the center attendance endpoint.
+     * GET /v1/centers/{centerId}/attendance?date={date} — one call per day.
      * Returns array of { date, start, end } where start/end are "HH:MM" strings.
-     * Tries multiple Zenoti endpoint patterns — logs which one succeeds.
      */
     async getWorkingHours(centerId, employeeId, startDate, endDate) {
-      const qs = `?center_id=${encodeURIComponent(centerId)}&start_date=${startDate}&end_date=${endDate}`;
-      const paths = [
-        // Center-scoped path (most common in newer Zenoti API versions)
-        `/centers/${encodeURIComponent(centerId)}/employees/${encodeURIComponent(employeeId)}/working_hours`,
-        // Employee-scoped schedule
-        `/employees/${encodeURIComponent(employeeId)}/schedule${qs}`,
-        // Center-scoped schedule
-        `/centers/${encodeURIComponent(centerId)}/employees/${encodeURIComponent(employeeId)}/schedule`,
-        // Original path (404'd — kept as last resort)
-        `/employees/${encodeURIComponent(employeeId)}/working_hours${qs}`,
-      ];
+      const results = [];
 
-      for (const path of paths) {
+      // Enumerate each date in the range
+      const start = new Date(startDate + 'T00:00:00');
+      const end   = new Date(endDate   + 'T00:00:00');
+      const dates = [];
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        dates.push(d.toISOString().slice(0, 10));
+      }
+
+      for (const dateStr of dates) {
         try {
-          const data = await apiFetch(path + (path.includes('?') ? '' : qs));
-          console.log(`[Zenoti] getWorkingHours succeeded on path: ${path}`);
-          console.log('[Zenoti] getWorkingHours raw keys:', Object.keys(data || {}));
-          console.log('[Zenoti] getWorkingHours sample:', JSON.stringify(data).slice(0, 400));
-          // Normalize — Zenoti may return working_hours, schedule, shifts, or a root array
-          const raw = Array.isArray(data.working_hours) ? data.working_hours
-                    : Array.isArray(data.schedule)      ? data.schedule
-                    : Array.isArray(data.shifts)        ? data.shifts
-                    : Array.isArray(data)               ? data
-                    : [];
-          if (!raw.length) continue; // empty response — try next path
-          return raw.map(d => ({
-            date:  d.date  || d.work_date || d.day || '',
-            start: d.start || d.start_time || d.from || d.open_time  || '09:00',
-            end:   d.end   || d.end_time   || d.to  || d.close_time  || '17:00',
-          }));
+          const data = await apiFetch(
+            `/centers/${encodeURIComponent(centerId)}/attendance?date=${dateStr}`
+          );
+          // Response is an array of attendance records (one per employee)
+          const records = Array.isArray(data) ? data
+                        : Array.isArray(data.attendance) ? data.attendance
+                        : Array.isArray(data.employees)  ? data.employees
+                        : [];
+          const record = records.find(r =>
+            (r.employee_id || r.id || '').toLowerCase() === employeeId.toLowerCase()
+          );
+          if (!record) continue; // employee not scheduled this day
+
+          const start = record.expected_check_in_time  || record.check_in_time  || record.start_time || '';
+          const end   = record.expected_check_out_time || record.check_out_time || record.end_time   || '';
+          if (!start || !end) continue;
+
+          results.push({ date: dateStr, start, end });
+          console.log(`[Zenoti] ${dateStr} shift: ${start}–${end}`);
         } catch (e) {
-          console.warn(`[Zenoti] getWorkingHours path failed (${path}): ${e.message.slice(0, 80)}`);
+          console.warn(`[Zenoti] attendance fetch failed for ${dateStr}: ${e.message.slice(0, 120)}`);
         }
       }
 
-      console.warn('[Zenoti] getWorkingHours: all paths failed — will use salon hours as fallback');
-      return [];
+      if (!results.length) {
+        console.warn('[Zenoti] getWorkingHours: no shift data found — will use salon hours as fallback');
+      }
+      return results;
     },
 
     /**
