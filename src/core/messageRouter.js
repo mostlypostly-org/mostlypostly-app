@@ -1175,7 +1175,6 @@ Log in to review: ${managerLink}
         : null;
 
       if (stylistRow?.integration_employee_id) {
-        await sendMessage.sendText(chatId, "Got it! Building your availability post... one moment!");
         try {
           const salonRow   = db.prepare(`SELECT * FROM salons WHERE slug = ?`).get(salonId);
           const dateRange  = parseDateRange(cleanText);
