@@ -32,7 +32,7 @@ import { composeFinalCaption } from "./composeFinalCaption.js";
 import { classifyPostType } from "./classifyPostType.js";
 import { buildBeforeAfterCollage } from "./buildBeforeAfterCollage.js";
 import { buildAvailabilityImage } from "./buildAvailabilityImage.js";
-import { isAvailabilityRequest, parseDateRange } from "./availabilityRequest.js";
+import { isAvailabilityRequest, hasDateHint, parseDateRange } from "./availabilityRequest.js";
 import {
   getZenotiClientForSalon,
   syncAvailabilityPool,
@@ -1176,8 +1176,14 @@ Log in to review: ${managerLink}
 
       if (stylistRow?.integration_employee_id) {
         try {
-          const salonRow   = db.prepare(`SELECT * FROM salons WHERE slug = ?`).get(salonId);
-          const dateRange  = parseDateRange(cleanText);
+          const salonRow = db.prepare(`SELECT * FROM salons WHERE slug = ?`).get(salonId);
+          // No date hint → show all upcoming openings (full pool window: today + 14 days)
+          const dateRange = hasDateHint(cleanText)
+            ? parseDateRange(cleanText)
+            : {
+                startDate: new Date().toISOString().slice(0, 10),
+                endDate:   new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+              };
 
           // Use pool if fresh, otherwise trigger a full salon sync (all stylists)
           let slots = getPooledStylistSlots(salonId, stylistRow.id, dateRange);
