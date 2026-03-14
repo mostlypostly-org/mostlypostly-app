@@ -11,6 +11,7 @@ import { createZenotiClient } from "../core/zenoti.js";
 import { handleZenotiEvent, handleVagaroEvent } from "../core/integrationHandlers.js";
 import { calculateOpenBlocks, formatBlocksAsSlots, categoriesForBlock, formatBlockWithCategory } from "../core/zenotiAvailability.js";
 import { buildAvailabilityImage } from "../core/buildAvailabilityImage.js";
+import { getZenotiClientForSalon, fetchStylistSlots, generateAndSaveAvailabilityPost } from "../core/zenotiSync.js";
 
 const router = express.Router();
 
@@ -489,22 +490,13 @@ router.post("/zenoti/sync", requireAuth, async (req, res) => {
   }
 
   try {
-    const client = createZenotiClient(row.app_id, secret);
-
-    // Resolve center ID
-    let centerId = row.center_id;
-    if (!centerId) {
-      console.log('[Integrations] Zenoti sync: no center_id stored, fetching centers list');
-      const centers = await client.getCenters();
-      console.log('[Integrations] Zenoti centers:', JSON.stringify(centers));
-      centerId = centers[0]?.id || null;
-    }
-
-    if (!centerId) {
+    const zenotiInfo = await getZenotiClientForSalon(salon_id);
+    if (!zenotiInfo) {
       console.warn('[Integrations] Zenoti sync: no center ID configured or found');
       return res.redirect('/manager/integrations?synced=1&found=0');
     }
 
+    const { client, centerId } = zenotiInfo;
     console.log(`[Integrations] Zenoti sync: using center_id=${centerId}`);
 
     // Update last sync timestamp
@@ -531,128 +523,18 @@ router.post("/zenoti/sync", requireAuth, async (req, res) => {
       return d.toISOString().slice(0, 10);
     })();
 
-    // Fetch service catalog once for the whole sync — used for block-to-category matching
-    const { categories: serviceCatalog, serviceNameToCategory } = await client.getServiceCatalog(centerId);
-
     let postsCreated = 0;
 
     for (const stylist of mappedStylists) {
-      const empId = stylist.integration_employee_id;
-      console.log(`[Integrations] Processing ${stylist.name} (employee ${empId})`);
-
-      // Fetch working hours and booked appointments for the date range
-      const [workingHours, appointments] = await Promise.all([
-        client.getWorkingHours(centerId, empId, startDate, endDate),
-        client.getAppointments(centerId, empId, startDate, endDate),
-      ]);
-
-      // Build this stylist's category profile from appointment history
-      // (which categories of service do they actually perform?)
-      const stylistCats = new Set();
-      for (const appt of appointments) {
-        const svcName = (appt.service?.name || appt.parent_service_name || '').toLowerCase();
-        if (svcName && serviceNameToCategory[svcName]) {
-          stylistCats.add(serviceNameToCategory[svcName]);
-        }
-      }
-      if (stylistCats.size) {
-        console.log(`[Integrations] ${stylist.name} categories from appointments:`, [...stylistCats].join(', '));
-      } else {
-        console.log(`[Integrations] ${stylist.name}: no category matches — will skip service hints`);
-      }
-
-      // Build a map of working hours keyed by date
-      const hoursByDate = {};
-      for (const wh of workingHours) {
-        if (wh.date) hoursByDate[wh.date.slice(0, 10)] = wh;
-      }
-
-      // Group appointments by date
-      const apptsByDate = {};
-      for (const appt of appointments) {
-        const apptDate = (appt.start_time || appt.start_date_time || appt.StartDateTime || '').slice(0, 10);
-        if (!apptDate) continue;
-        if (!apptsByDate[apptDate]) apptsByDate[apptDate] = [];
-        apptsByDate[apptDate].push(appt);
-      }
-
-      // Salon posting hours used as fallback shift window when Zenoti working hours unavailable
-      const fallbackStart = salon?.posting_start_time || '09:00';
-      const fallbackEnd   = salon?.posting_end_time   || '18:00';
-      const hasWorkingHours = Object.keys(hoursByDate).length > 0;
-      if (!hasWorkingHours) {
-        console.log(`[Integrations] ${stylist.name}: no working hours from Zenoti — using salon hours ${fallbackStart}–${fallbackEnd} as shift window`);
-      }
-
-      // Calculate open blocks per day and collect meaningful slots
-      const allSlots = [];
-      // Use working-hours dates if available; otherwise derive dates from appointments
-      const dates = hasWorkingHours
-        ? Object.keys(hoursByDate).sort()
-        : [...new Set(Object.keys(apptsByDate))].sort();
-
-      for (const dateStr of dates) {
-        const wh = hoursByDate[dateStr];
-        const shiftStart = wh?.start || fallbackStart;
-        const shiftEnd   = wh?.end   || fallbackEnd;
-        const dayAppts = apptsByDate[dateStr] || [];
-        const blocks = calculateOpenBlocks(shiftStart, shiftEnd, dayAppts, dateStr);
-
-        if (blocks.length) {
-          for (const block of blocks) {
-            const cats = serviceCatalog.length
-              ? categoriesForBlock(block, serviceCatalog, stylistCats)
-              : [];
-            // Pick the most fitting category (shortest threshold that fits = most specific match)
-            const category = cats[0] || null;
-            allSlots.push(formatBlockWithCategory(block, dateStr, category));
-          }
-          console.log(`[Integrations] ${stylist.name} on ${dateStr}: ${blocks.length} block(s) — ${allSlots.slice(-blocks.length).join(' | ')}`);
-        }
-      }
-
-      if (!allSlots.length) {
-        console.log(`[Integrations] ${stylist.name}: no open blocks found in next 7 days`);
-        continue;
-      }
-
-      // Build the availability image and create a manager_pending post
+      console.log(`[Integrations] Processing ${stylist.name} (employee ${stylist.integration_employee_id})`);
       try {
-        const availSlots = allSlots.slice(0, 6);
-        const bookingCta = salon?.booking_url ? 'Book via link in bio' : 'DM to book';
-
-        const imageUrl = await buildAvailabilityImage({
-          slots: availSlots,           // pre-structured — bypasses GPT parsing
-          text: availSlots.join('\n'), // kept for caption storage
-          stylistName: stylist.name,
-          salonName: salon?.name || salon_id,
-          salonId: salon_id,
-          stylistId: stylist.id,
-          instagramHandle: stylist.instagram_handle,
-          bookingCta,
-        });
-
-        // Insert as manager_pending post
-        const postId = uuidv4();
-        const now = new Date().toISOString();
-        const salonPostNum = (() => {
-          const row = db.prepare(`SELECT MAX(salon_post_number) AS m FROM posts WHERE salon_id = ?`).get(salon_id);
-          return (row?.m || 0) + 1;
-        })();
-
-        db.prepare(`
-          INSERT INTO posts
-            (id, salon_id, stylist_name, stylist_id, image_url, base_caption, final_caption,
-             post_type, status, salon_post_number, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 'availability', 'manager_pending', ?, ?, ?)
-        `).run(
-          postId, salon_id, stylist.name, stylist.id,
-          imageUrl, availSlots.join('\n'), availSlots.join('\n'),
-          salonPostNum, now, now
-        );
-
-        console.log(`[Integrations] Created availability post #${salonPostNum} for ${stylist.name}`);
-        postsCreated++;
+        const slots = await fetchStylistSlots({ client, centerId, stylist, salon, dateRange: { startDate, endDate } });
+        if (!slots.length) {
+          console.log(`[Integrations] ${stylist.name}: no open blocks found in next 7 days`);
+          continue;
+        }
+        const result = await generateAndSaveAvailabilityPost({ salon, stylist, slots });
+        if (result) postsCreated++;
       } catch (e) {
         console.error(`[Integrations] Failed to create post for ${stylist.name}:`, e.message);
       }

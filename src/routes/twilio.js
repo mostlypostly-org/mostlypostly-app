@@ -116,7 +116,7 @@ export default function twilioRoute(drafts, _lookupStylist, generateCaption) {
           res.type("text/xml").send(twiml.toString());
         } else {
           // ✅ Normal messages (photo or caption) → friendly auto-ACK
-          twiml.message("✅ Got it! Creating your preview 💇‍♀️");
+          twiml.message("Got it! Building your post... one moment!");
           res.type("text/xml").send(twiml.toString());
         }
 

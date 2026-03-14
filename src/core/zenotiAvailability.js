@@ -131,11 +131,19 @@ function fmtDuration(min) {
  * @returns {string[]} category names that fit, sorted shortest-threshold first
  */
 export function categoriesForBlock(block, categories, stylistCats) {
-  return categories
+  const fitting = categories
     .filter(c => stylistCats.has(c.categoryName))
     .filter(c => c.minDurationMin > 0 && c.minDurationMin <= block.durationMin)
-    .sort((a, b) => b.minDurationMin - a.minDurationMin) // longest threshold first = most premium/specific
-    .map(c => c.categoryName);
+    .sort((a, b) => b.minDurationMin - a.minDurationMin); // longest threshold first
+
+  const has = name => fitting.some(c => c.categoryName === name);
+
+  // Combined services for long blocks — Color + Highlight together needs ~150min
+  if (block.durationMin >= 150 && has('Color') && has('Highlights')) {
+    return ['Color + Highlight'];
+  }
+
+  return fitting.length ? [fitting[0].categoryName] : [];
 }
 
 /**
