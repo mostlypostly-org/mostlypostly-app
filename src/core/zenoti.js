@@ -75,59 +75,46 @@ export function createZenotiClient(appId, apiKey) {
      * Returns array of { date, start, end } where start/end are "HH:MM" strings.
      */
     async getWorkingHours(centerId, employeeId, startDate, endDate) {
-      const results = [];
+      // Try GET /v1/employees/{id}/schedules (same base URL as the POST update endpoint)
+      const qs = `?center_id=${encodeURIComponent(centerId)}&start_date=${startDate}&end_date=${endDate}`;
+      try {
+        const data = await apiFetch(`/employees/${encodeURIComponent(employeeId)}/schedules${qs}`);
+        console.log('[Zenoti] schedules raw keys:', Object.keys(data || {}));
+        console.log('[Zenoti] schedules sample:', JSON.stringify(data).slice(0, 500));
 
-      // Enumerate each date in the range
-      const start = new Date(startDate + 'T00:00:00');
-      const end   = new Date(endDate   + 'T00:00:00');
-      const dates = [];
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        dates.push(d.toISOString().slice(0, 10));
-      }
+        // Normalize — response may be { schedules: [...] } or a root array
+        const raw = Array.isArray(data.schedules) ? data.schedules
+                  : Array.isArray(data.shifts)    ? data.shifts
+                  : Array.isArray(data)            ? data
+                  : [];
 
-      // Only log first date to avoid flooding logs
-      let logged = false;
-      for (const dateStr of dates) {
-        try {
-          const data = await apiFetch(
-            `/centers/${encodeURIComponent(centerId)}/attendance?date=${dateStr}`
-          );
-          if (!logged) {
-            console.log(`[Zenoti] attendance raw keys (${dateStr}):`, Object.keys(data || {}));
-            console.log(`[Zenoti] attendance sample (${dateStr}):`, JSON.stringify(data).slice(0, 500));
-            logged = true;
-          }
-          // Response is an array of attendance records (one per employee)
-          const records = Array.isArray(data) ? data
-                        : Array.isArray(data.attendance) ? data.attendance
-                        : Array.isArray(data.employees)  ? data.employees
-                        : [];
-          if (!logged) console.log(`[Zenoti] attendance records found: ${records.length}`);
-          const record = records.find(r =>
-            (r.employee_id || r.id || '').toLowerCase() === employeeId.toLowerCase()
-          );
-          if (!record) {
-            if (records.length > 0 && !logged) {
-              console.log(`[Zenoti] attendance first record keys:`, Object.keys(records[0]));
-            }
-            continue; // employee not scheduled this day
-          }
-
-          const start = record.expected_check_in_time  || record.check_in_time  || record.start_time || '';
-          const end   = record.expected_check_out_time || record.check_out_time || record.end_time   || '';
-          if (!start || !end) continue;
-
-          results.push({ date: dateStr, start, end });
-          console.log(`[Zenoti] ${dateStr} shift: ${start}–${end}`);
-        } catch (e) {
-          console.warn(`[Zenoti] attendance fetch failed for ${dateStr}: ${e.message.slice(0, 120)}`);
+        if (raw.length) {
+          return raw.map(d => {
+            // Each entry may have nested shifts array or flat start/end
+            const shift = Array.isArray(d.shifts) && d.shifts[0] ? d.shifts[0] : d;
+            const dateStr = (d.date || d.work_date || '').slice(0, 10);
+            const start   = (shift.start_time || shift.start || shift.from || '').slice(11, 16) || (shift.start_time || shift.start || '').slice(0, 5);
+            const end     = (shift.end_time   || shift.end   || shift.to   || '').slice(11, 16) || (shift.end_time   || shift.end   || '').slice(0, 5);
+            return { date: dateStr, start, end };
+          }).filter(d => d.date && d.start && d.end);
         }
+      } catch (e) {
+        console.warn('[Zenoti] schedules endpoint failed:', e.message.slice(0, 120));
       }
 
-      if (!results.length) {
-        console.warn('[Zenoti] getWorkingHours: no shift data found — will use salon hours as fallback');
+      // Fallback: try center-level schedules filtered by employee
+      try {
+        const data = await apiFetch(
+          `/centers/${encodeURIComponent(centerId)}/employees/schedules${qs}`
+        );
+        console.log('[Zenoti] center schedules raw keys:', Object.keys(data || {}));
+        console.log('[Zenoti] center schedules sample:', JSON.stringify(data).slice(0, 500));
+      } catch (e) {
+        console.warn('[Zenoti] center schedules endpoint failed:', e.message.slice(0, 120));
       }
-      return results;
+
+      console.warn('[Zenoti] getWorkingHours: no shift data found — will use salon hours as fallback');
+      return [];
     },
 
     /**
