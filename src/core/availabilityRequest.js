@@ -4,6 +4,24 @@
 const DAY_NAMES = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
 
 /**
+ * Returns true if the message contains a specific date hint.
+ * When false, callers should use the full upcoming window rather than defaulting to "this week".
+ */
+export function hasDateHint(text) {
+  if (!text) return false;
+  const t = text.toLowerCase();
+  return (
+    t.includes('today') || t.includes('tomorrow') ||
+    t.includes('this week') || t.includes("week's") || t.includes('weeks') ||
+    t.includes('next week') ||
+    DAY_NAMES.some(d => t.includes(d)) ||
+    /\b\d{1,2}[\/\-]\d{1,2}\b/.test(t) ||
+    /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}/i.test(t) ||
+    /\bthe\s+\d{1,2}(?:st|nd|rd|th)\b|\b\d{1,2}(?:st|nd|rd|th)\b/.test(t)
+  );
+}
+
+/**
  * Detect if a message is an availability push request.
  * Returns true if the message contains availability intent with no photo.
  */
