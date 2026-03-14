@@ -134,7 +134,7 @@ export function categoriesForBlock(block, categories, stylistCats) {
   return categories
     .filter(c => stylistCats.has(c.categoryName))
     .filter(c => c.minDurationMin > 0 && c.minDurationMin <= block.durationMin)
-    .sort((a, b) => a.minDurationMin - b.minDurationMin)
+    .sort((a, b) => b.minDurationMin - a.minDurationMin) // longest threshold first = most premium/specific
     .map(c => c.categoryName);
 }
 

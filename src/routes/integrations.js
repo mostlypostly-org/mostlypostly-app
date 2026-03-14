@@ -647,7 +647,7 @@ router.post("/zenoti/sync", requireAuth, async (req, res) => {
           VALUES (?, ?, ?, ?, ?, ?, ?, 'availability', 'manager_pending', ?, ?, ?)
         `).run(
           postId, salon_id, stylist.name, stylist.id,
-          imageUrl, availText, availText,
+          imageUrl, availSlots.join('\n'), availSlots.join('\n'),
           salonPostNum, now, now
         );
 
