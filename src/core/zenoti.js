@@ -123,6 +123,54 @@ export function createZenotiClient(appId, apiKey) {
     },
 
     /**
+     * Get the service catalog for a center, grouped by category.
+     * Returns array of { categoryName, minDurationMin } — the minimum duration
+     * of any service in that category is the threshold for block matching.
+     * Also returns raw services for appointment-to-category mapping.
+     */
+    async getServiceCatalog(centerId) {
+      try {
+        // Fetch up to 200 services (paginate if needed)
+        const data = await apiFetch(
+          `/Centers/${encodeURIComponent(centerId)}/services?size=200`
+        );
+        console.log('[Zenoti] services raw keys:', Object.keys(data || {}));
+        const raw = Array.isArray(data.services) ? data.services
+                  : Array.isArray(data)           ? data
+                  : [];
+        console.log(`[Zenoti] services: ${raw.length} total`);
+        if (raw.length) {
+          console.log('[Zenoti] services sample:', JSON.stringify(raw[0]).slice(0, 300));
+        }
+
+        // Build category map: categoryName → min duration across all services in that category
+        const categoryMap = {};
+        for (const svc of raw) {
+          const cat = svc.category_name || svc.category?.name || 'Other';
+          const dur = svc.duration ?? svc.time ?? 0;
+          if (!categoryMap[cat] || dur < categoryMap[cat].minDurationMin) {
+            categoryMap[cat] = { categoryName: cat, minDurationMin: dur };
+          }
+        }
+
+        const categories = Object.values(categoryMap).filter(c => c.minDurationMin > 0);
+        console.log('[Zenoti] service categories:', categories.map(c => `${c.categoryName}(${c.minDurationMin}min)`).join(', '));
+
+        // Also return a name→category lookup for mapping appointment service names
+        const serviceNameToCategory = {};
+        for (const svc of raw) {
+          const cat = svc.category_name || svc.category?.name || 'Other';
+          if (svc.name) serviceNameToCategory[svc.name.toLowerCase()] = cat;
+        }
+
+        return { categories, serviceNameToCategory };
+      } catch (e) {
+        console.warn('[Zenoti] getServiceCatalog failed:', e.message.slice(0, 120));
+        return { categories: [], serviceNameToCategory: {} };
+      }
+    },
+
+    /**
      * Get booked appointments for an employee over a date range.
      * Returns raw appointment array — calculateOpenBlocks handles normalization.
      */

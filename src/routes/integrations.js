@@ -9,7 +9,7 @@ import pageShell from "../ui/pageShell.js";
 import { encrypt, decrypt } from "../core/encryption.js";
 import { createZenotiClient } from "../core/zenoti.js";
 import { handleZenotiEvent, handleVagaroEvent } from "../core/integrationHandlers.js";
-import { calculateOpenBlocks, formatBlocksAsSlots } from "../core/zenotiAvailability.js";
+import { calculateOpenBlocks, formatBlocksAsSlots, categoriesForBlock } from "../core/zenotiAvailability.js";
 import { buildAvailabilityImage } from "../core/buildAvailabilityImage.js";
 
 const router = express.Router();
@@ -531,6 +531,9 @@ router.post("/zenoti/sync", requireAuth, async (req, res) => {
       return d.toISOString().slice(0, 10);
     })();
 
+    // Fetch service catalog once for the whole sync — used for block-to-category matching
+    const { categories: serviceCatalog, serviceNameToCategory } = await client.getServiceCatalog(centerId);
+
     let postsCreated = 0;
 
     for (const stylist of mappedStylists) {
@@ -542,6 +545,21 @@ router.post("/zenoti/sync", requireAuth, async (req, res) => {
         client.getWorkingHours(centerId, empId, startDate, endDate),
         client.getAppointments(centerId, empId, startDate, endDate),
       ]);
+
+      // Build this stylist's category profile from appointment history
+      // (which categories of service do they actually perform?)
+      const stylistCats = new Set();
+      for (const appt of appointments) {
+        const svcName = (appt.service?.name || appt.parent_service_name || '').toLowerCase();
+        if (svcName && serviceNameToCategory[svcName]) {
+          stylistCats.add(serviceNameToCategory[svcName]);
+        }
+      }
+      if (stylistCats.size) {
+        console.log(`[Integrations] ${stylist.name} categories from appointments:`, [...stylistCats].join(', '));
+      } else {
+        console.log(`[Integrations] ${stylist.name}: no category matches — will skip service hints`);
+      }
 
       // Build a map of working hours keyed by date
       const hoursByDate = {};
@@ -581,9 +599,16 @@ router.post("/zenoti/sync", requireAuth, async (req, res) => {
         const blocks = calculateOpenBlocks(shiftStart, shiftEnd, dayAppts, dateStr);
 
         if (blocks.length) {
-          const slots = formatBlocksAsSlots(blocks, dateStr);
-          console.log(`[Integrations] ${stylist.name} on ${dateStr}: ${blocks.length} block(s) — ${slots.join(' | ')}`);
-          allSlots.push(...slots);
+          for (const block of blocks) {
+            const [slot] = formatBlocksAsSlots([block], dateStr);
+            // Annotate with which service categories fit in this block
+            const cats = serviceCatalog.length
+              ? categoriesForBlock(block, serviceCatalog, stylistCats)
+              : [];
+            const hint = cats.length ? ` · ${cats.slice(0, 2).join(' or ')}` : '';
+            allSlots.push(slot + hint);
+          }
+          console.log(`[Integrations] ${stylist.name} on ${dateStr}: ${blocks.length} block(s) — ${allSlots.slice(-blocks.length).join(' | ')}`);
         }
       }
 

@@ -107,6 +107,27 @@ function fmtDuration(min) {
 }
 
 /**
+ * Given an open block and the service category thresholds, return which
+ * service categories can realistically fit in that block.
+ *
+ * Uses minimum duration of any service in the category as the threshold —
+ * if the shortest color service is 90min we say "color" for any 90min+ block.
+ * Does NOT get granular about short/long variants — category-level only.
+ *
+ * @param {Object} block       - { durationMin: number }
+ * @param {Array}  categories  - [{ categoryName, minDurationMin }] from getServiceCatalog
+ * @param {Set}    stylistCats - Set of category names this stylist performs (from appointment history)
+ * @returns {string[]} category names that fit, sorted shortest-threshold first
+ */
+export function categoriesForBlock(block, categories, stylistCats) {
+  return categories
+    .filter(c => stylistCats.has(c.categoryName))
+    .filter(c => c.minDurationMin > 0 && c.minDurationMin <= block.durationMin)
+    .sort((a, b) => a.minDurationMin - b.minDurationMin)
+    .map(c => c.categoryName);
+}
+
+/**
  * Summarize blocks into a human-readable availability statement for the post caption.
  * e.g. "3 open slots Tuesday — 30min at 9am, 1hr at 1pm, 1hr at 4pm"
  */
