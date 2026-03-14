@@ -85,20 +85,33 @@ export function createZenotiClient(appId, apiKey) {
         dates.push(d.toISOString().slice(0, 10));
       }
 
+      // Only log first date to avoid flooding logs
+      let logged = false;
       for (const dateStr of dates) {
         try {
           const data = await apiFetch(
             `/centers/${encodeURIComponent(centerId)}/attendance?date=${dateStr}`
           );
+          if (!logged) {
+            console.log(`[Zenoti] attendance raw keys (${dateStr}):`, Object.keys(data || {}));
+            console.log(`[Zenoti] attendance sample (${dateStr}):`, JSON.stringify(data).slice(0, 500));
+            logged = true;
+          }
           // Response is an array of attendance records (one per employee)
           const records = Array.isArray(data) ? data
                         : Array.isArray(data.attendance) ? data.attendance
                         : Array.isArray(data.employees)  ? data.employees
                         : [];
+          if (!logged) console.log(`[Zenoti] attendance records found: ${records.length}`);
           const record = records.find(r =>
             (r.employee_id || r.id || '').toLowerCase() === employeeId.toLowerCase()
           );
-          if (!record) continue; // employee not scheduled this day
+          if (!record) {
+            if (records.length > 0 && !logged) {
+              console.log(`[Zenoti] attendance first record keys:`, Object.keys(records[0]));
+            }
+            continue; // employee not scheduled this day
+          }
 
           const start = record.expected_check_in_time  || record.check_in_time  || record.start_time || '';
           const end   = record.expected_check_out_time || record.check_out_time || record.end_time   || '';
