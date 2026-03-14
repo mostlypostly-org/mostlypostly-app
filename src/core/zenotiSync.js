@@ -71,14 +71,24 @@ export async function fetchStylistSlots({ client, centerId, stylist, salon, date
   const { categories: serviceCatalog, serviceNameToCategory } =
     await client.getServiceCatalog(centerId);
 
-  // Build stylist category profile from appointment history
+  // Build stylist category profile from appointment history.
+  // Check both service.name and parent_service_name — some Zenoti records only populate one.
   const stylistCats = new Set();
   for (const appt of appointments) {
-    const svcName = (appt.service?.name || appt.parent_service_name || '').toLowerCase();
-    if (svcName && serviceNameToCategory[svcName]) {
-      stylistCats.add(serviceNameToCategory[svcName]);
+    const names = [
+      appt.service?.name,
+      appt.parent_service_name,
+      appt.service_name,
+    ].filter(Boolean).map(n => n.toLowerCase());
+    for (const n of names) {
+      if (serviceNameToCategory[n]) stylistCats.add(serviceNameToCategory[n]);
     }
   }
+  // If we still couldn't infer any categories, assume the stylist does everything in the catalog.
+  // This happens when Zenoti returns appointments with null service fields.
+  const effectiveCats = stylistCats.size > 0
+    ? stylistCats
+    : new Set(serviceCatalog.map(c => c.categoryName));
 
   const fallbackStart = salon?.posting_start_time || '09:00';
   const fallbackEnd   = salon?.posting_end_time   || '18:00';
@@ -100,7 +110,8 @@ export async function fetchStylistSlots({ client, centerId, stylist, salon, date
     ? Object.keys(hoursByDate).sort()
     : [...new Set(Object.keys(apptsByDate))].sort();
 
-  const allSlots = [];
+  // Collect all open blocks with their duration so we can sort before slicing
+  const allSlots = []; // { label: string, durationMin: number }
   for (const dateStr of dates) {
     const wh = hoursByDate[dateStr];
     const shiftStart = wh?.start || fallbackStart;
@@ -109,13 +120,15 @@ export async function fetchStylistSlots({ client, centerId, stylist, salon, date
     const blocks     = calculateOpenBlocks(shiftStart, shiftEnd, dayAppts, dateStr);
 
     for (const block of blocks) {
-      const cats     = serviceCatalog.length ? categoriesForBlock(block, serviceCatalog, stylistCats) : [];
+      const cats     = serviceCatalog.length ? categoriesForBlock(block, serviceCatalog, effectiveCats) : [];
       const category = cats[0] || null;
-      allSlots.push(formatBlockWithCategory(block, dateStr, category));
+      allSlots.push({ label: formatBlockWithCategory(block, dateStr, category), durationMin: block.durationMin });
     }
   }
 
-  return allSlots.slice(0, 5);
+  // Sort longest blocks first so the most premium slots survive the 5-slot cap
+  allSlots.sort((a, b) => b.durationMin - a.durationMin);
+  return allSlots.slice(0, 5).map(s => s.label);
 }
 
 /**
