@@ -9,6 +9,8 @@ import pageShell from "../ui/pageShell.js";
 import { encrypt, decrypt } from "../core/encryption.js";
 import { createZenotiClient } from "../core/zenoti.js";
 import { handleZenotiEvent, handleVagaroEvent } from "../core/integrationHandlers.js";
+import { calculateOpenBlocks, formatBlocksAsSlots } from "../core/zenotiAvailability.js";
+import { buildAvailabilityImage } from "../core/buildAvailabilityImage.js";
 
 const router = express.Router();
 
@@ -69,7 +71,7 @@ router.get("/", requireAuth, (req, res) => {
     </div>`;
   } else if (synced) {
     alertHtml = `<div class="mb-6 rounded-xl bg-mpAccentLight border border-mpBorder px-4 py-3 text-sm text-mpAccent font-medium">
-      Sync complete — found ${syncFound} employee${syncFound !== 1 ? 's' : ''} with open availability.
+      Sync complete — ${syncFound} availability post${syncFound !== 1 ? 's' : ''} created and sent to Post Queue for approval.
     </div>`;
   }
 
@@ -480,56 +482,121 @@ router.post("/zenoti/sync", requireAuth, async (req, res) => {
 
     console.log(`[Integrations] Zenoti sync: using center_id=${centerId}`);
 
-    // Update last_event_at
+    // Update last sync timestamp
     db.prepare(
       `UPDATE salon_integrations SET last_event_at = ? WHERE salon_id = ? AND platform = 'zenoti'`
     ).run(new Date().toISOString(), salon_id);
 
-    const employees = await client.getEmployees(centerId);
-    console.log(`[Integrations] Zenoti sync: found ${employees.length} employees for center ${centerId}`);
+    // Load salon info for post generation
+    const salon = db.prepare(`SELECT * FROM salons WHERE slug = ?`).get(salon_id);
 
-    // Next 7 days as YYYY-MM-DD strings
+    // Get mapped stylists (only those with a Zenoti employee ID)
+    const mappedStylists = db.prepare(
+      `SELECT id, name, instagram_handle, integration_employee_id
+       FROM stylists WHERE salon_id = ? AND integration_employee_id IS NOT NULL`
+    ).all(salon_id);
+    console.log(`[Integrations] Zenoti sync: ${mappedStylists.length} mapped stylist(s)`);
+
+    // Date range: today through next 7 days
     const today = new Date();
-    const dates = Array.from({ length: 7 }, (_, i) => {
+    const startDate = today.toISOString().slice(0, 10);
+    const endDate = (() => {
       const d = new Date(today);
-      d.setDate(d.getDate() + i);
+      d.setDate(d.getDate() + 7);
       return d.toISOString().slice(0, 10);
-    });
+    })();
 
-    let employeesWithSlots = 0;
+    let postsCreated = 0;
 
-    for (const emp of employees) {
-      let hasSlots = false;
+    for (const stylist of mappedStylists) {
+      const empId = stylist.integration_employee_id;
+      console.log(`[Integrations] Processing ${stylist.name} (employee ${empId})`);
+
+      // Fetch working hours and booked appointments for the date range
+      const [workingHours, appointments] = await Promise.all([
+        client.getWorkingHours(centerId, empId, startDate, endDate),
+        client.getAppointments(centerId, empId, startDate, endDate),
+      ]);
+
+      // Build a map of working hours keyed by date
+      const hoursByDate = {};
+      for (const wh of workingHours) {
+        if (wh.date) hoursByDate[wh.date.slice(0, 10)] = wh;
+      }
+
+      // Group appointments by date
+      const apptsByDate = {};
+      for (const appt of appointments) {
+        const apptDate = (appt.start_time || appt.start_date_time || appt.StartDateTime || '').slice(0, 10);
+        if (!apptDate) continue;
+        if (!apptsByDate[apptDate]) apptsByDate[apptDate] = [];
+        apptsByDate[apptDate].push(appt);
+      }
+
+      // Calculate open blocks per day and collect meaningful slots
+      const allSlots = [];
+      const dates = Object.keys(hoursByDate).sort();
+
       for (const dateStr of dates) {
-        try {
-          const slots = await client.getAvailableSlots(centerId, emp.id, dateStr);
-          if (slots.length > 0) {
-            hasSlots = true;
-            console.log(`[Integrations] ${emp.name} has ${slots.length} slot(s) on ${dateStr}`);
-          }
-        } catch (e) {
-          console.warn(`[Integrations] getAvailableSlots failed for ${emp.name} on ${dateStr}:`, e.message);
+        const wh = hoursByDate[dateStr];
+        const dayAppts = apptsByDate[dateStr] || [];
+        const blocks = calculateOpenBlocks(wh.start, wh.end, dayAppts, dateStr);
+
+        if (blocks.length) {
+          const slots = formatBlocksAsSlots(blocks, dateStr);
+          console.log(`[Integrations] ${stylist.name} on ${dateStr}: ${blocks.length} block(s) — ${slots.join(' | ')}`);
+          allSlots.push(...slots);
         }
       }
 
-      if (hasSlots) {
-        employeesWithSlots++;
-        try {
-          const stylist = db.prepare(
-            `SELECT id, name FROM stylists WHERE salon_id = ? AND integration_employee_id = ? LIMIT 1`
-          ).get(salon_id, emp.id);
-          if (stylist) {
-            console.log(`[Integrations] Matched employee ${emp.name} → stylist: ${stylist.name}`);
-          } else {
-            console.log(`[Integrations] No stylist match for employee ${emp.name} (id=${emp.id})`);
-          }
-        } catch (e) {
-          console.warn('[Integrations] stylist lookup skipped:', e.message);
-        }
+      if (!allSlots.length) {
+        console.log(`[Integrations] ${stylist.name}: no open blocks found in next 7 days`);
+        continue;
+      }
+
+      // Build the availability image and create a manager_pending post
+      try {
+        const availText = allSlots.slice(0, 6).join('\n');
+        const palette = salon?.brand_palette ? JSON.parse(salon.brand_palette) : null;
+        const bookingCta = salon?.booking_url ? 'Book via link in bio' : 'DM to book';
+
+        const imageUrl = await buildAvailabilityImage({
+          text: availText,
+          stylistName: stylist.name,
+          salonName: salon?.name || salon_id,
+          salonId: salon_id,
+          stylistId: stylist.id,
+          instagramHandle: stylist.instagram_handle,
+          bookingCta,
+        });
+
+        // Insert as manager_pending post
+        const postId = uuidv4();
+        const now = new Date().toISOString();
+        const salonPostNum = (() => {
+          const row = db.prepare(`SELECT MAX(salon_post_number) AS m FROM posts WHERE salon_id = ?`).get(salon_id);
+          return (row?.m || 0) + 1;
+        })();
+
+        db.prepare(`
+          INSERT INTO posts
+            (id, salon_id, stylist_name, stylist_id, image_url, base_caption, final_caption,
+             post_type, status, salon_post_number, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'availability', 'manager_pending', ?, ?, ?)
+        `).run(
+          postId, salon_id, stylist.name, stylist.id,
+          imageUrl, availText, availText,
+          salonPostNum, now, now
+        );
+
+        console.log(`[Integrations] Created availability post #${salonPostNum} for ${stylist.name}`);
+        postsCreated++;
+      } catch (e) {
+        console.error(`[Integrations] Failed to create post for ${stylist.name}:`, e.message);
       }
     }
 
-    res.redirect(`/manager/integrations?synced=1&found=${employeesWithSlots}`);
+    res.redirect(`/manager/integrations?synced=1&found=${postsCreated}`);
   } catch (e) {
     console.error('[Integrations] Zenoti sync error:', e.message);
     res.redirect('/manager/integrations?synced=1&found=0');

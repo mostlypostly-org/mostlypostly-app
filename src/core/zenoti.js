@@ -70,18 +70,58 @@ export function createZenotiClient(appId, apiKey) {
     },
 
     /**
-     * Get available appointment slots for an employee on a given date.
-     * dateStr format: YYYY-MM-DD
-     * Returns array of time strings (e.g. "09:00", "09:30").
+     * Get an employee's working hours for a date range.
+     * Returns array of { date, start, end } where start/end are "HH:MM" strings.
+     * Logs raw response so endpoint shape can be confirmed and adjusted.
      */
-    async getAvailableSlots(centerId, employeeId, dateStr) {
-      const path = `/appointments/v1/slots?center_id=${encodeURIComponent(centerId)}&therapist_id=${encodeURIComponent(employeeId)}&date=${encodeURIComponent(dateStr)}`;
-      const data = await apiFetch(path);
-      const raw = Array.isArray(data.slots) ? data.slots : (Array.isArray(data) ? data : []);
-      return raw.map(s => {
-        if (typeof s === 'string') return s;
-        return s.time || s.start_time || s.slot_time || String(s);
-      });
+    async getWorkingHours(centerId, employeeId, startDate, endDate) {
+      // Try the most common Zenoti working-hours endpoint pattern
+      const path = `/employees/${encodeURIComponent(employeeId)}/working_hours`
+        + `?center_id=${encodeURIComponent(centerId)}&start_date=${startDate}&end_date=${endDate}`;
+      try {
+        const data = await apiFetch(path);
+        console.log('[Zenoti] getWorkingHours raw keys:', Object.keys(data || {}));
+        console.log('[Zenoti] getWorkingHours sample:', JSON.stringify(data).slice(0, 400));
+        // Normalize — Zenoti may return working_hours, schedule, shifts, or a root array
+        const raw = Array.isArray(data.working_hours) ? data.working_hours
+                  : Array.isArray(data.schedule)      ? data.schedule
+                  : Array.isArray(data.shifts)        ? data.shifts
+                  : Array.isArray(data)               ? data
+                  : [];
+        return raw.map(d => ({
+          date:  d.date  || d.work_date || d.day || '',
+          start: d.start || d.start_time || d.from || d.open_time  || '09:00',
+          end:   d.end   || d.end_time   || d.to  || d.close_time  || '17:00',
+        }));
+      } catch (e) {
+        console.warn('[Zenoti] getWorkingHours failed:', e.message);
+        return [];
+      }
+    },
+
+    /**
+     * Get booked appointments for an employee over a date range.
+     * Returns raw appointment array — calculateOpenBlocks handles normalization.
+     */
+    async getAppointments(centerId, employeeId, startDate, endDate) {
+      const path = `/appointments`
+        + `?center_id=${encodeURIComponent(centerId)}`
+        + `&therapist_id=${encodeURIComponent(employeeId)}`
+        + `&start_date=${startDate}&end_date=${endDate}`;
+      try {
+        const data = await apiFetch(path);
+        console.log('[Zenoti] getAppointments raw keys:', Object.keys(data || {}));
+        console.log('[Zenoti] getAppointments sample:', JSON.stringify(data).slice(0, 400));
+        const raw = Array.isArray(data.appointments) ? data.appointments
+                  : Array.isArray(data.bookings)     ? data.bookings
+                  : Array.isArray(data)              ? data
+                  : [];
+        console.log(`[Zenoti] getAppointments found ${raw.length} appointments`);
+        return raw;
+      } catch (e) {
+        console.warn('[Zenoti] getAppointments failed:', e.message);
+        return [];
+      }
     },
   };
 }
