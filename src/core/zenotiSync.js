@@ -186,6 +186,12 @@ export async function syncAvailabilityPool(salonId) {
   }
 
   availabilityPool.set(salonId, { syncedAt: Date.now(), byStylist });
+
+  // Persist last sync time to DB so the integrations page reflects both manual and auto syncs
+  db.prepare(
+    `UPDATE salon_integrations SET last_event_at = ? WHERE salon_id = ? AND platform = 'zenoti'`
+  ).run(new Date().toISOString(), salonId);
+
   console.log(`[ZenotiPool] Pool refreshed for salon=${salonId} — ${mappedStylists.length} stylist(s), window: ${startDate} → ${endDate}`);
   return byStylist;
 }

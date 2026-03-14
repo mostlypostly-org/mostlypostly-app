@@ -116,8 +116,8 @@ router.get("/", requireAuth, (req, res) => {
           </div>
           ${zenoti.last_event_at ? `
           <div class="flex justify-between">
-            <span class="text-mpMuted">Last event</span>
-            <span class="text-mpCharcoal">${zenoti.last_event_at}</span>
+            <span class="text-mpMuted">Last synced</span>
+            <span class="text-mpCharcoal">${new Date(zenoti.last_event_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</span>
           </div>` : ""}
         </div>
 
