@@ -28,9 +28,14 @@ export function calculateOpenBlocks(workingStart, workingEnd, appointments, date
     const s = a.start_time || a.start_date_time || a.StartDateTime
            || a.scheduled_start_time || a.actual_start_time
            || a.start || a.from;
-    const e = a.end_time   || a.end_date_time   || a.EndDateTime
-           || a.scheduled_end_time || a.actual_completed_time
-           || a.end   || a.to;
+    let e = a.end_time   || a.end_date_time   || a.EndDateTime
+         || a.scheduled_end_time || a.actual_completed_time
+         || a.end   || a.to;
+    // Derive end from service_length (minutes) when end_time is missing
+    if (!e && s && a.service_length) {
+      const startMs = new Date(s).getTime();
+      if (!isNaN(startMs)) e = new Date(startMs + a.service_length * 60000).toISOString();
+    }
     return { start: new Date(s), end: new Date(e), _raw: a };
   });
   const dropped = rawMapped.filter(a => isNaN(a.start) || isNaN(a.end) || a.end <= a.start);
