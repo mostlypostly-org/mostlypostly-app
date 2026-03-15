@@ -114,7 +114,10 @@ async function fetchRawBlocks({ client, centerId, stylist, salon, dateRange }) {
 
   const apptsByDate = {};
   for (const appt of allBookedTime) {
-    const d = (appt.start_time || appt.start_date_time || appt.StartDateTime || '').slice(0, 10);
+    const d = (
+      appt.start_time || appt.start_date_time || appt.StartDateTime ||
+      appt.scheduled_start_time || appt.actual_start_time || ''
+    ).slice(0, 10);
     if (!d) continue;
     (apptsByDate[d] = apptsByDate[d] || []).push(appt);
   }
