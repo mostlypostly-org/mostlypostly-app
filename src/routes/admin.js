@@ -15,6 +15,8 @@ import { isContentSafe, sanitizeText } from "../../src/utils/moderation.js";
 import { UPLOADS_DIR } from "../core/uploadPath.js";
 import { PLAN_LIMITS } from "./billing.js";
 import { sendWelcomeSms } from "../core/stylistWelcome.js";
+import { generateCelebrationImage } from "../core/celebrationImageGen.js";
+import { generateCelebrationCaption } from "../core/celebrationCaption.js";
 
 const managerPhotoUpload = multer({
   storage: multer.diskStorage({
@@ -1839,6 +1841,100 @@ router.post("/feature-requests/:id/vote", requireAuth, (req, res) => {
     console.error('[Admin] Vote toggle failed:', err.message);
   }
   res.redirect("/manager/admin#feedback");
+});
+
+// ───────────────────────────────────────────────────────────
+// GET /manager/admin/test-celebration — Generate a test celebration post
+// ───────────────────────────────────────────────────────────
+router.get("/test-celebration", requireAuth, async (req, res) => {
+  const salon_id = req.manager.salon_id;
+  const { stylist: stylistId, type: celebType = "birthday" } = req.query;
+
+  try {
+    if (!stylistId) {
+      return res.status(400).send("Missing ?stylist=<id> query param");
+    }
+
+    const stylist = db.prepare(`
+      SELECT id, name, first_name, photo_url, hire_date
+      FROM stylists WHERE id = ? AND salon_id = ?
+    `).get(stylistId, salon_id);
+
+    if (!stylist) {
+      return res.status(404).send("Stylist not found");
+    }
+
+    const salon = db.prepare(`
+      SELECT name, tone, brand_palette, celebration_font_styles, celebration_font_index, logo_url
+      FROM salons WHERE slug = ?
+    `).get(salon_id);
+
+    const styles = (() => {
+      try { return JSON.parse(salon.celebration_font_styles || '["script"]'); }
+      catch { return ["script"]; }
+    })();
+    const fontStyle = styles[(salon.celebration_font_index || 0) % styles.length];
+
+    const palette = (() => {
+      try { return JSON.parse(salon.brand_palette || "{}"); }
+      catch { return {}; }
+    })();
+    const accentColor = palette.cta || palette.accent || "#3B72B9";
+
+    const logoUrl = salon.logo_url;
+    let logoPath = null;
+    if (logoUrl?.startsWith("/uploads/")) {
+      const abs = path.resolve("public" + logoUrl);
+      if (fs.existsSync(abs)) logoPath = abs;
+    }
+
+    const firstName = stylist.first_name || stylist.name?.split(" ")[0] || stylist.name || "Team Member";
+    const anniversaryYears = celebType === "anniversary" && stylist.hire_date
+      ? Math.floor(DateTime.now().diff(DateTime.fromISO(stylist.hire_date), "years").years)
+      : undefined;
+
+    const { feedUrl, storyUrl } = await generateCelebrationImage({
+      profilePhotoUrl: stylist.photo_url,
+      salonLogoPath:   logoPath,
+      firstName,
+      celebrationType: celebType,
+      anniversaryYears,
+      salonName: salon.name,
+      accentColor,
+      fontStyle,
+    });
+
+    const caption = await generateCelebrationCaption({
+      firstName,
+      salonName:       salon.name,
+      tone:            salon.tone || "warm and professional",
+      celebrationType: celebType,
+      anniversaryYears,
+    });
+
+    const now = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const insertPost = (imageUrl, postType) => {
+      const id = crypto.randomUUID();
+      db.prepare(`
+        INSERT INTO posts (
+          id, salon_id, stylist_name, stylist_id,
+          image_url, base_caption, final_caption,
+          post_type, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manager_approved', ?)
+      `).run(id, salon_id, stylist.name, stylist.id, imageUrl, caption, caption, postType, now);
+      return id;
+    };
+
+    insertPost(feedUrl, "celebration");
+    insertPost(storyUrl, "celebration_story");
+
+    console.log(`[Admin] Test celebration (${celebType}) created for ${firstName} in salon ${salon_id}`);
+
+    res.redirect("/manager/admin?notice=Test+celebration+post+queued#branding");
+  } catch (err) {
+    console.error("[Admin] test-celebration error:", err.message);
+    res.status(500).send(`Error generating test post: ${err.message}`);
+  }
 });
 
 // ───────────────────────────────────────────────────────────
