@@ -127,6 +127,8 @@ async function fetchRawBlocks({ client, centerId, stylist, salon, dateRange }) {
     }
     (apptsByDate[d] = apptsByDate[d] || []).push(appt);
   }
+  console.log(`[ZenotiSync] ${stylist.name} appointment date buckets:`,
+    Object.entries(apptsByDate).sort().map(([d, a]) => `${d}:${a.length}`).join(', ') || '(none)');
 
   const hasWorkingHours = Object.keys(hoursByDate).length > 0;
   const dates = hasWorkingHours
