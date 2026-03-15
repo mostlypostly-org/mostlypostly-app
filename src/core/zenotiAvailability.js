@@ -26,14 +26,19 @@ export function calculateOpenBlocks(workingStart, workingEnd, appointments, date
   // Normalize appointments — handle multiple Zenoti date field patterns
   const rawMapped = (appointments || []).map(a => {
     const s = a.start_time || a.start_date_time || a.StartDateTime
-           || a.scheduled_start_time || a.start || a.from;
+           || a.scheduled_start_time || a.actual_start_time
+           || a.start || a.from;
     const e = a.end_time   || a.end_date_time   || a.EndDateTime
-           || a.scheduled_end_time   || a.end   || a.to;
+           || a.scheduled_end_time || a.actual_completed_time
+           || a.end   || a.to;
     return { start: new Date(s), end: new Date(e), _raw: a };
   });
   const dropped = rawMapped.filter(a => isNaN(a.start) || isNaN(a.end) || a.end <= a.start);
   if (dropped.length) {
-    console.warn(`[Availability] ${dateStr}: ${dropped.length} appointment(s) dropped — unrecognized field names. Keys seen:`, dropped.map(a => Object.keys(a._raw).join(',')).join(' | '));
+    console.warn(
+      `[Availability] ${dateStr}: ${dropped.length} appointment(s) dropped — start_time values:`,
+      dropped.map(a => a._raw.start_time ?? '(null)').join(', ')
+    );
   }
   const appts = rawMapped
     .filter(a => !isNaN(a.start) && !isNaN(a.end) && a.end > a.start)
@@ -109,10 +114,11 @@ export function formatBlockWithCategory(block, dateStr, category) {
 }
 
 function fmt12h(date) {
-  return date
-    .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-    .toLowerCase()
-    .replace(' ', '');
+  const mins = date.getMinutes();
+  const opts = mins === 0
+    ? { hour: 'numeric', hour12: true }
+    : { hour: 'numeric', minute: '2-digit', hour12: true };
+  return date.toLocaleTimeString('en-US', opts).toLowerCase().replace(' ', '');
 }
 
 function fmtDuration(min) {
