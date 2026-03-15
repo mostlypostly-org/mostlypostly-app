@@ -251,5 +251,31 @@ export function createZenotiClient(appId, apiKey) {
       console.log(`[Zenoti] getAppointments total: ${all.length} appointments`);
       return all;
     },
+
+    /**
+     * Get blockout times for an employee across a date range.
+     * GET /v1/employees/{employeeId}/blockouttimes
+     * Returns normalized array of { start_time, end_time } ISO strings
+     * so they merge cleanly with appointments in calculateOpenBlocks.
+     */
+    async getEmployeeBlockouts(employeeId, startDate, endDate) {
+      const qs = `?start_date=${startDate}&end_date=${endDate}`;
+      try {
+        const data = await apiFetch(`/employees/${encodeURIComponent(employeeId)}/blockouttimes${qs}`);
+        const raw = Array.isArray(data.blockout_times) ? data.blockout_times
+                  : Array.isArray(data.blockouttimes)  ? data.blockouttimes
+                  : Array.isArray(data)                 ? data
+                  : [];
+        console.log(`[Zenoti] getEmployeeBlockouts for ${employeeId}: ${raw.length} blockout(s)`);
+        // Normalize to the same shape appointments use so calculateOpenBlocks handles them identically
+        return raw.map(b => ({
+          start_time: b.start_time || b.start_date_time || b.start || null,
+          end_time:   b.end_time   || b.end_date_time   || b.end   || null,
+        })).filter(b => b.start_time && b.end_time);
+      } catch (err) {
+        console.warn(`[Zenoti] getEmployeeBlockouts failed for ${employeeId}:`, err.message);
+        return [];
+      }
+    },
   };
 }

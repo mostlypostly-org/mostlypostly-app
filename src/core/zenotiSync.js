@@ -77,15 +77,19 @@ async function fetchRawBlocks({ client, centerId, stylist, salon, dateRange }) {
 
   const { startDate, endDate } = dateRange;
 
-  const [workingHours, appointments] = await Promise.all([
+  const [workingHours, appointments, blockouts] = await Promise.all([
     client.getWorkingHours(centerId, empId, startDate, endDate),
     client.getAppointments(centerId, empId, startDate, endDate),
+    client.getEmployeeBlockouts(empId, startDate, endDate),
   ]);
+
+  // Merge blockouts into appointments so calculateOpenBlocks treats them as booked time
+  const allBookedTime = [...appointments, ...blockouts];
 
   const { categories: serviceCatalog, serviceNameToCategory } =
     await client.getServiceCatalog(centerId);
 
-  // Build stylist category profile — check all service name fields Zenoti may populate
+  // Build stylist category profile from appointments only (not blockouts)
   const stylistCats = new Set();
   for (const appt of appointments) {
     const names = [appt.service?.name, appt.parent_service_name, appt.service_name]
@@ -109,7 +113,7 @@ async function fetchRawBlocks({ client, centerId, stylist, salon, dateRange }) {
   }
 
   const apptsByDate = {};
-  for (const appt of appointments) {
+  for (const appt of allBookedTime) {
     const d = (appt.start_time || appt.start_date_time || appt.StartDateTime || '').slice(0, 10);
     if (!d) continue;
     (apptsByDate[d] = apptsByDate[d] || []).push(appt);
