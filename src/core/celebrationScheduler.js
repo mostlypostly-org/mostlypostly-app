@@ -51,16 +51,23 @@ function resolveLogoPath(logoUrl) {
   return null;
 }
 
-function insertPost({ salonId, stylistName, stylistId, imageUrl, caption, postType }) {
+function randomDelay(min = 20, max = 45) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function insertPost({ salonId, stylistName, stylistId, imageUrl, caption, postType, delayMinutes }) {
   const id  = crypto.randomUUID();
   const now = new Date().toISOString().replace("T", " ").slice(0, 19);
+  const scheduledFor = DateTime.utc()
+    .plus({ minutes: delayMinutes })
+    .toFormat("yyyy-LL-dd HH:mm:ss");
   db.prepare(`
     INSERT INTO posts (
       id, salon_id, stylist_name, stylist_id,
       image_url, base_caption, final_caption,
-      post_type, status, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manager_approved', ?)
-  `).run(id, salonId, stylistName, stylistId, imageUrl, caption, caption, postType, now);
+      post_type, status, scheduled_for, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manager_approved', ?, ?)
+  `).run(id, salonId, stylistName, stylistId, imageUrl, caption, caption, postType, scheduledFor, now);
   return id;
 }
 
@@ -164,22 +171,25 @@ export async function runCelebrationCheck() {
             anniversaryYears: stylist.anniversaryYears,
           });
 
+          const delay = randomDelay(5, 20);
           insertPost({
-            salonId:     salon.slug,
-            stylistName: stylist.name,
-            stylistId:   stylist.id,
-            imageUrl:    feedUrl,
+            salonId:      salon.slug,
+            stylistName:  stylist.name,
+            stylistId:    stylist.id,
+            imageUrl:     feedUrl,
             caption,
-            postType:    "celebration",
+            postType:     "celebration",
+            delayMinutes: delay,
           });
 
           insertPost({
-            salonId:     salon.slug,
-            stylistName: stylist.name,
-            stylistId:   stylist.id,
-            imageUrl:    storyUrl,
+            salonId:      salon.slug,
+            stylistName:  stylist.name,
+            stylistId:    stylist.id,
+            imageUrl:     storyUrl,
             caption,
-            postType:    "celebration_story",
+            postType:     "celebration_story",
+            delayMinutes: delay + randomDelay(1, 5),
           });
 
           fontIndexBump++;
