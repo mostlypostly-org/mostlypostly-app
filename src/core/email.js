@@ -46,9 +46,9 @@ function emailWrapper({ preheader, body }) {
 
             <!-- Blue header band with logo -->
             <tr><td style="background:#3B72B9;padding:20px 32px;">
-              <img src="https://mostlypostly.com/logo/MostlyPostly%20Logo%20-%20Primary%20(Trimmed).png"
+              <img src="https://mostlypostly.com/logo/MostlyPostly%20Logo%20-%20White%20Transparent.svg"
                    alt="MostlyPostly" height="28"
-                   style="display:block;border:0;outline:none;text-decoration:none;filter:brightness(0) invert(1);" />
+                   style="display:block;border:0;outline:none;text-decoration:none;" />
             </td></tr>
 
             <!-- Body content -->
