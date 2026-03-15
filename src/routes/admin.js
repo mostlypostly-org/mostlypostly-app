@@ -295,13 +295,13 @@ router.get("/", requireAuth, (req, res) => {
     <!-- Tab Navigation -->
     <div class="mb-6">
       <h1 class="text-2xl font-bold mb-4">Admin</h1>
-      <div class="flex gap-1 border-b border-mpBorder overflow-x-auto" id="admin-tabs">
-        <button type="button" onclick="adminTab('business')" data-tab="business" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-mpAccent text-mpAccent">Business</button>
-        <button type="button" onclick="adminTab('branding')" data-tab="branding" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Branding</button>
-        <button type="button" onclick="adminTab('posting')" data-tab="posting" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Posting</button>
-        <button type="button" onclick="adminTab('photos')" data-tab="photos" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Stock Photos</button>
-        <button type="button" onclick="adminTab('security')" data-tab="security" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Security</button>
-        <button type="button" onclick="adminTab('feedback')" data-tab="feedback" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Issues &amp; Feedback${openIssues.length > 0 ? ` <span class="ml-1 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-xs font-semibold text-orange-700">${openIssues.length}</span>` : ""}</button>
+      <div class="flex gap-1 border-b border-mpBorder overflow-x-auto" id="admin-tabs" style="position:relative;z-index:10">
+        <button type="button" data-tab="business" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 cursor-pointer" style="border-color:#3B72B9;color:#3B72B9">Business</button>
+        <button type="button" data-tab="branding" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 cursor-pointer" style="border-color:transparent;color:#7A7C85">Branding</button>
+        <button type="button" data-tab="posting" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 cursor-pointer" style="border-color:transparent;color:#7A7C85">Posting</button>
+        <button type="button" data-tab="photos" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 cursor-pointer" style="border-color:transparent;color:#7A7C85">Stock Photos</button>
+        <button type="button" data-tab="security" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 cursor-pointer" style="border-color:transparent;color:#7A7C85">Security</button>
+        <button type="button" data-tab="feedback" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 cursor-pointer" style="border-color:transparent;color:#7A7C85">Issues &amp; Feedback${openIssues.length > 0 ? ` <span style="margin-left:4px;display:inline-flex;align-items:center;background:#ffedd5;padding:1px 6px;border-radius:9999px;font-size:11px;font-weight:600;color:#c2410c">${openIssues.length}</span>` : ""}</button>
       </div>
     </div>
 
@@ -893,28 +893,42 @@ router.get("/", requireAuth, (req, res) => {
   </div><!-- end admin-panel-feedback -->
 
   <script>
-  function adminTab(name) {
-    document.querySelectorAll('.admin-panel').forEach(p => p.classList.add('hidden'));
-    document.querySelectorAll('.admin-tab-btn').forEach(b => {
-      b.classList.remove('border-mpAccent', 'text-mpAccent');
-      b.classList.add('border-transparent', 'text-mpMuted');
-    });
-    const panel = document.getElementById('admin-panel-' + name);
-    if (panel) panel.classList.remove('hidden');
-    const btn = document.querySelector('[data-tab="' + name + '"]');
-    if (btn) {
-      btn.classList.remove('border-transparent', 'text-mpMuted');
-      btn.classList.add('border-mpAccent', 'text-mpAccent');
-    }
-    history.replaceState(null, '', location.pathname + '#' + name);
-  }
-  // Restore from hash on load
   (function() {
-    const hash = location.hash.replace('#', '');
-    const validTabs = ['business','branding','posting','photos','security','feedback'];
-    if (validTabs.includes(hash)) {
-      adminTab(hash);
+    var ACCENT = '#3B72B9';
+    var MUTED  = '#7A7C85';
+    var validTabs = ['business','branding','posting','photos','security','feedback'];
+
+    function adminTab(name) {
+      // Hide all panels
+      document.querySelectorAll('.admin-panel').forEach(function(p) {
+        p.style.display = 'none';
+      });
+      // Reset all tab buttons
+      document.querySelectorAll('.admin-tab-btn').forEach(function(b) {
+        b.style.borderColor = 'transparent';
+        b.style.color = MUTED;
+      });
+      // Show target panel
+      var panel = document.getElementById('admin-panel-' + name);
+      if (panel) panel.style.display = 'block';
+      // Activate target button
+      var btn = document.querySelector('[data-tab="' + name + '"]');
+      if (btn) {
+        btn.style.borderColor = ACCENT;
+        btn.style.color = ACCENT;
+      }
+      history.replaceState(null, '', location.pathname + '#' + name);
     }
+
+    // Wire up click handlers
+    document.getElementById('admin-tabs').addEventListener('click', function(e) {
+      var btn = e.target.closest('[data-tab]');
+      if (btn) adminTab(btn.getAttribute('data-tab'));
+    });
+
+    // Restore from hash, or show default
+    var hash = location.hash.replace('#', '');
+    adminTab(validTabs.includes(hash) ? hash : 'business');
   })();
   </script>
 
