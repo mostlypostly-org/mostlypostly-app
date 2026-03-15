@@ -221,7 +221,6 @@ async function renderImage({ photoBuffer, svgOverlay, logoLayer }) {
  * @param {string}  opts.profilePhotoUrl         Stylist photo URL or absolute local path
  * @param {string}  [opts.salonLogoPath]         Absolute path to salon logo file
  * @param {string}  opts.firstName
- * @param {string}  [opts.lastName]              Only initial used in sub-label
  * @param {"birthday"|"anniversary"} opts.celebrationType
  * @param {number}  [opts.anniversaryYears]      e.g. 5
  * @param {string}  [opts.salonName]             Used in anniversary sub-label
@@ -233,7 +232,6 @@ export async function generateCelebrationImage({
   profilePhotoUrl,
   salonLogoPath,
   firstName,
-  lastName,
   celebrationType,
   anniversaryYears,
   salonName = "",
