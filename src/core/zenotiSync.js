@@ -117,9 +117,14 @@ async function fetchRawBlocks({ client, centerId, stylist, salon, dateRange }) {
     const d = (
       appt.start_time || appt.start_date_time || appt.StartDateTime ||
       appt.scheduled_start_time || appt.actual_start_time ||
+      appt.start || appt.from ||
       appt.start_time_utc || ''
     ).slice(0, 10);
-    if (!d) continue;
+    if (!d) {
+      console.warn('[ZenotiSync] Appointment has no parseable date — keys:', Object.keys(appt).join(', '));
+      console.warn('[ZenotiSync] Raw appointment:', JSON.stringify(appt).slice(0, 300));
+      continue;
+    }
     (apptsByDate[d] = apptsByDate[d] || []).push(appt);
   }
 

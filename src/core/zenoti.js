@@ -259,24 +259,42 @@ export function createZenotiClient(appId, apiKey) {
      * so they merge cleanly with appointments in calculateOpenBlocks.
      */
     async getEmployeeBlockouts(employeeId, startDate, endDate, centerId) {
-      let qs = `?start_date=${startDate}&end_date=${endDate}`;
-      if (centerId) qs += `&center_id=${encodeURIComponent(centerId)}`;
-      try {
-        const data = await apiFetch(`/employees/${encodeURIComponent(employeeId)}/blockouttimes${qs}`);
-        const raw = Array.isArray(data.blockout_times) ? data.blockout_times
-                  : Array.isArray(data.blockouttimes)  ? data.blockouttimes
-                  : Array.isArray(data)                 ? data
-                  : [];
-        console.log(`[Zenoti] getEmployeeBlockouts for ${employeeId}: ${raw.length} blockout(s)`);
-        // Normalize to the same shape appointments use so calculateOpenBlocks handles them identically
-        return raw.map(b => ({
-          start_time: b.start_time || b.start_date_time || b.start || null,
-          end_time:   b.end_time   || b.end_date_time   || b.end   || null,
-        })).filter(b => b.start_time && b.end_time);
-      } catch (err) {
-        console.warn(`[Zenoti] getEmployeeBlockouts failed for ${employeeId}:`, err.message);
-        return [];
+      // Blockout endpoint has the same 10-day limit as appointments — chunk identically
+      const MAX_DAYS = 10;
+      const chunks = [];
+      let cursor = new Date(startDate);
+      const end  = new Date(endDate);
+      while (cursor <= end) {
+        const chunkEnd = new Date(cursor);
+        chunkEnd.setDate(chunkEnd.getDate() + MAX_DAYS - 1);
+        if (chunkEnd > end) chunkEnd.setTime(end.getTime());
+        chunks.push({ start: cursor.toISOString().slice(0, 10), end: chunkEnd.toISOString().slice(0, 10) });
+        cursor = new Date(chunkEnd);
+        cursor.setDate(cursor.getDate() + 1);
       }
+
+      const all = [];
+      for (const chunk of chunks) {
+        let qs = `?start_date=${chunk.start}&end_date=${chunk.end}`;
+        if (centerId) qs += `&center_id=${encodeURIComponent(centerId)}`;
+        try {
+          const data = await apiFetch(`/employees/${encodeURIComponent(employeeId)}/blockouttimes${qs}`);
+          const raw = Array.isArray(data.blockout_times) ? data.blockout_times
+                    : Array.isArray(data.blockouttimes)  ? data.blockouttimes
+                    : Array.isArray(data)                 ? data
+                    : [];
+          all.push(...raw);
+        } catch (err) {
+          console.warn(`[Zenoti] getEmployeeBlockouts chunk ${chunk.start}→${chunk.end} failed:`, err.message);
+        }
+      }
+
+      console.log(`[Zenoti] getEmployeeBlockouts for ${employeeId}: ${all.length} blockout(s)`);
+      // Normalize to the same shape appointments use so calculateOpenBlocks handles them identically
+      return all.map(b => ({
+        start_time: b.start_time || b.start_date_time || b.start || null,
+        end_time:   b.end_time   || b.end_date_time   || b.end   || null,
+      })).filter(b => b.start_time && b.end_time);
     },
   };
 }
