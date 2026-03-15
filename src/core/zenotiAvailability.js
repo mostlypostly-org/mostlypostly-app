@@ -24,17 +24,22 @@ export function calculateOpenBlocks(workingStart, workingEnd, appointments, date
   if (dayEnd <= dayStart) return [];
 
   // Normalize appointments — handle multiple Zenoti date field patterns
-  const appts = (appointments || [])
-    .map(a => {
-      const s = a.start_time || a.start_date_time || a.StartDateTime
-             || a.scheduled_start_time || a.start || a.from;
-      const e = a.end_time   || a.end_date_time   || a.EndDateTime
-             || a.scheduled_end_time   || a.end   || a.to;
-      return { start: new Date(s), end: new Date(e) };
-    })
+  const rawMapped = (appointments || []).map(a => {
+    const s = a.start_time || a.start_date_time || a.StartDateTime
+           || a.scheduled_start_time || a.start || a.from;
+    const e = a.end_time   || a.end_date_time   || a.EndDateTime
+           || a.scheduled_end_time   || a.end   || a.to;
+    return { start: new Date(s), end: new Date(e), _raw: a };
+  });
+  const dropped = rawMapped.filter(a => isNaN(a.start) || isNaN(a.end) || a.end <= a.start);
+  if (dropped.length) {
+    console.warn(`[Availability] ${dateStr}: ${dropped.length} appointment(s) dropped — unrecognized field names. Keys seen:`, dropped.map(a => Object.keys(a._raw).join(',')).join(' | '));
+  }
+  const appts = rawMapped
     .filter(a => !isNaN(a.start) && !isNaN(a.end) && a.end > a.start)
     .filter(a => a.start < dayEnd && a.end > dayStart) // overlaps the working day
     .sort((a, b) => a.start - b.start);
+  console.log(`[Availability] ${dateStr}: shift ${workingStart}–${workingEnd}, ${appts.length} appointment(s) parsed`);
 
   const blocks = [];
   let cursor = dayStart;
@@ -82,7 +87,7 @@ function parseLocalTime(dateStr, timeStr) {
  */
 export function formatBlocksAsSlots(blocks, dateStr) {
   const dayName = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
-    weekday: 'long',
+    month: 'short', day: 'numeric',
   });
   return blocks.map(b => {
     const start = fmt12h(b.start);
@@ -98,7 +103,7 @@ export function formatBlocksAsSlots(blocks, dateStr) {
  * If no category provided, falls back to just "Saturday: 9:00am".
  */
 export function formatBlockWithCategory(block, dateStr, category) {
-  const dayName = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+  const dayName = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const start = fmt12h(block.start);
   return category ? `${dayName}: ${start} · ${category}` : `${dayName}: ${start}`;
 }
@@ -153,7 +158,7 @@ export function categoriesForBlock(block, categories, stylistCats) {
 export function summarizeBlocks(blocks, dateStr) {
   if (!blocks.length) return null;
   const dayName = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
-    weekday: 'long',
+    month: 'short', day: 'numeric',
   });
   const parts = blocks.map(b => `${fmtDuration(b.durationMin)} at ${fmt12h(b.start)}`);
   return `${blocks.length} open slot${blocks.length > 1 ? 's' : ''} ${dayName} — ${parts.join(', ')}`;
