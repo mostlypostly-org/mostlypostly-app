@@ -1913,20 +1913,23 @@ router.get("/test-celebration", requireAuth, async (req, res) => {
     });
 
     const now = new Date().toISOString().replace("T", " ").slice(0, 19);
-    const insertPost = (imageUrl, postType) => {
+    const scheduledFeed  = DateTime.utc().plus({ minutes: 5 }).toFormat("yyyy-LL-dd HH:mm:ss");
+    const scheduledStory = DateTime.utc().plus({ minutes: 8 }).toFormat("yyyy-LL-dd HH:mm:ss");
+
+    const insertPost = (imageUrl, postType, scheduledFor) => {
       const id = crypto.randomUUID();
       db.prepare(`
         INSERT INTO posts (
           id, salon_id, stylist_name, stylist_id,
           image_url, base_caption, final_caption,
-          post_type, status, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manager_approved', ?)
-      `).run(id, salon_id, stylist.name, stylist.id, imageUrl, caption, caption, postType, now);
+          post_type, status, scheduled_for, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manager_approved', ?, ?)
+      `).run(id, salon_id, stylist.name, stylist.id, imageUrl, caption, caption, postType, scheduledFor, now);
       return id;
     };
 
-    insertPost(feedUrl, "celebration");
-    insertPost(storyUrl, "celebration_story");
+    insertPost(feedUrl, "celebration", scheduledFeed);
+    insertPost(storyUrl, "celebration_story", scheduledStory);
 
     console.log(`[Admin] Test celebration (${celebType}) created for ${firstName} in salon ${salon_id}`);
 
