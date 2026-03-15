@@ -164,6 +164,42 @@ router.get("/", requireAuth, (req, res) => {
     } catch { return []; }
   })();
 
+  // Feature requests for this salon
+  const allRequests = (() => {
+    try {
+      return db.prepare(`
+        SELECT fr.*,
+               (SELECT 1 FROM feature_request_votes WHERE feature_request_id = fr.id AND salon_id = ?) AS my_vote
+        FROM feature_requests
+        WHERE status != 'declined'
+        ORDER BY vote_count DESC, fr.created_at DESC
+        LIMIT 50
+      `).all(salon_id);
+    } catch { return []; }
+  })();
+
+  const statusLabel = { submitted: 'Submitted', under_review: 'Under Review', planned: '📅 Planned', live: '✅ Live', declined: 'Declined' };
+  const statusColor = { submitted: 'bg-gray-100 text-gray-600', under_review: 'bg-blue-100 text-blue-700', planned: 'bg-purple-100 text-purple-700', live: 'bg-green-100 text-green-700', declined: 'bg-red-100 text-red-600' };
+
+  const featureRequestsHtml = allRequests.length === 0
+    ? `<div class="px-6 py-8 text-center text-sm text-mpMuted">No requests yet — be the first to submit an idea!</div>`
+    : `<div class="divide-y">${allRequests.map(r => `
+    <div class="px-6 py-4 flex gap-4 items-start">
+      <form method="POST" action="/manager/admin/feature-requests/${r.id}/vote" class="flex flex-col items-center shrink-0 w-12">
+        <button type="submit" class="text-lg ${r.my_vote ? 'text-mpAccent' : 'text-gray-300 hover:text-mpAccent'}" title="${r.my_vote ? 'Remove vote' : 'Vote for this'}">▲</button>
+        <span class="text-sm font-bold text-mpCharcoal">${r.vote_count}</span>
+      </form>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-start justify-between gap-2">
+          <p class="text-sm font-medium text-mpCharcoal">${r.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</p>
+          <span class="text-xs px-2 py-0.5 rounded-full shrink-0 ${statusColor[r.status] || statusColor.submitted}">${statusLabel[r.status] || r.status}</span>
+        </div>
+        ${r.description ? `<p class="text-xs text-mpMuted mt-0.5">${r.description.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</p>` : ''}
+        <p class="text-xs text-mpMuted mt-1">${new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+      </div>
+    </div>
+  `).join('')}</div>`;
+
   // Brand palette
   let brandPalette = null;
   try {
@@ -255,11 +291,24 @@ router.get("/", requireAuth, (req, res) => {
       <span><strong>Manager view</strong> — Settings below are read-only. Contact your account owner to make changes.</span>
     </div>
     ` : ""}
+
+    <!-- Tab Navigation -->
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold mb-4">Admin</h1>
+      <div class="flex gap-1 border-b border-mpBorder overflow-x-auto" id="admin-tabs">
+        <button onclick="adminTab('business')" data-tab="business" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-mpAccent text-mpAccent">Business</button>
+        <button onclick="adminTab('branding')" data-tab="branding" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Branding</button>
+        <button onclick="adminTab('posting')" data-tab="posting" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Posting</button>
+        <button onclick="adminTab('photos')" data-tab="photos" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Stock Photos</button>
+        <button onclick="adminTab('security')" data-tab="security" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Security</button>
+        <button onclick="adminTab('feedback')" data-tab="feedback" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Issues &amp; Feedback${openIssues.length > 0 ? ` <span class="ml-1 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-xs font-semibold text-orange-700">${openIssues.length}</span>` : ""}</button>
+      </div>
+    </div>
+
     <div ${!isOwner ? 'class="opacity-50 pointer-events-none select-none"' : ""}>
-    <section class="mb-6">
-      <h1 class="text-2xl font-bold mb-2">Admin</h1>
-      <p class="text-sm text-mpMuted">Manage social connections, posting rules, and team configuration.</p>
-    </section>
+
+    <!-- BUSINESS TAB -->
+    <div id="admin-panel-business" class="admin-panel">
 
     <!-- SOCIAL CONNECTIONS -->
     <section class="mb-6 grid gap-4 md:grid-cols-[1.2fr,0.8fr]">
@@ -397,6 +446,50 @@ router.get("/", requireAuth, (req, res) => {
       </div>
     </section>
 
+    <!-- TEAM MEMBERS — in Business tab -->
+    ${(() => {
+      const planLimits = PLAN_LIMITS[salonRow.plan] || PLAN_LIMITS.trial;
+      const stylistLimit = planLimits.stylists; // null = unlimited (Pro)
+      const atLimit = stylistLimit !== null && dbStylists.length >= stylistLimit;
+      const pct = stylistLimit ? Math.round((dbStylists.length / stylistLimit) * 100) : 0;
+      const barColor = pct >= 100 ? "bg-red-400" : pct >= 75 ? "bg-yellow-400" : "bg-mpAccent";
+      return `
+    <section class="mb-6">
+      <div class="rounded-2xl border border-mpBorder bg-white px-4 py-4 flex flex-col justify-between">
+        <div>
+          <h2 class="text-sm font-semibold text-mpCharcoal mb-1">Team Members</h2>
+          <p class="text-xs text-mpMuted mb-3">
+            Add stylists, set tone variants, upload profile photos, configure birthdays and anniversaries,
+            and manage celebration posts — all from the Team page.
+          </p>
+          ${stylistLimit !== null ? `
+          <div class="mb-2">
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-mpMuted">Stylists used</span>
+              <span class="font-semibold text-mpCharcoal">${dbStylists.length} / ${stylistLimit}</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-1.5">
+              <div class="${barColor} h-1.5 rounded-full" style="width:${Math.min(100,pct)}%"></div>
+            </div>
+          </div>
+          ${atLimit ? `<p class="text-xs text-red-500 font-medium mb-1">Stylist limit reached. <a href="/manager/billing" class="underline text-mpAccent">Upgrade to add more →</a></p>` : ""}
+          ` : `<p class="text-xs text-mpMuted mb-1">${dbStylists.length} stylists · <span class="text-mpCharcoal font-medium">Unlimited</span> on Pro</p>`}
+        </div>
+        <div class="mt-3">
+          <a href="/manager/stylists?salon=${salon_id}"
+             class="inline-flex items-center gap-1.5 rounded-full bg-mpCharcoal px-4 py-2 text-xs font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
+            Manage Team
+          </a>
+        </div>
+      </div>
+    </section>`;
+    })()}
+
+    </div><!-- end admin-panel-business -->
+
+    <!-- POSTING TAB -->
+    <div id="admin-panel-posting" class="admin-panel hidden">
+
     <!-- POSTING RULES — moved to Scheduler page -->
     <section class="mb-6 grid gap-4 md:grid-cols-2">
       <!-- Scheduler link card -->
@@ -462,6 +555,11 @@ router.get("/", requireAuth, (req, res) => {
       </div>
     </section>
 
+    </div><!-- end admin-panel-posting -->
+
+    <!-- BRANDING TAB -->
+    <div id="admin-panel-branding" class="admin-panel hidden">
+
     <!-- BRAND PALETTE -->
     <section class="mb-6">
       <div class="rounded-2xl border border-mpBorder bg-white px-4 py-4">
@@ -515,6 +613,11 @@ router.get("/", requireAuth, (req, res) => {
       </div>
     </section>
 
+    </div><!-- end admin-panel-branding -->
+
+    <!-- SECURITY TAB -->
+    <div id="admin-panel-security" class="admin-panel hidden">
+
     <!-- ACCOUNT SECURITY -->
     <section class="mb-6">
       <div class="rounded-2xl border border-mpBorder bg-white px-5 py-5">
@@ -562,77 +665,7 @@ router.get("/", requireAuth, (req, res) => {
       </div>
     </section>
 
-    <!-- TEAM MEMBERS — managed on dedicated Team page -->
-    ${(() => {
-      const planLimits = PLAN_LIMITS[salonRow.plan] || PLAN_LIMITS.trial;
-      const stylistLimit = planLimits.stylists; // null = unlimited (Pro)
-      const atLimit = stylistLimit !== null && dbStylists.length >= stylistLimit;
-      const pct = stylistLimit ? Math.round((dbStylists.length / stylistLimit) * 100) : 0;
-      const barColor = pct >= 100 ? "bg-red-400" : pct >= 75 ? "bg-yellow-400" : "bg-mpAccent";
-      return `
-    <section class="mb-6">
-      <div class="rounded-2xl border border-mpBorder bg-white px-4 py-4 flex flex-col justify-between">
-        <div>
-          <h2 class="text-sm font-semibold text-mpCharcoal mb-1">Team Members</h2>
-          <p class="text-xs text-mpMuted mb-3">
-            Add stylists, set tone variants, upload profile photos, configure birthdays and anniversaries,
-            and manage celebration posts — all from the Team page.
-          </p>
-          ${stylistLimit !== null ? `
-          <div class="mb-2">
-            <div class="flex justify-between text-xs mb-1">
-              <span class="text-mpMuted">Stylists used</span>
-              <span class="font-semibold text-mpCharcoal">${dbStylists.length} / ${stylistLimit}</span>
-            </div>
-            <div class="w-full bg-gray-100 rounded-full h-1.5">
-              <div class="${barColor} h-1.5 rounded-full" style="width:${Math.min(100,pct)}%"></div>
-            </div>
-          </div>
-          ${atLimit ? `<p class="text-xs text-red-500 font-medium mb-1">Stylist limit reached. <a href="/manager/billing" class="underline text-mpAccent">Upgrade to add more →</a></p>` : ""}
-          ` : `<p class="text-xs text-mpMuted mb-1">${dbStylists.length} stylists · <span class="text-mpCharcoal font-medium">Unlimited</span> on Pro</p>`}
-        </div>
-        <div class="mt-3">
-          <a href="/manager/stylists?salon=${salon_id}"
-             class="inline-flex items-center gap-1.5 rounded-full bg-mpCharcoal px-4 py-2 text-xs font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
-            Manage Team
-          </a>
-        </div>
-      </div>
-    </section>`;
-    })()}
-
-    ${openIssues.length > 0 ? `
-    <!-- Stylist Issues Alert -->
-    <section class="mb-6">
-      <div class="rounded-2xl border border-orange-200 bg-orange-50 px-5 py-4">
-        <div class="flex items-start gap-3">
-          <div class="text-orange-500 text-xl mt-0.5">⚠️</div>
-          <div class="flex-1">
-            <h2 class="text-sm font-semibold text-orange-800 mb-1">
-              Availability Data Issue${openIssues.length > 1 ? "s" : ""}
-              <span class="ml-2 inline-flex items-center rounded-full bg-orange-200 px-2 py-0.5 text-xs font-semibold text-orange-800">${openIssues.length} open</span>
-            </h2>
-            <p class="text-xs text-orange-700 mb-3">
-              One or more stylists reported their availability looked incorrect. This usually means appointments in your salon software don't match what the system found. Please verify appointments are entered correctly.
-            </p>
-            <div class="space-y-2">
-              ${openIssues.map(issue => `
-                <div class="text-xs bg-white rounded-lg border border-orange-100 px-3 py-2 flex items-center justify-between">
-                  <div>
-                    <span class="font-medium text-orange-800">${issue.stylist_name || "Unknown stylist"}</span>
-                    <span class="text-orange-500 ml-2">${new Date(issue.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                    <span class="ml-2 text-orange-400">${(issue.issue_type || "").replace(/_/g, " ")}</span>
-                  </div>
-                  <span class="text-orange-400 capitalize">${issue.status}</span>
-                </div>
-              `).join("")}
-            </div>
-            <p class="text-xs text-orange-600 mt-3">Issues are reviewed by MostlyPostly support. If you need immediate help, contact <a href="mailto:support@mostlypostly.com" class="underline font-medium">support@mostlypostly.com</a>.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-    ` : ""}
+    </div><!-- end admin-panel-security -->
 
                 <!-- Modal Backdrop -->
         <div
@@ -703,9 +736,8 @@ router.get("/", requireAuth, (req, res) => {
 
   </div><!-- end owner-only sections -->
 
-  <!-- ═══════════════════════════════════════════════════════ -->
-  <!-- STOCK PHOTOS                                           -->
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STOCK PHOTOS TAB PANEL (outside owner-only div — editable by all managers) -->
+  <div id="admin-panel-photos" class="admin-panel hidden">
   ${(() => {
     const stockPhotos = db.prepare(
       `SELECT sp.id, sp.label, sp.url
@@ -790,6 +822,101 @@ router.get("/", requireAuth, (req, res) => {
     </section>
     `;
   })()}
+  </div><!-- end admin-panel-photos -->
+
+  <!-- ISSUES & FEEDBACK TAB PANEL (outside owner-only div — accessible to all managers) -->
+  <div id="admin-panel-feedback" class="admin-panel hidden">
+    ${openIssues.length > 0 ? `
+    <!-- Stylist Issues Alert -->
+    <section class="mb-6">
+      <div class="rounded-2xl border border-orange-200 bg-orange-50 px-5 py-4">
+        <div class="flex items-start gap-3">
+          <div class="text-orange-500 text-xl mt-0.5">⚠️</div>
+          <div class="flex-1">
+            <h2 class="text-sm font-semibold text-orange-800 mb-1">
+              Availability Data Issue${openIssues.length > 1 ? "s" : ""}
+              <span class="ml-2 inline-flex items-center rounded-full bg-orange-200 px-2 py-0.5 text-xs font-semibold text-orange-800">${openIssues.length} open</span>
+            </h2>
+            <p class="text-xs text-orange-700 mb-3">
+              One or more stylists reported their availability looked incorrect. This usually means appointments in your salon software don't match what the system found. Please verify appointments are entered correctly.
+            </p>
+            <div class="space-y-2">
+              ${openIssues.map(issue => `
+                <div class="text-xs bg-white rounded-lg border border-orange-100 px-3 py-2 flex items-center justify-between">
+                  <div>
+                    <span class="font-medium text-orange-800">${issue.stylist_name || "Unknown stylist"}</span>
+                    <span class="text-orange-500 ml-2">${new Date(issue.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                    <span class="ml-2 text-orange-400">${(issue.issue_type || "").replace(/_/g, " ")}</span>
+                  </div>
+                  <span class="text-orange-400 capitalize">${issue.status}</span>
+                </div>
+              `).join("")}
+            </div>
+            <p class="text-xs text-orange-600 mt-3">Issues are reviewed by MostlyPostly support. If you need immediate help, contact <a href="mailto:support@mostlypostly.com" class="underline font-medium">support@mostlypostly.com</a>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    ` : ""}
+
+    <!-- Feature Requests -->
+    <section class="mb-6">
+      <div class="rounded-2xl border border-mpBorder bg-white overflow-hidden">
+        <div class="px-6 py-4 border-b">
+          <h2 class="font-semibold text-mpCharcoal">Feature Requests &amp; Ideas</h2>
+          <p class="text-xs text-mpMuted mt-0.5">Submit ideas, vote on what matters most. Our team reviews all submissions.</p>
+        </div>
+
+        <!-- Submit new request form -->
+        <div class="px-6 py-4 border-b bg-gray-50">
+          <form method="POST" action="/manager/admin/feature-requests" class="space-y-3">
+            <div>
+              <label class="block text-xs font-medium text-mpCharcoal mb-1">Your idea (required)</label>
+              <input type="text" name="title" required maxlength="120" placeholder="e.g. Auto-schedule posts for peak engagement times"
+                class="w-full border border-mpBorder rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-mpAccent/20">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-mpCharcoal mb-1">More detail (optional)</label>
+              <textarea name="description" rows="2" maxlength="500" placeholder="Describe the problem it solves or how you'd use it..."
+                class="w-full border border-mpBorder rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-mpAccent/20 resize-none"></textarea>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-mpAccent text-white text-sm font-medium rounded-lg hover:bg-mpCharcoalDark transition-colors">
+              Submit Idea
+            </button>
+          </form>
+        </div>
+
+        <!-- Feature request list (loaded server-side) -->
+        ${featureRequestsHtml}
+      </div>
+    </section>
+  </div><!-- end admin-panel-feedback -->
+
+  <script>
+  function adminTab(name) {
+    document.querySelectorAll('.admin-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('.admin-tab-btn').forEach(b => {
+      b.classList.remove('border-mpAccent', 'text-mpAccent');
+      b.classList.add('border-transparent', 'text-mpMuted');
+    });
+    const panel = document.getElementById('admin-panel-' + name);
+    if (panel) panel.classList.remove('hidden');
+    const btn = document.querySelector('[data-tab="' + name + '"]');
+    if (btn) {
+      btn.classList.remove('border-transparent', 'text-mpMuted');
+      btn.classList.add('border-mpAccent', 'text-mpAccent');
+    }
+    history.replaceState(null, '', location.pathname + '#' + name);
+  }
+  // Restore from hash on load
+  (function() {
+    const hash = location.hash.replace('#', '');
+    const validTabs = ['business','branding','posting','photos','security','feedback'];
+    if (validTabs.includes(hash)) {
+      adminTab(hash);
+    }
+  })();
+  </script>
 
   `;
 
@@ -1596,6 +1723,53 @@ router.post("/resend-welcome/:stylistId", requireAuth, async (req, res) => {
     console.error("[Admin] resend-welcome failed:", err.message);
     return res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// ───────────────────────────────────────────────────────────
+// POST /feature-requests — Submit new feature request
+// ───────────────────────────────────────────────────────────
+router.post("/feature-requests", requireAuth, (req, res) => {
+  const salon_id = req.manager?.salon_id;
+  const { title, description } = req.body;
+  if (!title?.trim()) return res.redirect("/manager/admin#feedback");
+
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  try {
+    db.prepare(`
+      INSERT INTO feature_requests (id, title, description, submitted_by, status, public, vote_count, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 'submitted', 0, 1, ?, ?)
+    `).run(id, title.trim().slice(0, 120), (description || '').trim().slice(0, 500), salon_id, now, now);
+    // Auto-vote by submitter
+    db.prepare(`
+      INSERT OR IGNORE INTO feature_request_votes (id, feature_request_id, salon_id, created_at)
+      VALUES (?, ?, ?, ?)
+    `).run(crypto.randomUUID(), id, salon_id, now);
+  } catch (err) {
+    console.error('[Admin] Feature request insert failed:', err.message);
+  }
+  res.redirect("/manager/admin#feedback");
+});
+
+// ───────────────────────────────────────────────────────────
+// POST /feature-requests/:id/vote — Toggle vote on a request
+// ───────────────────────────────────────────────────────────
+router.post("/feature-requests/:id/vote", requireAuth, (req, res) => {
+  const salon_id = req.manager?.salon_id;
+  const { id } = req.params;
+  try {
+    const existing = db.prepare(`SELECT id FROM feature_request_votes WHERE feature_request_id = ? AND salon_id = ?`).get(id, salon_id);
+    if (existing) {
+      db.prepare(`DELETE FROM feature_request_votes WHERE feature_request_id = ? AND salon_id = ?`).run(id, salon_id);
+      db.prepare(`UPDATE feature_requests SET vote_count = MAX(0, vote_count - 1), updated_at = ? WHERE id = ?`).run(new Date().toISOString(), id);
+    } else {
+      db.prepare(`INSERT OR IGNORE INTO feature_request_votes (id, feature_request_id, salon_id, created_at) VALUES (?, ?, ?, ?)`).run(crypto.randomUUID(), id, salon_id, new Date().toISOString());
+      db.prepare(`UPDATE feature_requests SET vote_count = vote_count + 1, updated_at = ? WHERE id = ?`).run(new Date().toISOString(), id);
+    }
+  } catch (err) {
+    console.error('[Admin] Vote toggle failed:', err.message);
+  }
+  res.redirect("/manager/admin#feedback");
 });
 
 // ───────────────────────────────────────────────────────────

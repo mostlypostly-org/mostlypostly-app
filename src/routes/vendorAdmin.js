@@ -210,6 +210,21 @@ router.get("/", requireSecret, requirePin, (req, res) => {
   `).all();
   const openIssueCount = issues.filter(i => i.status === 'open').length;
 
+  // Feature requests across all salons
+  const featureRequests = (() => {
+    try {
+      return db.prepare(`
+        SELECT fr.*, s.name AS salon_name
+        FROM feature_requests fr
+        LEFT JOIN salons s ON s.slug = fr.submitted_by
+        ORDER BY CASE fr.status WHEN 'submitted' THEN 0 WHEN 'under_review' THEN 1 WHEN 'planned' THEN 2 WHEN 'live' THEN 3 ELSE 4 END,
+                 fr.vote_count DESC, fr.created_at DESC
+        LIMIT 200
+      `).all();
+    } catch { return []; }
+  })();
+  const openRequestCount = featureRequests.filter(r => r.status === 'submitted' || r.status === 'under_review').length;
+
   // All unique vendor names for the approval assignment dropdown
   const vendorNames = [...new Set(campaigns.map(c => c.vendor_name))].sort();
 
@@ -317,6 +332,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
       <div class="stat-card"><div class="stat-val text-purple-600">${totalCampaigns}</div><div class="stat-lbl">Vendor Campaigns</div></div>
       <div class="stat-card"><div class="stat-val ${pendingCount > 0 ? "text-yellow-500" : "text-gray-400"}">${pendingCount}</div><div class="stat-lbl">Pending Approvals</div></div>
       <div class="stat-card"><div class="stat-val ${openIssueCount > 0 ? "text-red-500" : "text-gray-400"}">${openIssueCount}</div><div class="stat-lbl">Open Issues</div></div>
+      <div class="stat-card"><div class="stat-val ${openRequestCount > 0 ? "text-indigo-600" : "text-gray-400"}">${openRequestCount}</div><div class="stat-lbl">Feature Requests</div></div>
     </div>
 
     <!-- Platform Issues -->
@@ -356,6 +372,60 @@ router.get("/", requireSecret, requirePin, (req, res) => {
                   ${issue.status === "open" ? `<form method="POST" action="/internal/vendors/issues/${safe(issue.id)}/acknowledge${qs(req)}"><button class="text-xs text-blue-500 hover:text-blue-700">Acknowledge</button></form>` : ""}
                   ${issue.status !== "resolved" ? `<form method="POST" action="/internal/vendors/issues/${safe(issue.id)}/resolve${qs(req)}"><button class="text-xs text-green-500 hover:text-green-700">Resolve</button></form>` : ""}
                 </div>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>`}
+    </div>
+
+    <!-- Feature Requests -->
+    <div class="border rounded-2xl bg-white overflow-hidden">
+      <div class="px-6 py-4 border-b flex items-center justify-between">
+        <div>
+          <h2 class="font-bold">Feature Requests
+            ${openRequestCount > 0 ? `<span class="ml-2 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">${openRequestCount} needs review</span>` : ""}
+          </h2>
+          <p class="text-xs text-gray-500 mt-0.5">Ideas submitted by salons. Change status to move them through the pipeline. Set to Planned or Live + toggle Public to appear on the roadmap.</p>
+        </div>
+      </div>
+      ${featureRequests.length === 0 ? `<div class="px-6 py-8 text-center text-sm text-gray-400">No feature requests yet</div>` : `
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+          <tr>
+            <th class="px-4 py-2 text-left">Idea</th>
+            <th class="px-4 py-2 text-left">From</th>
+            <th class="px-4 py-2 text-center">Votes</th>
+            <th class="px-4 py-2 text-left">Status</th>
+            <th class="px-4 py-2 text-left">Public</th>
+            <th class="px-4 py-2 text-left">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          ${featureRequests.map(r => `
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3 max-w-xs">
+                <p class="font-medium text-gray-800 text-sm">${safe(r.title)}</p>
+                ${r.description ? `<p class="text-xs text-gray-400 mt-0.5">${safe(r.description).slice(0, 100)}${r.description.length > 100 ? '…' : ''}</p>` : ''}
+              </td>
+              <td class="px-4 py-3 text-xs text-gray-500">${safe(r.salon_name || r.submitted_by)}</td>
+              <td class="px-4 py-3 text-center font-bold text-gray-700">${r.vote_count}</td>
+              <td class="px-4 py-3">
+                <form method="POST" action="/internal/vendors/feature-requests/${safe(r.id)}/status${qs(req)}" class="flex gap-1 items-center">
+                  <select name="status" onchange="this.form.submit()" class="text-xs border rounded px-1.5 py-1 bg-white">
+                    ${['submitted','under_review','planned','live','declined'].map(s => `<option value="${s}" ${r.status === s ? 'selected' : ''}>${s.replace('_',' ')}</option>`).join('')}
+                  </select>
+                </form>
+              </td>
+              <td class="px-4 py-3">
+                <form method="POST" action="/internal/vendors/feature-requests/${safe(r.id)}/toggle-public${qs(req)}">
+                  <button type="submit" class="text-xs px-2 py-0.5 rounded-full ${r.public ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}">${r.public ? '✓ Public' : 'Private'}</button>
+                </form>
+              </td>
+              <td class="px-4 py-3">
+                <form method="POST" action="/internal/vendors/feature-requests/${safe(r.id)}/delete${qs(req)}" onsubmit="return confirm('Delete this feature request?')">
+                  <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
+                </form>
               </td>
             </tr>
           `).join("")}
@@ -557,6 +627,33 @@ router.get("/", requireSecret, requirePin, (req, res) => {
 </body></html>`;
 
   res.send(html);
+});
+
+// ── POST /feature-requests/:id/status — Change request status ─────────────────
+router.post("/feature-requests/:id/status", requireSecret, requirePin, (req, res) => {
+  const { status } = req.body;
+  const validStatuses = ['submitted', 'under_review', 'planned', 'live', 'declined'];
+  if (!validStatuses.includes(status)) return res.redirect(`/internal/vendors${qs(req)}`);
+  db.prepare(`UPDATE feature_requests SET status = ?, updated_at = ? WHERE id = ?`)
+    .run(status, new Date().toISOString(), req.params.id);
+  res.redirect(`/internal/vendors${qs(req)}`);
+});
+
+// ── POST /feature-requests/:id/toggle-public — Toggle public roadmap visibility ─
+router.post("/feature-requests/:id/toggle-public", requireSecret, requirePin, (req, res) => {
+  const row = db.prepare(`SELECT public FROM feature_requests WHERE id = ?`).get(req.params.id);
+  if (row) {
+    db.prepare(`UPDATE feature_requests SET public = ?, updated_at = ? WHERE id = ?`)
+      .run(row.public ? 0 : 1, new Date().toISOString(), req.params.id);
+  }
+  res.redirect(`/internal/vendors${qs(req)}`);
+});
+
+// ── POST /feature-requests/:id/delete — Delete a feature request ──────────────
+router.post("/feature-requests/:id/delete", requireSecret, requirePin, (req, res) => {
+  db.prepare(`DELETE FROM feature_request_votes WHERE feature_request_id = ?`).run(req.params.id);
+  db.prepare(`DELETE FROM feature_requests WHERE id = ?`).run(req.params.id);
+  res.redirect(`/internal/vendors${qs(req)}`);
 });
 
 // ── POST /issues/:id/acknowledge — Mark issue as acknowledged ─────────────────

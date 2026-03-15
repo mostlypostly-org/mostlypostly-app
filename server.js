@@ -437,6 +437,84 @@ app.use("/manager/queue", postQueueRoute);
 app.use("/internal/vendors", vendorAdminRoute);
 
 // -------------------------------------------------------
+// PUBLIC ROADMAP — /roadmap (no auth)
+// Shows feature_requests with public=1 and status in (planned, live)
+// -------------------------------------------------------
+app.get("/roadmap", (req, res) => {
+  let planned = [], live = [];
+  try {
+    const rows = db.prepare(`
+      SELECT title, description, vote_count, status, updated_at
+      FROM feature_requests
+      WHERE public = 1 AND status IN ('planned', 'live')
+      ORDER BY status DESC, vote_count DESC, updated_at DESC
+    `).all();
+    planned = rows.filter(r => r.status === 'planned');
+    live    = rows.filter(r => r.status === 'live');
+  } catch {}
+
+  const safe = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const card = r => `
+    <div class="border border-mpBorder rounded-2xl bg-white px-5 py-4">
+      <div class="flex items-start justify-between gap-3">
+        <p class="font-semibold text-mpCharcoal">${safe(r.title)}</p>
+        <span class="shrink-0 text-xs px-2 py-0.5 rounded-full ${r.status === 'live' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'}">${r.status === 'live' ? '✅ Live' : '📅 Planned'}</span>
+      </div>
+      ${r.description ? `<p class="text-sm text-mpMuted mt-1">${safe(r.description)}</p>` : ''}
+      <p class="text-xs text-mpMuted mt-2">${r.vote_count} salon${r.vote_count !== 1 ? 's' : ''} requested this</p>
+    </div>`;
+
+  const body = `
+    <div class="max-w-2xl mx-auto px-4 py-12">
+      <div class="mb-10 text-center">
+        <img src="/logo/logo-trimmed.png" alt="MostlyPostly" class="h-10 mx-auto mb-6">
+        <h1 class="text-3xl font-bold text-mpCharcoal">Product Roadmap</h1>
+        <p class="text-mpMuted mt-2">Features planned and shipped, shaped by our salon community.</p>
+      </div>
+
+      ${live.length ? `
+      <section class="mb-10">
+        <h2 class="text-lg font-bold text-mpCharcoal mb-4 flex items-center gap-2">✅ Recently Shipped</h2>
+        <div class="space-y-3">${live.map(card).join('')}</div>
+      </section>` : ''}
+
+      ${planned.length ? `
+      <section class="mb-10">
+        <h2 class="text-lg font-bold text-mpCharcoal mb-4 flex items-center gap-2">📅 Coming Soon</h2>
+        <div class="space-y-3">${planned.map(card).join('')}</div>
+      </section>` : ''}
+
+      ${!live.length && !planned.length ? `
+      <div class="text-center py-16 text-mpMuted">
+        <p class="text-lg mb-2">Roadmap coming soon</p>
+        <p class="text-sm">Sign in to your account to submit feature requests and vote on ideas.</p>
+      </div>` : ''}
+
+      <div class="text-center mt-12 pt-8 border-t border-mpBorder">
+        <p class="text-sm text-mpMuted mb-3">Want to influence what we build next?</p>
+        <a href="/manager/login" class="inline-block px-5 py-2.5 bg-mpAccent text-white text-sm font-medium rounded-xl hover:bg-mpAccentDark transition-colors">Sign in to vote →</a>
+      </div>
+    </div>`;
+
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roadmap — MostlyPostly</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: {
+    mpCharcoal: '#2B2D35', mpAccent: '#3B72B9', mpAccentDark: '#1a1c22',
+    mpBg: '#F8FAFC', mpMuted: '#7A7C85', mpBorder: '#E2E8F0'
+  }}}}</script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Plus Jakarta Sans', sans-serif; background: #F8FAFC; }</style>
+</head>
+<body>${body}</body>
+</html>`);
+});
+
+// -------------------------------------------------------
 // 13. MFA (TOTP setup, verify, disable)
 // -------------------------------------------------------
 app.use("/manager/mfa", mfaRoute);
