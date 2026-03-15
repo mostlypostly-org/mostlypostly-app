@@ -296,12 +296,12 @@ router.get("/", requireAuth, (req, res) => {
     <div class="mb-6">
       <h1 class="text-2xl font-bold mb-4">Admin</h1>
       <div class="flex gap-1 border-b border-mpBorder overflow-x-auto" id="admin-tabs">
-        <button onclick="adminTab('business')" data-tab="business" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-mpAccent text-mpAccent">Business</button>
-        <button onclick="adminTab('branding')" data-tab="branding" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Branding</button>
-        <button onclick="adminTab('posting')" data-tab="posting" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Posting</button>
-        <button onclick="adminTab('photos')" data-tab="photos" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Stock Photos</button>
-        <button onclick="adminTab('security')" data-tab="security" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Security</button>
-        <button onclick="adminTab('feedback')" data-tab="feedback" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Issues &amp; Feedback${openIssues.length > 0 ? ` <span class="ml-1 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-xs font-semibold text-orange-700">${openIssues.length}</span>` : ""}</button>
+        <button type="button" onclick="adminTab('business')" data-tab="business" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-mpAccent text-mpAccent">Business</button>
+        <button type="button" onclick="adminTab('branding')" data-tab="branding" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Branding</button>
+        <button type="button" onclick="adminTab('posting')" data-tab="posting" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Posting</button>
+        <button type="button" onclick="adminTab('photos')" data-tab="photos" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Stock Photos</button>
+        <button type="button" onclick="adminTab('security')" data-tab="security" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Security</button>
+        <button type="button" onclick="adminTab('feedback')" data-tab="feedback" class="admin-tab-btn px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-mpMuted hover:text-mpCharcoal">Issues &amp; Feedback${openIssues.length > 0 ? ` <span class="ml-1 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-xs font-semibold text-orange-700">${openIssues.length}</span>` : ""}</button>
       </div>
     </div>
 
