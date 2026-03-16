@@ -1142,16 +1142,17 @@ router.get("/edit/business-info", requireAuth, (req, res) => {
             <p class="text-[11px] text-mpMuted mt-1">Used on every post. Usually your salon handle.</p>
           </div>
           <div>
-            <label class="text-xs font-semibold text-mpMuted">Custom Hashtags (up to 4, space or comma separated)</label>
+            <label class="text-xs font-semibold text-mpMuted">Custom Hashtags (up to 2, space or comma separated)</label>
             <input name="custom_tags_raw" value="${customTags.join(" ")}"
-              placeholder="#balayage #haircolor #hairstyle" class="${inputCls}" />
+              placeholder="#balayage #haircolor" class="${inputCls}" />
+            <p class="text-[11px] text-mpMuted mt-1">Max 3 total (salon tag + 2 custom). Stylists can add up to 2 more on each post.</p>
           </div>
           <input type="hidden" name="hashtags_json" id="hashtags-json-input" />
           <div class="flex gap-3 pt-1">
             <button type="submit" onclick="
               const salon = document.querySelector('[name=salon_tag]').value.trim().replace(/^#+/,'');
               const custom = document.querySelector('[name=custom_tags_raw]').value
-                .split(/[,\\s]+/).map(t=>t.trim().replace(/^#+/,'')).filter(Boolean).slice(0,4);
+                .split(/[,\\s]+/).map(t=>t.trim().replace(/^#+/,'')).filter(Boolean).slice(0,2);
               const all = (salon ? ['#'+salon] : []).concat(custom.map(t=>'#'+t));
               document.getElementById('hashtags-json-input').value = JSON.stringify(all);
             " class="flex-1 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-semibold rounded-full py-2.5 transition-colors">Save Hashtags</button>
@@ -1432,7 +1433,7 @@ router.post("/update-hashtags", requireAuth, (req, res) => {
     }
 
 
-    const merged = (salonTag ? [salonTag] : []).concat(custom);
+    const merged = (salonTag ? [salonTag] : []).concat(custom).slice(0, 3);
 
     db.prepare(
       `
