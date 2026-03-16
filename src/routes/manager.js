@@ -293,18 +293,7 @@ router.get("/", requireAuth, async (req, res) => {
                   ${caption.replace(/<br\/>/g, " ")}
                 </p>
 
-                <a href="#" class="text-xs text-blue-400 hover:underline"
-                  onclick="
-                    var card = this.closest('.recent-card');
-                    var full = card.querySelector('.full-caption');
-                    var preview = card.querySelector('.caption-preview');
-                    var showing = full.style.display === 'block';
-                    full.style.display = showing ? 'none' : 'block';
-                    preview.style.display = showing ? '' : 'none';
-                    this.textContent = showing ? 'Show more' : 'Show less';
-                    return false;">
-                  Show more
-                </a>
+                <button type="button" class="show-more-btn text-xs text-blue-400 hover:underline mt-1">Show more</button>
 
                 <!-- Expanded Caption -->
                 <div class="full-caption mt-2 text-sm text-mpCharcoal whitespace-pre-line leading-relaxed" style="display:none">
@@ -402,6 +391,21 @@ router.get("/", requireAuth, async (req, res) => {
 
       <h2 class="text-xl font-bold text-mpCharcoal mt-10 mb-3">Recent Activity</h2>
       ${recentCards}
+
+  <script>
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.show-more-btn');
+    if (!btn) return;
+    var card = btn.closest('.recent-card');
+    if (!card) return;
+    var full    = card.querySelector('.full-caption');
+    var preview = card.querySelector('.caption-preview');
+    var showing = full.style.display === 'block';
+    full.style.display    = showing ? 'none' : 'block';
+    preview.style.display = showing ? ''     : 'none';
+    btn.textContent       = showing ? 'Show more' : 'Show less';
+  });
+  </script>
   `;
 
   return res.send(
