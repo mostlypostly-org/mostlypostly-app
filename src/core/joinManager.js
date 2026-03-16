@@ -48,13 +48,19 @@ export async function continueJoinConversation(identifier, messageText, sendMess
     case 2:
       data.contact = text.replace(/\D/g, "");
       session.step = 3;
-      await sendMessage(`📱 Thanks! What is their Instagram handle (you can type none)?`);
+      await sendMessage(
+        `📱 Thanks! What is their Instagram handle?`,
+        ["reply:NONE"]
+      );
       return { done: false };
 
     case 3:
       data.instagram_handle = text.toLowerCase().replace("@", "") === "none" ? "" : text.replace("@", "");
       session.step = 4;
-      await sendMessage(`🎨 Great! What are their specialties?\n(Type 1–2, separated by commas, or reply NONE if you’re not sure yet)`);
+      await sendMessage(
+        `🎨 Great! What are their specialties? (Type 1–2, separated by commas)`,
+        ["reply:NONE"]
+      );
       return { done: false };
 
     case 4:

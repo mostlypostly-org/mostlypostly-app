@@ -148,11 +148,11 @@ export default function twilioRoute(drafts, _lookupStylist, generateCaption) {
     try {
       // --- JOIN FLOW ---
       if (upperInit.startsWith("JOIN")) {
-        await handleJoinCommand(from, lookupStylist, text, (msg) => sendViaTwilio(from, msg));
+        await handleJoinCommand(from, lookupStylist, text, (msg, buttons = []) => sendViaRcs(from, msg, buttons));
         return;
       }
       if (joinSessions.has(from)) {
-        await continueJoinConversation(from, text, (msg) => sendViaTwilio(from, msg));
+        await continueJoinConversation(from, text, (msg, buttons = []) => sendViaRcs(from, msg, buttons));
         return;
       }
 
