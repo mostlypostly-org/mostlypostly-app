@@ -63,8 +63,10 @@ router.get("/", requireAuth, (req, res) => {
     catch { imgUrl = p.image_url; }
     imgUrl = toProxyUrl(imgUrl);
 
-    const scheduledDt = DateTime.fromSQL(p.scheduled_for, { zone: "utc" }).setZone(tz);
-    const timeDisplay = scheduledDt.isValid ? scheduledDt.toFormat("EEE, MMM d · h:mm a") : "—";
+    let scheduledDt = DateTime.fromSQL(p.scheduled_for, { zone: "utc" });
+    if (!scheduledDt.isValid) scheduledDt = DateTime.fromISO(p.scheduled_for, { zone: "utc" });
+    scheduledDt = scheduledDt.setZone(tz);
+    const timeDisplay = scheduledDt.isValid ? scheduledDt.toFormat("EEE, MMM d · h:mm a") : "Unscheduled";
 
     return `
       <div class="queue-card group flex items-center gap-3 bg-white border border-mpBorder rounded-2xl px-4 py-3
@@ -84,10 +86,10 @@ router.get("/", requireAuth, (req, res) => {
         <div class="position-num flex-shrink-0 w-5 text-center text-xs font-bold text-mpMuted">${i + 1}</div>
 
         <!-- Thumbnail (click to enlarge) -->
-        <div class="flex-shrink-0 w-11 h-11 rounded-xl overflow-hidden bg-mpBg border border-mpBorder"
-             style="cursor:zoom-in" onclick="_qp(this)">
+        <div class="queue-thumb flex-shrink-0 w-11 h-11 rounded-xl overflow-hidden bg-mpBg border border-mpBorder"
+             style="cursor:zoom-in" data-img="${safe(imgUrl || '')}">
           ${imgUrl
-            ? `<img src="${safe(imgUrl)}" style="width:100%;height:100%;object-fit:cover;pointer-events:none" data-src="${safe(imgUrl)}" />`
+            ? `<img src="${safe(imgUrl)}" style="width:100%;height:100%;object-fit:cover;pointer-events:none" />`
             : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px">📷</div>`}
         </div>
 
@@ -144,23 +146,27 @@ router.get("/", requireAuth, (req, res) => {
 
     <!-- Image lightbox -->
     <div id="img-lightbox"
-         style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out"
-         onclick="this.style.display='none'">
+         style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out">
       <img id="img-lightbox-img" src="" alt=""
            style="max-width:90vw;max-height:90vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.6)" />
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
     <script>
-    function _qp(thumbDiv) {
-      var img = thumbDiv.querySelector('img');
-      var src = img ? img.getAttribute('data-src') : '';
-      if (!src) return;
-      var lb = document.getElementById('img-lightbox');
-      var lbImg = document.getElementById('img-lightbox-img');
-      lbImg.src = src;
-      lb.style.display = 'flex';
-    }
+    document.addEventListener('click', function(e) {
+      var thumb = e.target.closest('.queue-thumb');
+      if (thumb) {
+        var src = thumb.getAttribute('data-img');
+        if (src) {
+          document.getElementById('img-lightbox-img').src = src;
+          document.getElementById('img-lightbox').style.display = 'flex';
+        }
+        return;
+      }
+      if (e.target.closest('#img-lightbox')) {
+        document.getElementById('img-lightbox').style.display = 'none';
+      }
+    });
 
     (function() {
       const list = document.getElementById('queue-list');

@@ -298,15 +298,16 @@ router.get("/", requireAuth, async (req, res) => {
                     var card = this.closest('.recent-card');
                     var full = card.querySelector('.full-caption');
                     var preview = card.querySelector('.caption-preview');
-                    var expanded = full.classList.toggle('hidden');
-                    preview.classList.toggle('hidden', !expanded);
-                    this.textContent = expanded ? 'Show more' : 'Show less';
+                    var showing = full.style.display === 'block';
+                    full.style.display = showing ? 'none' : 'block';
+                    preview.style.display = showing ? '' : 'none';
+                    this.textContent = showing ? 'Show more' : 'Show less';
                     return false;">
                   Show more
                 </a>
 
                 <!-- Expanded Caption -->
-                <div class="full-caption hidden mt-2 text-sm text-mpCharcoal whitespace-pre-line leading-relaxed">
+                <div class="full-caption mt-2 text-sm text-mpCharcoal whitespace-pre-line leading-relaxed" style="display:none">
                   ${caption.replace(/<br\/>/g, "\n")}
                 </div>
 
