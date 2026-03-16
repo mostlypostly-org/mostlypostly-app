@@ -175,6 +175,7 @@ export default function twilioRoute(drafts, _lookupStylist, generateCaption) {
         moderateAIOutput,
         sendMessage: {
           sendText: async (target, msg) => sendViaTwilio(target || from, msg),
+          sendRcs: async (target, msg, buttons) => sendViaRcs(target || from, msg, buttons),
         },
         io: null,
       });

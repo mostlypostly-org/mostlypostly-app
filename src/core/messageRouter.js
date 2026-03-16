@@ -583,9 +583,16 @@ async function processNewImageFlow({
       const baseUrl = process.env.PUBLIC_BASE_URL || "";
       const portalUrl = `${baseUrl}/stylist/${postId}?token=${portalToken}`;
 
-      await sendMessage.sendText(chatId,
-        `Your caption preview is ready! Review and edit it here:\n${portalUrl}\n\nOr reply APPROVE to submit now, or CANCEL to discard. (Link expires in 24 hours.)`
-      );
+      const previewMsg =
+        `Your caption preview is ready!\n\n` +
+        `Review or edit here:\n${portalUrl}\n\n` +
+        `Or tap a button below (or reply APPROVE/REDO/CANCEL). Link expires in 24 hours.`;
+
+      if (sendMessage.sendRcs) {
+        await sendMessage.sendRcs(chatId, previewMsg, ["reply:APPROVE", "reply:REDO", "reply:CANCEL"]);
+      } else {
+        await sendMessage.sendText(chatId, previewMsg);
+      }
     } catch (err) {
       console.warn("⚠️ Could not generate portal token, falling back to SMS preview:", err.message);
       await sendMessage.sendText(chatId, `Preview:\n\n${previewCaption}\n\nReply APPROVE to submit or CANCEL to discard.`);
