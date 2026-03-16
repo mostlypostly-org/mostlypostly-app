@@ -8,6 +8,7 @@ import { existsSync } from "fs";
 
 let browser = null;
 let chromeReady = false;
+let launchPromise = null; // mutex — prevents concurrent puppeteer.launch() calls
 
 async function ensureChrome() {
   if (chromeReady) return;
@@ -33,18 +34,30 @@ async function ensureChrome() {
 async function getBrowser() {
   await ensureChrome();
   if (browser) return browser;
-  browser = await puppeteer.launch({
+  // Return existing launch promise so concurrent calls share one Chrome instance
+  if (launchPromise) return launchPromise;
+  launchPromise = puppeteer.launch({
     headless: true,
+    timeout: 60000,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
+      "--no-zygote",
+      "--single-process",
       "--font-render-hinting=none",
     ],
+  }).then(b => {
+    browser = b;
+    launchPromise = null;
+    b.on("disconnected", () => { browser = null; launchPromise = null; chromeReady = false; });
+    return b;
+  }).catch(err => {
+    launchPromise = null;
+    throw err;
   });
-  browser.on("disconnected", () => { browser = null; chromeReady = false; });
-  return browser;
+  return launchPromise;
 }
 
 /**
