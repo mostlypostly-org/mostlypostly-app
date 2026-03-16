@@ -444,18 +444,21 @@ router.get("/manager/billing", requireAuth, requireOwner, async (req, res) => {
         </script>` : ""}
 
         <script>
-          let isAnnual = false;
           function toggleCycle() {
-            isAnnual = !isAnnual;
-            const thumb   = document.getElementById('cycleThumb');
-            const toggle  = document.getElementById('cycleToggle');
-            const lm      = document.getElementById('label-monthly');
-            const la      = document.getElementById('label-annual');
+            const toggle = document.getElementById('cycleToggle');
+            const isAnnual = toggle.dataset.annual !== '1';
+            toggle.dataset.annual = isAnnual ? '1' : '0';
 
-            thumb.style.transform  = isAnnual ? 'translateX(1.375rem)' : 'translateX(0.25rem)';
-            toggle.style.background = isAnnual ? '#3B72B9' : '';
-            lm.className = 'text-xs font-semibold ' + (isAnnual ? 'text-mpMuted' : 'text-mpCharcoal');
-            la.className = 'text-xs font-semibold ' + (isAnnual ? 'text-mpCharcoal' : 'text-mpMuted');
+            const thumb = document.getElementById('cycleThumb');
+            const lm    = document.getElementById('label-monthly');
+            const la    = document.getElementById('label-annual');
+
+            thumb.style.transform = isAnnual ? 'translateX(1.375rem)' : 'translateX(0.25rem)';
+            toggle.style.backgroundColor = isAnnual ? '#3B72B9' : '#E2E8F0';
+            lm.style.fontWeight = isAnnual ? '400' : '700';
+            la.style.fontWeight = isAnnual ? '700' : '400';
+            lm.style.color = isAnnual ? '#6B7280' : '#2B2D35';
+            la.style.color = isAnnual ? '#2B2D35' : '#6B7280';
 
             document.querySelectorAll('.price-monthly').forEach(el => el.classList.toggle('hidden', isAnnual));
             document.querySelectorAll('.price-annual').forEach(el => el.classList.toggle('hidden', !isAnnual));
