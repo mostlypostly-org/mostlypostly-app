@@ -2,7 +2,7 @@
 // Sends welcome SMS to newly added stylists and handles the quick-start follow-up.
 
 import db from "../../db.js";
-import { sendViaTwilio } from "../routes/twilio.js";
+import { sendViaTwilio, sendViaRcs } from "../routes/twilio.js";
 
 const KB_URL = "https://mostlypostly.com/kb/stylist-texting.html";
 
@@ -21,11 +21,12 @@ export async function sendWelcomeSms(stylist, salonName) {
   const hasConsent = !!compliance_opt_in;
 
   if (!hasConsent) {
-    await sendViaTwilio(
+    await sendViaRcs(
       phone,
       `Hi ${name}! ${salonName} has added you to MostlyPostly — your AI social media assistant.\n\n` +
-      `Text a camera photo to this number and we'll create a professional Instagram & Facebook caption for you automatically.\n\n` +
-      `Reply AGREE to get started. Reply STOP to opt out. Msg & data rates may apply.`
+      `Text a photo and we'll create a professional Instagram & Facebook caption automatically.\n\n` +
+      `Tap Agree below to get started. Reply STOP to opt out. Msg & data rates may apply.`,
+      ["reply:AGREE"]
     );
   } else {
     await sendViaTwilio(
