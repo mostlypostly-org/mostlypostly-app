@@ -1141,18 +1141,11 @@ router.get("/edit/business-info", requireAuth, (req, res) => {
                 placeholder="#balayage #haircolor" class="${inputCls}" />
               <p class="text-[11px] text-mpMuted mt-1">Max 3 total (salon tag + 2 custom). Stylists can add up to 2 more on each post.</p>
             </div>
-            <input type="hidden" name="hashtags_json" id="hashtags-json-input" />
           </div>
         </div>
 
         <div class="flex gap-3 pt-2">
-          <button type="submit" onclick="
-            const salon = document.querySelector('[name=salon_tag]').value.trim().replace(/^#+/,'');
-            const custom = document.querySelector('[name=custom_tags_raw]').value
-              .split(/[,\\s]+/).map(t=>t.trim().replace(/^#+/,'')).filter(Boolean).slice(0,2);
-            const all = (salon ? ['#'+salon] : []).concat(custom.map(t=>'#'+t));
-            document.getElementById('hashtags-json-input').value = JSON.stringify(all);
-          " class="flex-1 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-semibold rounded-full py-2.5 transition-colors">Save Changes</button>
+          <button type="submit" class="flex-1 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-semibold rounded-full py-2.5 transition-colors">Save Changes</button>
           <a href="/manager/admin" class="flex-1 text-center border border-mpBorder rounded-full py-2.5 text-sm text-mpMuted hover:text-mpCharcoal transition-colors">Cancel</a>
         </div>
       </form>
@@ -1236,7 +1229,8 @@ router.post("/update-salon-info", requireAuth, (req, res) => {
     industry,
     tone_profile,
     timezone,
-    hashtags_json
+    salon_tag,
+    custom_tags_raw
   } = req.body;
 
   if (!salon_id) {
@@ -1244,15 +1238,23 @@ router.post("/update-salon-info", requireAuth, (req, res) => {
   }
 
   try {
-    // Process hashtags if submitted alongside business info
+    // Build hashtags from the plain text fields — no client-side JS needed
     let hashtagsValue = null;
-    if (hashtags_json) {
-      try {
-        const parsed = JSON.parse(hashtags_json);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          hashtagsValue = JSON.stringify(parsed.slice(0, 3));
-        }
-      } catch { /* ignore parse errors */ }
+    if (salon_tag !== undefined || custom_tags_raw !== undefined) {
+      const tagClean = (t) => t.trim().replace(/^#+/, "");
+      const salonTagCleaned = salon_tag ? tagClean(salon_tag) : "";
+      const customCleaned = (custom_tags_raw || "")
+        .split(/[,\s]+/)
+        .map(tagClean)
+        .filter(Boolean)
+        .slice(0, 2);
+      const all = (salonTagCleaned ? [`#${salonTagCleaned}`] : [])
+        .concat(customCleaned.map(t => `#${t}`));
+      if (all.length > 0) {
+        hashtagsValue = JSON.stringify(all);
+      } else {
+        hashtagsValue = "[]";
+      }
     }
 
     db.prepare(`

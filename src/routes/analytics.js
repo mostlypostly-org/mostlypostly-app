@@ -17,8 +17,10 @@ function pageShell({ title, body, salon_id = "" }) {
 function resolveSalonId(req) {
   const fromToken = req.manager?.salon_id || req.salon_id || null;
   const fromQuery = req.query.salon || req.query.salon_id || null;
+  const fromBody  = req.body?.salon || req.body?.salon_id || null;
   if (fromToken) return fromToken;
   if (fromQuery) return fromQuery;
+  if (fromBody)  return fromBody;
   try {
     const all = getAllSalons();
     const ids = Object.keys(all || {});
@@ -73,6 +75,8 @@ function postTypeLabel(t) {
 router.get("/", (req, res) => {
   const salon_id = resolveSalonId(req);
   const qs = salon_id ? `?salon=${encodeURIComponent(salon_id)}` : "";
+  const msgParam = req.query.msg || "";
+  const errParam = req.query.err || "";
 
   if (!salon_id) {
     return res.status(400).send(pageShell({
@@ -161,13 +165,21 @@ router.get("/", (req, res) => {
 
   // ── HTML ──────────────────────────────────────────────────────────
 
+  const resultBanner = msgParam ? `
+    <div class="mb-4 rounded-2xl border border-green-200 bg-green-50 px-5 py-3 text-sm font-medium text-green-800">${msgParam}</div>` :
+    errParam ? `
+    <div class="mb-4 rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm font-medium text-red-700">${errParam}</div>` : "";
+
   const syncBanner = !hasInsights ? `
     <div class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-mpBorder bg-mpAccentLight px-5 py-4">
       <div>
         <p class="text-sm font-bold text-mpCharcoal">No social insights synced yet</p>
         <p class="text-xs text-mpMuted mt-0.5">Click Sync to pull likes, reach, saves, and engagement from Facebook &amp; Instagram.</p>
       </div>
-      <button onclick="runSync()" data-sync-btn class="shrink-0 rounded-full bg-mpCharcoal px-5 py-2.5 text-sm font-semibold text-white hover:bg-mpCharcoalDark transition-colors">Sync Now</button>
+      <form method="POST" action="/analytics/sync">
+        <input type="hidden" name="salon" value="${salon_id}" />
+        <button type="submit" class="shrink-0 rounded-full bg-mpCharcoal px-5 py-2.5 text-sm font-semibold text-white hover:bg-mpCharcoalDark transition-colors">Sync Now</button>
+      </form>
     </div>` : "";
 
   const summaryCards = `
@@ -280,9 +292,12 @@ router.get("/", (req, res) => {
         <h2 class="text-base font-bold text-mpCharcoal">Recent Published Posts</h2>
         <p class="text-xs text-mpMuted mt-0.5">Last 20 posts with performance data.</p>
       </div>
-      <button onclick="runSync()" data-sync-btn class="rounded-full border border-mpBorder bg-mpBg px-4 py-1.5 text-xs font-semibold text-mpCharcoal hover:border-mpAccent hover:bg-white transition-colors">
-        Sync Insights
-      </button>
+      <form method="POST" action="/analytics/sync">
+        <input type="hidden" name="salon" value="${salon_id}" />
+        <button type="submit" class="rounded-full border border-mpBorder bg-mpBg px-4 py-1.5 text-xs font-semibold text-mpCharcoal hover:border-mpAccent hover:bg-white transition-colors">
+          Sync Insights
+        </button>
+      </form>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
@@ -324,103 +339,6 @@ router.get("/", (req, res) => {
     </div>
   </div>`;
 
-  const syncScript = `
-  <div id="sync-toast" class="fixed bottom-6 right-6 z-50 transition-all duration-300" style="display:none">
-    <div id="sync-toast-msg" class="rounded-2xl bg-mpCharcoal text-white px-5 py-3 text-sm font-medium shadow-xl max-w-xs"></div>
-  </div>
-  <script>
-    function showToast(text, durationMs, onHide) {
-      const el = document.getElementById('sync-toast');
-      const msg = document.getElementById('sync-toast-msg');
-      if (!el || !msg) return;
-      msg.textContent = text;
-      el.style.display = 'block';
-      clearTimeout(el._hideTimer);
-      el._hideTimer = setTimeout(() => { el.style.display = 'none'; if (onHide) onHide(); }, durationMs || 4000);
-    }
-
-    function setSyncBtns(label, disabled) {
-      document.querySelectorAll('[data-sync-btn]').forEach(b => { b.textContent = label; b.disabled = disabled; });
-    }
-
-    const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
-
-    async function runBackfill() {
-      setSyncBtns('Working…', true);
-      showToast('Backfilling FB post IDs…', 30000);
-      try {
-        const res = await fetch('/analytics/backfill-fb-ids${qs}', { method: 'POST', headers: { 'X-CSRF-Token': csrfToken() } });
-        let data = {};
-        try { data = await res.json(); } catch { data = { error: 'Unexpected response from server' }; }
-        const msg = res.ok ? 'Matched ' + data.matched + ' of ' + data.scanned + ' posts.' : 'Error: ' + (data.error || 'unknown');
-        showToast(msg, 5000, () => { if (res.ok && data.matched > 0) location.reload(); });
-      } catch(e) {
-        showToast('Backfill failed: ' + e.message, 6000);
-      } finally {
-        setSyncBtns('Sync Insights', false);
-      }
-    }
-
-    let _resetConfirmPending = false;
-    let _resetConfirmTimer = null;
-    async function runResetBackfill() {
-      const btn = document.getElementById('reset-relink-btn');
-      if (!_resetConfirmPending) {
-        // First click: ask for confirmation inline
-        _resetConfirmPending = true;
-        if (btn) { btn.textContent = 'Tap again to confirm'; btn.classList.add('border-red-400', 'text-red-600'); }
-        _resetConfirmTimer = setTimeout(() => {
-          _resetConfirmPending = false;
-          if (btn) { btn.textContent = 'Reset & Relink FB'; btn.classList.remove('border-red-400', 'text-red-600'); }
-        }, 4000);
-        return;
-      }
-      // Second click: confirmed — proceed
-      clearTimeout(_resetConfirmTimer);
-      _resetConfirmPending = false;
-      if (btn) { btn.textContent = 'Working…'; btn.disabled = true; btn.classList.remove('border-red-400', 'text-red-600'); }
-      setSyncBtns('Working…', true);
-      showToast('Resetting & relinking FB post IDs…', 30000);
-      try {
-        const res = await fetch('/analytics/reset-and-backfill-fb-ids${qs}', { method: 'POST', headers: { 'X-CSRF-Token': csrfToken() } });
-        let data = {};
-        try { data = await res.json(); } catch { data = { error: 'Unexpected response from server' }; }
-        const msg = res.ok
-          ? 'Cleared ' + data.cleared + ' IDs, matched ' + data.matched + ' of ' + data.fb_posts_fetched + ' FB posts.'
-          : 'Error: ' + (data.error || 'unknown');
-        showToast(msg, 6000, () => { if (res.ok) location.reload(); });
-      } catch(e) {
-        showToast('Reset failed: ' + e.message, 6000);
-      } finally {
-        if (btn) { btn.textContent = 'Reset & Relink FB'; btn.disabled = false; }
-        setSyncBtns('Sync Insights', false);
-      }
-    }
-
-    async function runSync() {
-      setSyncBtns('Syncing…', true);
-      showToast('Syncing insights from Facebook & Instagram…', 30000);
-      try {
-        const res = await fetch('/analytics/sync${qs}', { method: 'POST', headers: { 'X-CSRF-Token': csrfToken() } });
-        let data = {};
-        try { data = await res.json(); } catch { data = { error: 'Unexpected response from server' }; }
-        let msg;
-        if (!res.ok) {
-          msg = 'Error: ' + (data.error || 'unknown');
-        } else if (data.errors && data.errors.length) {
-          msg = 'Synced ' + data.synced + ' records. ' + data.errors.length + ' error(s): ' + data.errors[0];
-        } else {
-          msg = 'Synced ' + data.synced + ' insight record' + (data.synced === 1 ? '' : 's') + '.';
-        }
-        showToast(msg, 5000, () => { if (res.ok && data.synced > 0) location.reload(); });
-      } catch(e) {
-        showToast('Sync failed: ' + e.message, 6000);
-      } finally {
-        setSyncBtns('Sync Insights', false);
-      }
-    }
-  </script>`;
-
   const body = `
     <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div>
@@ -428,21 +346,28 @@ router.get("/", (req, res) => {
         <p class="mt-1 text-sm text-mpMuted">Social performance across Facebook and Instagram.</p>
       </div>
       <div class="flex gap-2">
-        <button id="reset-relink-btn" onclick="runResetBackfill()" class="shrink-0 rounded-full border border-mpBorder bg-white px-4 py-2.5 text-sm font-semibold text-mpCharcoal hover:border-mpAccent transition-colors">
-          Reset &amp; Relink FB
-        </button>
-        <button onclick="runSync()" data-sync-btn class="shrink-0 rounded-full bg-mpCharcoal px-5 py-2.5 text-sm font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
-          Sync Insights
-        </button>
+        <form method="POST" action="/analytics/reset-and-backfill-fb-ids"
+              onsubmit="return confirm('This will clear all stored FB post IDs and re-match from the live Facebook timeline. Continue?')">
+          <input type="hidden" name="salon" value="${salon_id}" />
+          <button type="submit" class="shrink-0 rounded-full border border-mpBorder bg-white px-4 py-2.5 text-sm font-semibold text-mpCharcoal hover:border-mpAccent transition-colors">
+            Reset &amp; Relink FB
+          </button>
+        </form>
+        <form method="POST" action="/analytics/sync">
+          <input type="hidden" name="salon" value="${salon_id}" />
+          <button type="submit" class="shrink-0 rounded-full bg-mpCharcoal px-5 py-2.5 text-sm font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
+            Sync Insights
+          </button>
+        </form>
       </div>
     </div>
+    ${resultBanner}
     ${syncBanner}
     ${summaryCards}
     ${platformSplit}
     ${topPostsHtml}
     ${byTypeHtml}
     ${recentTable}
-    ${syncScript}
   `;
 
   res.send(pageShell({ title: "Analytics", body, salon_id }));
@@ -454,14 +379,15 @@ router.get("/", (req, res) => {
 
 router.post("/reset-and-backfill-fb-ids", async (req, res) => {
   const salon_id = resolveSalonId(req);
-  if (!salon_id) return res.status(400).json({ error: "No salon context" });
+  const back = salon_id ? `/analytics?salon=${encodeURIComponent(salon_id)}` : "/analytics";
+  if (!salon_id) return res.redirect(`/analytics?err=${encodeURIComponent("No salon context")}`);
 
   const salonRow = db.prepare(
     `SELECT facebook_page_id, facebook_page_token FROM salons WHERE slug=?`
   ).get(salon_id);
 
   if (!salonRow?.facebook_page_id || !salonRow?.facebook_page_token) {
-    return res.status(400).json({ error: "Salon missing Facebook credentials" });
+    return res.redirect(`${back}&err=${encodeURIComponent("Salon missing Facebook credentials")}`);
   }
 
   const { facebook_page_id: pageId, facebook_page_token: token } = salonRow;
@@ -478,7 +404,7 @@ router.post("/reset-and-backfill-fb-ids", async (req, res) => {
     const fbRes = await fetch(fbUrl);
     const fbJson = await fbRes.json();
     if (!fbRes.ok || fbJson.error) {
-      return res.status(502).json({ error: fbJson?.error?.message || "FB API error" });
+      return res.redirect(`${back}&err=${encodeURIComponent(fbJson?.error?.message || "FB API error")}`);
     }
     fbPosts.push(...(fbJson.data || []));
     fbUrl = fbJson.paging?.next || null;
@@ -502,7 +428,8 @@ router.post("/reset-and-backfill-fb-ids", async (req, res) => {
     }
   }
 
-  res.json({ cleared, fb_posts_fetched: fbPosts.length, db_posts_scanned: dbPosts.length, matched });
+  const msg = `Cleared ${cleared} IDs, matched ${matched} of ${fbPosts.length} FB posts.`;
+  res.redirect(`${back}&msg=${encodeURIComponent(msg)}`);
 });
 
 // ─── POST /analytics/backfill-fb-ids ─────────────────────────────────────────
@@ -511,14 +438,15 @@ router.post("/reset-and-backfill-fb-ids", async (req, res) => {
 
 router.post("/backfill-fb-ids", async (req, res) => {
   const salon_id = resolveSalonId(req);
-  if (!salon_id) return res.status(400).json({ error: "No salon context" });
+  const back = salon_id ? `/analytics?salon=${encodeURIComponent(salon_id)}` : "/analytics";
+  if (!salon_id) return res.redirect(`/analytics?err=${encodeURIComponent("No salon context")}`);
 
   const salonRow = db.prepare(
     `SELECT facebook_page_id, facebook_page_token FROM salons WHERE slug=?`
   ).get(salon_id);
 
   if (!salonRow?.facebook_page_id || !salonRow?.facebook_page_token) {
-    return res.status(400).json({ error: "Salon missing Facebook credentials" });
+    return res.redirect(`${back}&err=${encodeURIComponent("Salon missing Facebook credentials")}`);
   }
 
   const { facebook_page_id: pageId, facebook_page_token: token } = salonRow;
@@ -529,7 +457,7 @@ router.post("/backfill-fb-ids", async (req, res) => {
   const fbJson = await fbRes.json();
 
   if (!fbRes.ok || fbJson.error) {
-    return res.status(502).json({ error: fbJson?.error?.message || "FB API error" });
+    return res.redirect(`${back}&err=${encodeURIComponent(fbJson?.error?.message || "FB API error")}`);
   }
 
   const fbPosts = fbJson.data || [];
@@ -552,14 +480,16 @@ router.post("/backfill-fb-ids", async (req, res) => {
     }
   }
 
-  res.json({ scanned: dbPosts.length, fb_posts_fetched: fbPosts.length, matched });
+  const msg = `Matched ${matched} of ${dbPosts.length} posts.`;
+  res.redirect(`${back}&msg=${encodeURIComponent(msg)}`);
 });
 
 // ─── POST /analytics/sync ─────────────────────────────────────────────────────
 
 router.post("/sync", async (req, res) => {
   const salon_id = resolveSalonId(req);
-  if (!salon_id) return res.status(400).json({ error: "No salon context" });
+  const back = salon_id ? `/analytics?salon=${encodeURIComponent(salon_id)}` : "/analytics";
+  if (!salon_id) return res.redirect(`/analytics?err=${encodeURIComponent("No salon context")}`);
 
   const salonRow = db.prepare(
     `SELECT facebook_page_token, facebook_page_id, instagram_business_id FROM salons WHERE slug=?`
@@ -573,14 +503,19 @@ router.post("/sync", async (req, res) => {
   };
 
   if (!salon.facebook_page_token) {
-    return res.status(400).json({ error: "No Facebook page token found. Reconnect Facebook in Admin." });
+    return res.redirect(`${back}&err=${encodeURIComponent("No Facebook page token found. Reconnect Facebook in Admin.")}`);
   }
 
   try {
     const result = await syncSalonInsights(salon);
-    res.json(result);
+    const synced = result?.synced ?? 0;
+    const errCount = result?.errors?.length ?? 0;
+    const msg = errCount > 0
+      ? `Synced ${synced} records. ${errCount} error(s): ${result.errors[0]}`
+      : `Synced ${synced} insight record${synced === 1 ? "" : "s"}.`;
+    res.redirect(`${back}&msg=${encodeURIComponent(msg)}`);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.redirect(`${back}&err=${encodeURIComponent(err.message)}`);
   }
 });
 
