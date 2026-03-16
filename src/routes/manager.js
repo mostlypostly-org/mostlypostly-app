@@ -10,6 +10,7 @@ import { buildPromotionImage } from "../core/buildPromotionImage.js";
 import { getSalonPolicy } from "../scheduler.js";
 import { sendViaTwilio } from "./twilio.js";
 import { PLAN_LIMITS } from "./billing.js";
+import { translatePostError } from "../core/postErrorTranslator.js";
 
 const router = express.Router();
 
@@ -163,6 +164,13 @@ router.get("/", requireAuth, async (req, res) => {
           AND status NOT IN ('manager_pending', 'draft', 'cancelled')
         ORDER BY created_at DESC
        LIMIT 25`
+    )
+    .all(salon_id);
+
+  // Fetch failed posts (need manager attention)
+  const failedPosts = db
+    .prepare(
+      `SELECT * FROM posts WHERE salon_id = ? AND status = 'failed' ORDER BY created_at DESC LIMIT 10`
     )
     .all(salon_id);
 
@@ -352,6 +360,50 @@ router.get("/", requireAuth, async (req, res) => {
   `;
 
   /* -------------------------------------------------------------
+     FAILED POSTS BANNER (Layer 1 + 3)
+  ------------------------------------------------------------- */
+  const failedBanner = failedPosts.length === 0 ? "" : `
+    <div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4">
+      <div class="flex items-center gap-2 mb-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        </svg>
+        <h3 class="font-bold text-red-700 text-sm">${failedPosts.length} post${failedPosts.length > 1 ? "s" : ""} failed to publish</h3>
+      </div>
+      ${failedPosts.map(p => {
+        const friendlyErr = translatePostError(p.error_message || "");
+        const thumb = (() => {
+          let urls = [];
+          try { urls = JSON.parse(p.image_urls || "[]"); } catch {}
+          const u = urls[0] || p.image_url;
+          return u ? toProxyUrl(u) : null;
+        })();
+        return `
+        <div class="flex items-start gap-3 py-3 border-t border-red-100">
+          ${thumb ? `<img src="${esc(thumb)}" class="w-14 h-14 rounded-lg object-cover shrink-0 bg-red-100" onerror="this.style.display='none'">` : `<div class="w-14 h-14 rounded-lg bg-red-100 shrink-0"></div>`}
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-semibold text-red-700 mb-0.5">${esc(p.stylist_name || "Unknown")}</p>
+            <p class="text-xs text-red-600 mb-2">${esc(friendlyErr)}</p>
+            <div class="flex gap-2">
+              <form method="POST" action="/manager/retry-post" class="inline">
+                <input type="hidden" name="post_id" value="${esc(p.id)}">
+                <button type="submit" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded">
+                  Retry
+                </button>
+              </form>
+              <a href="/manager/cancel-post?post=${esc(p.id)}"
+                 onclick="return confirm('Remove this failed post?')"
+                 class="px-3 py-1 border border-red-200 text-red-500 hover:bg-red-100 text-xs font-semibold rounded">
+                Dismiss
+              </a>
+            </div>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+  `;
+
+  /* -------------------------------------------------------------
      PAGE BODY (old layout)
   ------------------------------------------------------------- */
   const body = `
@@ -383,6 +435,8 @@ router.get("/", requireAuth, async (req, res) => {
           <a href="/manager/billing" class="underline text-mpAccent ml-1">Upgrade for more →</a>
         </p>` : ""}
       </div>
+
+      ${failedBanner}
 
       ${upcomingPromoCards}
 
@@ -523,6 +577,23 @@ router.get("/cancel-post", requireAuth, (req, res) => {
     ).run(id, salon_id);
   }
   return res.redirect(`/manager?salon=${encodeURIComponent(salon_id)}`);
+});
+
+/* -------------------------------------------------------------
+   RETRY FAILED POST (Layer 4)
+------------------------------------------------------------- */
+router.post("/retry-post", requireAuth, (req, res) => {
+  const { post_id } = req.body;
+  const salon_id = req.manager.salon_id;
+  if (post_id) {
+    const retryAt = DateTime.utc().plus({ minutes: 2 }).toFormat("yyyy-LL-dd HH:mm:ss");
+    db.prepare(
+      `UPDATE posts
+       SET status='manager_approved', retry_count=0, scheduled_for=?, error_message=NULL
+       WHERE id=? AND salon_id=? AND status='failed'`
+    ).run(retryAt, post_id, salon_id);
+  }
+  return res.redirect("/manager");
 });
 
 router.get("/deny", requireAuth, (req, res) => {

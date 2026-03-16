@@ -485,6 +485,23 @@ export async function runSchedulerOnce() {
             db.prepare(
               `UPDATE posts SET status='failed', retry_count=?, error_message=? WHERE id=?`
             ).run(newRetryCount, err.message.slice(0, 500), post.id);
+
+            // Layer 2: SMS manager on permanent failure
+            try {
+              const mgr = db.prepare(
+                `SELECT phone FROM managers WHERE salon_id=? AND role IN ('owner','manager') AND phone IS NOT NULL ORDER BY rowid LIMIT 1`
+              ).get(post.salon_id);
+              if (mgr?.phone) {
+                const { translatePostError } = await import("./core/postErrorTranslator.js");
+                const friendlyErr = translatePostError(err.message);
+                const { sendViaTwilio } = await import("./routes/twilio.js");
+                await sendViaTwilio(mgr.phone,
+                  `⚠️ MostlyPostly: A post by ${post.stylist_name || "a stylist"} failed to publish after 3 attempts. ${friendlyErr} Log in to retry or dismiss: https://app.mostlypostly.com/manager`
+                );
+              }
+            } catch (smsErr) {
+              console.warn(`[Scheduler] Failed to send failure SMS:`, smsErr.message);
+            }
           } else {
             const min   = salon.spacing_min ?? 20;
             const max   = salon.spacing_max ?? 45;
