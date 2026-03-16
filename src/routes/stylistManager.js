@@ -1309,14 +1309,12 @@ function buildTeamMemberForm({ salon_id, salonTone, managerSeatsAvailable }) {
               <input type="text" name="bio" class="${inputCls}" />
             </div>
             <div class="flex items-center gap-2">
-              <input type="checkbox" name="celebrations_enabled" value="1" id="celeb_check"
-                     ${s.celebrations_enabled !== 0 ? "checked" : ""}
+              <input type="checkbox" name="celebrations_enabled" value="1" id="celeb_check" checked
                      class="h-4 w-4 rounded border-mpBorder text-mpAccent" />
               <label for="celeb_check" class="text-xs text-mpMuted">Enable birthday &amp; anniversary celebration posts</label>
             </div>
             <div class="flex items-center gap-2">
               <input type="checkbox" name="auto_approve" value="1" id="auto_approve_check"
-                     ${s.auto_approve ? "checked" : ""}
                      class="h-4 w-4 rounded border-mpBorder text-mpAccent" />
               <label for="auto_approve_check" class="text-xs text-mpMuted">Auto-approve — posts go straight to queue when stylist approves (no manager review)</label>
             </div>

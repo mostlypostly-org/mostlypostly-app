@@ -429,7 +429,6 @@ router.get("/", requireAuth, (req, res) => {
           <div class="flex flex-col gap-1 mt-2">
             <div class="flex justify-between mb-1">
               <dt class="text-mpMuted">Default Hashtags</dt>
-              <a href="/manager/admin/edit/business-info#hashtags" class="text-xs text-mpAccent hover:text-mpCharcoal font-medium">Edit</a>
             </div>
             <dd class="flex flex-wrap gap-1">
               <!-- Primary salon tag (locked) -->
@@ -1127,39 +1126,36 @@ router.get("/edit/business-info", requireAuth, (req, res) => {
             ${toneOptions.map(o => `<option${(row.tone || "") === o ? " selected" : ""}>${o}</option>`).join("")}
           </select>
         </div>
+        <!-- Default Hashtags (merged into same form) -->
+        <div id="hashtags" class="border-t border-mpBorder pt-4 mt-2">
+          <p class="text-xs font-semibold text-mpMuted mb-3">Default Hashtags</p>
+          <div class="space-y-3">
+            <div>
+              <label class="text-xs font-semibold text-mpMuted">Primary Salon Tag</label>
+              <input name="salon_tag" value="${salonTag}" class="${inputCls}" />
+              <p class="text-[11px] text-mpMuted mt-1">Used on every post. Usually your salon handle.</p>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-mpMuted">Custom Hashtags (up to 2, space or comma separated)</label>
+              <input name="custom_tags_raw" value="${customTags.join(" ")}"
+                placeholder="#balayage #haircolor" class="${inputCls}" />
+              <p class="text-[11px] text-mpMuted mt-1">Max 3 total (salon tag + 2 custom). Stylists can add up to 2 more on each post.</p>
+            </div>
+            <input type="hidden" name="hashtags_json" id="hashtags-json-input" />
+          </div>
+        </div>
+
         <div class="flex gap-3 pt-2">
-          <button type="submit" class="flex-1 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-semibold rounded-full py-2.5 transition-colors">Save Changes</button>
+          <button type="submit" onclick="
+            const salon = document.querySelector('[name=salon_tag]').value.trim().replace(/^#+/,'');
+            const custom = document.querySelector('[name=custom_tags_raw]').value
+              .split(/[,\\s]+/).map(t=>t.trim().replace(/^#+/,'')).filter(Boolean).slice(0,2);
+            const all = (salon ? ['#'+salon] : []).concat(custom.map(t=>'#'+t));
+            document.getElementById('hashtags-json-input').value = JSON.stringify(all);
+          " class="flex-1 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-semibold rounded-full py-2.5 transition-colors">Save Changes</button>
           <a href="/manager/admin" class="flex-1 text-center border border-mpBorder rounded-full py-2.5 text-sm text-mpMuted hover:text-mpCharcoal transition-colors">Cancel</a>
         </div>
       </form>
-
-      <div class="bg-white rounded-2xl border border-mpBorder p-6">
-        <h2 class="text-sm font-semibold text-mpCharcoal mb-4">Default Hashtags</h2>
-        <form method="POST" action="/manager/admin/update-hashtags" class="space-y-3">
-          <div>
-            <label class="text-xs font-semibold text-mpMuted">Primary Salon Tag (locked)</label>
-            <input name="salon_tag" value="${salonTag}" class="${inputCls}" />
-            <p class="text-[11px] text-mpMuted mt-1">Used on every post. Usually your salon handle.</p>
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-mpMuted">Custom Hashtags (up to 2, space or comma separated)</label>
-            <input name="custom_tags_raw" value="${customTags.join(" ")}"
-              placeholder="#balayage #haircolor" class="${inputCls}" />
-            <p class="text-[11px] text-mpMuted mt-1">Max 3 total (salon tag + 2 custom). Stylists can add up to 2 more on each post.</p>
-          </div>
-          <input type="hidden" name="hashtags_json" id="hashtags-json-input" />
-          <div class="flex gap-3 pt-1">
-            <button type="submit" onclick="
-              const salon = document.querySelector('[name=salon_tag]').value.trim().replace(/^#+/,'');
-              const custom = document.querySelector('[name=custom_tags_raw]').value
-                .split(/[,\\s]+/).map(t=>t.trim().replace(/^#+/,'')).filter(Boolean).slice(0,2);
-              const all = (salon ? ['#'+salon] : []).concat(custom.map(t=>'#'+t));
-              document.getElementById('hashtags-json-input').value = JSON.stringify(all);
-            " class="flex-1 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-semibold rounded-full py-2.5 transition-colors">Save Hashtags</button>
-            <a href="/manager/admin" class="flex-1 text-center border border-mpBorder rounded-full py-2.5 text-sm text-mpMuted hover:text-mpCharcoal transition-colors">Cancel</a>
-          </div>
-        </form>
-      </div>
     </div>`;
 
   res.send(pageShell({ title: "Edit Business Info", body, salon_id, manager_phone, current: "admin" }));
@@ -1239,7 +1235,8 @@ router.post("/update-salon-info", requireAuth, (req, res) => {
     booking_url,
     industry,
     tone_profile,
-    timezone
+    timezone,
+    hashtags_json
   } = req.body;
 
   if (!salon_id) {
@@ -1247,20 +1244,32 @@ router.post("/update-salon-info", requireAuth, (req, res) => {
   }
 
   try {
+    // Process hashtags if submitted alongside business info
+    let hashtagsValue = null;
+    if (hashtags_json) {
+      try {
+        const parsed = JSON.parse(hashtags_json);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          hashtagsValue = JSON.stringify(parsed.slice(0, 3));
+        }
+      } catch { /* ignore parse errors */ }
+    }
+
     db.prepare(`
       UPDATE salons
         SET
-          name        = COALESCE(?, name),
-          address     = COALESCE(?, address),
-          city        = COALESCE(?, city),
-          state       = COALESCE(?, state),
-          zip         = COALESCE(?, zip),
-          website     = COALESCE(?, website),
-          booking_url = COALESCE(?, booking_url),
-          industry    = COALESCE(?, industry),
-          tone        = COALESCE(?, tone),
-          timezone    = COALESCE(?, timezone),
-          updated_at  = datetime('now')
+          name             = COALESCE(?, name),
+          address          = COALESCE(?, address),
+          city             = COALESCE(?, city),
+          state            = COALESCE(?, state),
+          zip              = COALESCE(?, zip),
+          website          = COALESCE(?, website),
+          booking_url      = COALESCE(?, booking_url),
+          industry         = COALESCE(?, industry),
+          tone             = COALESCE(?, tone),
+          timezone         = COALESCE(?, timezone),
+          default_hashtags = COALESCE(?, default_hashtags),
+          updated_at       = datetime('now')
         WHERE slug = ?
     `).run(
       name || null,
@@ -1273,6 +1282,7 @@ router.post("/update-salon-info", requireAuth, (req, res) => {
       industry || null,
       tone_profile || null,
       timezone || null,
+      hashtagsValue,
       salon_id
     );
 
