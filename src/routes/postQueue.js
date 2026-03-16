@@ -83,10 +83,11 @@ router.get("/", requireAuth, (req, res) => {
         <!-- Position -->
         <div class="position-num flex-shrink-0 w-5 text-center text-xs font-bold text-mpMuted">${i + 1}</div>
 
-        <!-- Thumbnail -->
-        <div class="flex-shrink-0 w-11 h-11 rounded-xl overflow-hidden bg-mpBg border border-mpBorder">
+        <!-- Thumbnail (click to enlarge) -->
+        <div class="flex-shrink-0 w-11 h-11 rounded-xl overflow-hidden bg-mpBg border border-mpBorder cursor-zoom-in"
+             data-preview="${safe(imgUrl || '')}">
           ${imgUrl
-            ? `<img src="${imgUrl}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div style=\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px\'>📷</div>'" />`
+            ? `<img src="${safe(imgUrl)}" class="w-full h-full object-cover pointer-events-none" />`
             : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px">📷</div>`}
         </div>
 
@@ -99,10 +100,13 @@ router.get("/", requireAuth, (req, res) => {
           <p class="text-sm text-mpCharcoal leading-snug line-clamp-1">${safe(preview)}</p>
         </div>
 
-        <!-- Scheduled time -->
+        <!-- Scheduled time + remove -->
         <div class="flex-shrink-0 text-right min-w-[130px]">
           <div class="scheduled-time text-xs font-semibold text-mpCharcoal">${timeDisplay}</div>
           <div class="text-[10px] text-mpMuted mt-0.5">Post #${safe(String(p.salon_post_number || "—"))}</div>
+          <a href="/manager/cancel-post?post=${safe(p.id)}"
+             class="text-[10px] text-red-400 hover:text-red-600 mt-1 inline-block"
+             onclick="return confirm('Remove this post from the queue?')">Remove</a>
         </div>
       </div>`;
   }).join("");
@@ -138,11 +142,30 @@ router.get("/", requireAuth, (req, res) => {
       `}
     </div>
 
+    <!-- Image lightbox -->
+    <div id="img-lightbox"
+         style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out"
+         onclick="this.style.display='none'">
+      <img id="img-lightbox-img" src="" alt=""
+           style="max-width:90vw;max-height:90vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.6)" />
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
     <script>
     (function() {
       const list = document.getElementById('queue-list');
       if (!list) return;
+
+      // Thumbnail click → lightbox
+      list.addEventListener('click', function(e) {
+        const thumb = e.target.closest('[data-preview]');
+        if (!thumb) return;
+        const src = thumb.getAttribute('data-preview');
+        if (!src) return;
+        const lb = document.getElementById('img-lightbox');
+        document.getElementById('img-lightbox-img').src = src;
+        lb.style.display = 'flex';
+      });
 
       const statusEl = document.getElementById('save-status');
       let saveTimer = null;
