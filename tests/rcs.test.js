@@ -47,10 +47,19 @@ describe("sendViaRcs", () => {
   it("falls back to plain SMS when RCS_ENABLED is unset", async () => {
     vi.resetModules();
     delete process.env.RCS_ENABLED;
+    const twilio = await import("twilio");
+    const freshCreate = twilio.default().messages.create;
     const mod = await import("../src/routes/twilio.js");
     const sendViaRcsFallback = mod.sendViaRcs;
     await sendViaRcsFallback("+15550001111", "Hello!", ["reply:Approve"]);
     // Should still call create but without persistentAction
+    expect(freshCreate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ persistentAction: expect.anything() })
+    );
+  });
+
+  it("does not send persistentAction when buttons is empty even if RCS_ENABLED=true", async () => {
+    await sendViaRcs("+15550001111", "Hello!", []);
     expect(mockCreate).toHaveBeenCalledWith(
       expect.not.objectContaining({ persistentAction: expect.anything() })
     );
