@@ -1918,13 +1918,14 @@ router.get("/test-celebration", requireAuth, async (req, res) => {
 
     const insertPost = (imageUrl, postType, scheduledFor) => {
       const id = crypto.randomUUID();
+      const postNum = db.prepare(`SELECT MAX(salon_post_number) AS m FROM posts WHERE salon_id = ?`).get(salon_id)?.m || 0;
       db.prepare(`
         INSERT INTO posts (
           id, salon_id, stylist_name, stylist_id,
           image_url, base_caption, final_caption,
-          post_type, status, scheduled_for, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manager_approved', ?, ?)
-      `).run(id, salon_id, stylist.name, stylist.id, imageUrl, caption, caption, postType, scheduledFor, now);
+          post_type, status, scheduled_for, salon_post_number, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manager_approved', ?, ?, ?)
+      `).run(id, salon_id, stylist.name, stylist.id, imageUrl, caption, caption, postType, scheduledFor, postNum + 1, now);
       return id;
     };
 

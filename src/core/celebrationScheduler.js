@@ -55,19 +55,25 @@ function randomDelay(min = 20, max = 45) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function nextPostNumber(salonId) {
+  const row = db.prepare(`SELECT MAX(salon_post_number) AS m FROM posts WHERE salon_id = ?`).get(salonId);
+  return (row?.m || 0) + 1;
+}
+
 function insertPost({ salonId, stylistName, stylistId, imageUrl, caption, postType, delayMinutes }) {
   const id  = crypto.randomUUID();
   const now = new Date().toISOString().replace("T", " ").slice(0, 19);
   const scheduledFor = DateTime.utc()
     .plus({ minutes: delayMinutes })
     .toFormat("yyyy-LL-dd HH:mm:ss");
+  const postNum = nextPostNumber(salonId);
   db.prepare(`
     INSERT INTO posts (
       id, salon_id, stylist_name, stylist_id,
       image_url, base_caption, final_caption,
-      post_type, status, scheduled_for, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manager_approved', ?, ?)
-  `).run(id, salonId, stylistName, stylistId, imageUrl, caption, caption, postType, scheduledFor, now);
+      post_type, status, scheduled_for, salon_post_number, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manager_approved', ?, ?, ?)
+  `).run(id, salonId, stylistName, stylistId, imageUrl, caption, caption, postType, scheduledFor, postNum, now);
   return id;
 }
 
