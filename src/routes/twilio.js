@@ -33,6 +33,24 @@ export async function sendViaTwilio(to, body) {
   }
 }
 
+export async function sendViaRcs(to, body, buttons = []) {
+  try {
+    const rcsEnabled = process.env.RCS_ENABLED === "true";
+    const base = process.env.TWILIO_MESSAGING_SERVICE_SID
+      ? { messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID, to, body }
+      : { from: process.env.TWILIO_PHONE_NUMBER, to, body };
+
+    const opts = rcsEnabled && buttons.length
+      ? { ...base, persistentAction: buttons }
+      : base;
+
+    const resp = await client.messages.create(opts);
+    console.log(`[Twilio RCS → ${to}] id=${resp.sid} :: ${body.slice(0, 140)}`);
+  } catch (err) {
+    console.error("⚠️ [Twilio RCS Send Error]:", err.message);
+  }
+}
+
 const MessagingResponse = twilio.twiml.MessagingResponse;
 
 // ======================================================
