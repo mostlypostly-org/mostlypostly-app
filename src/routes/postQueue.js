@@ -64,7 +64,7 @@ router.get("/", requireAuth, (req, res) => {
     imgUrl = toProxyUrl(imgUrl);
 
     const scheduledDt = DateTime.fromSQL(p.scheduled_for, { zone: "utc" }).setZone(tz);
-    const timeDisplay = scheduledDt.toFormat("EEE, MMM d · h:mm a");
+    const timeDisplay = scheduledDt.isValid ? scheduledDt.toFormat("EEE, MMM d · h:mm a") : "—";
 
     return `
       <div class="queue-card group flex items-center gap-3 bg-white border border-mpBorder rounded-2xl px-4 py-3
@@ -84,10 +84,10 @@ router.get("/", requireAuth, (req, res) => {
         <div class="position-num flex-shrink-0 w-5 text-center text-xs font-bold text-mpMuted">${i + 1}</div>
 
         <!-- Thumbnail (click to enlarge) -->
-        <div class="flex-shrink-0 w-11 h-11 rounded-xl overflow-hidden bg-mpBg border border-mpBorder cursor-zoom-in"
-             data-preview="${safe(imgUrl || '')}">
+        <div class="flex-shrink-0 w-11 h-11 rounded-xl overflow-hidden bg-mpBg border border-mpBorder"
+             style="cursor:zoom-in" onclick="_qp(this)">
           ${imgUrl
-            ? `<img src="${safe(imgUrl)}" class="w-full h-full object-cover pointer-events-none" />`
+            ? `<img src="${safe(imgUrl)}" style="width:100%;height:100%;object-fit:cover;pointer-events:none" data-src="${safe(imgUrl)}" />`
             : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px">📷</div>`}
         </div>
 
@@ -152,20 +152,19 @@ router.get("/", requireAuth, (req, res) => {
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
     <script>
+    function _qp(thumbDiv) {
+      var img = thumbDiv.querySelector('img');
+      var src = img ? img.getAttribute('data-src') : '';
+      if (!src) return;
+      var lb = document.getElementById('img-lightbox');
+      var lbImg = document.getElementById('img-lightbox-img');
+      lbImg.src = src;
+      lb.style.display = 'flex';
+    }
+
     (function() {
       const list = document.getElementById('queue-list');
       if (!list) return;
-
-      // Thumbnail click → lightbox
-      list.addEventListener('click', function(e) {
-        const thumb = e.target.closest('[data-preview]');
-        if (!thumb) return;
-        const src = thumb.getAttribute('data-preview');
-        if (!src) return;
-        const lb = document.getElementById('img-lightbox');
-        document.getElementById('img-lightbox-img').src = src;
-        lb.style.display = 'flex';
-      });
 
       const statusEl = document.getElementById('save-status');
       let saveTimer = null;
