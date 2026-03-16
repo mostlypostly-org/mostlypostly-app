@@ -407,7 +407,7 @@ router.post("/add", requireAuth, photoUpload.single("photo"), async (req, res) =
   const salon_id = req.manager.salon_id;
   const salon = db.prepare("SELECT tone FROM salons WHERE slug = ?").get(salon_id);
   const { role = "stylist", first_name, last_name, phone, instagram_handle, tone_variant,
-          birthday_mmdd, hire_date, bio, profile_url, celebrations_enabled,
+          birthday_mmdd, hire_date, bio, profile_url, celebrations_enabled, auto_approve,
           email, temp_password } = req.body;
 
   const qs = `?salon=${encodeURIComponent(salon_id)}`;
@@ -447,8 +447,8 @@ router.post("/add", requireAuth, photoUpload.single("photo"), async (req, res) =
       INSERT INTO stylists
         (id, salon_id, name, first_name, last_name, phone, instagram_handle,
          tone_variant, birthday_mmdd, hire_date, specialties, bio, profile_url,
-         photo_url, celebrations_enabled)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         photo_url, celebrations_enabled, auto_approve)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run(
       id, salon_id, name, first_name || null, last_name || null,
       normalizePhone(phone), instagram_handle || null,
@@ -460,6 +460,7 @@ router.post("/add", requireAuth, photoUpload.single("photo"), async (req, res) =
       profile_url || null,
       photo_url,
       celebrations_enabled === "1" ? 1 : 0,
+      auto_approve === "1" ? 1 : 0,
     );
 
     // Send welcome SMS to new stylist
@@ -979,6 +980,22 @@ function buildStylistForm({ salon_id, salonTone, stylist, isEdit }) {
 
         <!-- Profile URL -->
         ${fieldRow("Profile URL", "profile_url", "url", s.profile_url || "", "Link to stylist page on salon website. Used in celebration post captions.")}
+
+        <!-- Celebrations -->
+        <div class="flex items-center gap-2">
+          <input type="checkbox" name="celebrations_enabled" value="1" id="celeb_check"
+                 ${s.celebrations_enabled !== 0 ? "checked" : ""}
+                 class="h-4 w-4 rounded border-mpBorder text-mpAccent" />
+          <label for="celeb_check" class="text-xs text-mpMuted">Enable birthday &amp; anniversary celebration posts</label>
+        </div>
+
+        <!-- Auto-approve -->
+        <div class="flex items-center gap-2">
+          <input type="checkbox" name="auto_approve" value="1" id="auto_approve_check"
+                 ${s.auto_approve ? "checked" : ""}
+                 class="h-4 w-4 rounded border-mpBorder text-mpAccent" />
+          <label for="auto_approve_check" class="text-xs text-mpMuted">Auto-approve — posts go straight to queue when stylist approves (no manager review)</label>
+        </div>
 
         <!-- Submit -->
         <div class="flex gap-3 pt-2">
