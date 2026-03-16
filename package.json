@@ -10,7 +10,8 @@
     "guard:hashtags": "node scripts/guard-no-hardcoded-hashtags.js",
     "check:salons": "node scripts/check-salon-defaults.js",
     "validate:salons": "node scripts/validate-salons.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "postinstall": "npx puppeteer browsers install chrome"
   },
   "keywords": [
     "postly",
