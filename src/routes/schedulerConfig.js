@@ -146,10 +146,22 @@ router.get("/", requireAuth, (req, res) => {
   const isPro = (salon.plan || "trial") === "pro";
 
   // --- Content priority rows ---
-  let priorityOrder = [...DEFAULT_PRIORITY];
+  // Legacy keys: staff_celebrations and celebration_story → collapse to celebration
+  const LEGACY_CELEBRATION_TYPES = new Set(["staff_celebrations", "celebration_story"]);
+  const VALID_PRIORITY_TYPES = new Set(Object.keys(CONTENT_TYPE_LABELS));
+  const normalizePriorityOrder = (arr) => {
+    const seen = new Set();
+    return arr
+      .map(t => LEGACY_CELEBRATION_TYPES.has(t) ? "celebration" : t)
+      .filter(t => VALID_PRIORITY_TYPES.has(t) && !seen.has(t) && seen.add(t));
+  };
+  let priorityOrder = normalizePriorityOrder([...DEFAULT_PRIORITY]);
   try {
     const parsed = JSON.parse(salon.content_priority || "null");
-    if (Array.isArray(parsed) && parsed.length) priorityOrder = parsed;
+    if (Array.isArray(parsed) && parsed.length) {
+      const normalized = normalizePriorityOrder(parsed);
+      if (normalized.length) priorityOrder = normalized;
+    }
   } catch {}
 
   const priorityRows = priorityOrder.map((type, i) => `

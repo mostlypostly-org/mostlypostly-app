@@ -421,8 +421,8 @@ router.get("/manager/billing", requireAuth, requireOwner, async (req, res) => {
             <!-- Monthly / Annual toggle -->
             <div class="flex items-center gap-3">
               <span id="label-monthly" class="text-xs font-semibold text-mpCharcoal">Monthly</span>
-              <button type="button" id="cycleToggle" onclick="toggleCycle()"
-                class="relative inline-flex h-6 w-11 items-center rounded-full bg-mpBorder transition-colors focus:outline-none">
+              <button type="button" id="cycleToggle"
+                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none" style="background-color:#E2E8F0">
                 <span id="cycleThumb" class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform translate-x-1"></span>
               </button>
               <span id="label-annual" class="text-xs font-semibold text-mpMuted">
@@ -444,29 +444,39 @@ router.get("/manager/billing", requireAuth, requireOwner, async (req, res) => {
         </script>` : ""}
 
         <script>
-          function toggleCycle() {
-            const toggle = document.getElementById('cycleToggle');
-            const isAnnual = toggle.dataset.annual !== '1';
-            toggle.dataset.annual = isAnnual ? '1' : '0';
-
-            const thumb = document.getElementById('cycleThumb');
-            const lm    = document.getElementById('label-monthly');
-            const la    = document.getElementById('label-annual');
-
-            thumb.style.transform = isAnnual ? 'translateX(1.375rem)' : 'translateX(0.25rem)';
-            toggle.style.backgroundColor = isAnnual ? '#3B72B9' : '#E2E8F0';
-            lm.style.fontWeight = isAnnual ? '400' : '700';
-            la.style.fontWeight = isAnnual ? '700' : '400';
-            lm.style.color = isAnnual ? '#6B7280' : '#2B2D35';
-            la.style.color = isAnnual ? '#2B2D35' : '#6B7280';
-
-            document.querySelectorAll('.price-monthly').forEach(el => el.classList.toggle('hidden', isAnnual));
-            document.querySelectorAll('.price-annual').forEach(el => el.classList.toggle('hidden', !isAnnual));
-            document.querySelectorAll('.price-annual-note').forEach(el => el.classList.toggle('hidden', !isAnnual));
-            document.querySelectorAll('.plan-checkout-btn').forEach(btn => {
-              btn.href = isAnnual ? btn.dataset.annual : btn.dataset.monthly;
+          (function() {
+            var annual = false;
+            function applyToggle() {
+              var toggle = document.getElementById('cycleToggle');
+              var thumb  = document.getElementById('cycleThumb');
+              var lm     = document.getElementById('label-monthly');
+              var la     = document.getElementById('label-annual');
+              if (!toggle) return;
+              toggle.style.backgroundColor = annual ? '#3B72B9' : '#E2E8F0';
+              thumb.style.transform = annual ? 'translateX(1.375rem)' : 'translateX(0.25rem)';
+              lm.style.fontWeight = annual ? '400' : '700';
+              la.style.fontWeight = annual ? '700' : '400';
+              lm.style.color = annual ? '#6B7280' : '#2B2D35';
+              la.style.color = annual ? '#2B2D35' : '#6B7280';
+              document.querySelectorAll('.price-monthly').forEach(function(el) { el.style.display = annual ? 'none' : ''; });
+              document.querySelectorAll('.price-annual').forEach(function(el) { el.style.display = annual ? '' : 'none'; });
+              document.querySelectorAll('.price-annual-note').forEach(function(el) { el.style.display = annual ? '' : 'none'; });
+              document.querySelectorAll('.plan-checkout-btn').forEach(function(btn) {
+                btn.href = annual ? btn.dataset.annual : btn.dataset.monthly;
+              });
+            }
+            document.addEventListener('DOMContentLoaded', function() {
+              // Hide annual prices initially (they start with class="hidden" but ensure via JS too)
+              document.querySelectorAll('.price-annual,.price-annual-note').forEach(function(el) { el.style.display = 'none'; });
+              var btn = document.getElementById('cycleToggle');
+              if (btn) {
+                btn.addEventListener('click', function() {
+                  annual = !annual;
+                  applyToggle();
+                });
+              }
             });
-          }
+          })();
         </script>
 
       </div>
