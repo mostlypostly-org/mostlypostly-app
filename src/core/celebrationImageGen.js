@@ -1,217 +1,220 @@
 // src/core/celebrationImageGen.js
 // Generates dual-format celebration images: 1080x1080 (feed) + 1080x1920 (story).
-// Uses sharp + SVG with embedded Google Fonts base64.
-// Layers: stylist photo → vignette → accent bar → text → logo watermark → #MostlyPostly
+// Uses Puppeteer (headless Chrome) for browser-quality rendering.
+// Layers: stylist photo → vignette → accent bar → large name text → logo → #MostlyPostly
 
-import sharp from "sharp";
 import fs from "fs";
 import path from "path";
 import fetch from "node-fetch";
 import crypto from "crypto";
 import { UPLOADS_DIR, toUploadUrl } from "./uploadPath.js";
-import { getFontBase64 } from "./fontLoader.js";
+import { renderHtmlToJpeg } from "./puppeteerRenderer.js";
 
 const CELEBRATIONS_DIR = path.join(UPLOADS_DIR, "celebrations");
 fs.mkdirSync(CELEBRATIONS_DIR, { recursive: true });
 
 const ACCENT_COLOR = "#3B72B9";
 
-// Font style definitions
+// Font style definitions — Google Fonts loaded by the browser directly
 const FONT_STYLES = {
   script: {
-    headlineFont:   "Great Vibes",
-    headlineSizes:  { square: 110, story: 130 },
-    headlineWeight: "normal",
-    labelFont:      "Lato",
-    labelWeight:    "300",
-    letterSpacing:  "4",
+    googleFonts: "Great+Vibes|Lato:wght@300;400",
+    headlineFont: "'Great Vibes', cursive",
+    labelFont: "'Lato', sans-serif",
+    labelWeight: "300",
+    letterSpacing: "6px",
   },
   editorial: {
-    headlineFont:   "Montserrat",
-    headlineSizes:  { square: 96, story: 116 },
-    headlineWeight: "700",
-    labelFont:      "Montserrat",
-    labelWeight:    "400",
-    letterSpacing:  "8",
+    googleFonts: "Montserrat:wght@400;700;800",
+    headlineFont: "'Montserrat', sans-serif",
+    headlineWeight: "800",
+    labelFont: "'Montserrat', sans-serif",
+    labelWeight: "400",
+    letterSpacing: "8px",
   },
   playful: {
-    headlineFont:   "Pacifico",
-    headlineSizes:  { square: 88, story: 108 },
-    headlineWeight: "normal",
-    labelFont:      "Lato",
-    labelWeight:    "400",
-    letterSpacing:  "3",
+    googleFonts: "Pacifico|Lato:wght@400",
+    headlineFont: "'Pacifico', cursive",
+    labelFont: "'Lato', sans-serif",
+    labelWeight: "400",
+    letterSpacing: "4px",
   },
 };
 
-async function fetchImageBuffer(url) {
-  const resp = await fetch(url, { timeout: 10000 });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
-  return Buffer.from(await resp.arrayBuffer());
-}
-
-async function loadPhotoBuffer(profilePhotoUrl, width, height, accentHex) {
+async function toBase64DataUri(source) {
   try {
-    let raw;
-    if (profilePhotoUrl?.startsWith("http")) {
-      raw = await fetchImageBuffer(profilePhotoUrl);
-    } else if (profilePhotoUrl && fs.existsSync(profilePhotoUrl)) {
-      raw = fs.readFileSync(profilePhotoUrl);
+    let buf;
+    if (source?.startsWith("http")) {
+      const resp = await fetch(source, { timeout: 10000 });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      buf = Buffer.from(await resp.arrayBuffer());
+    } else if (source && fs.existsSync(source)) {
+      buf = fs.readFileSync(source);
     } else {
-      throw new Error("no photo");
+      throw new Error("no source");
     }
-    return await sharp(raw)
-      .resize(width, height, { fit: "cover", position: "attention" })
-      .jpeg({ quality: 90 })
-      .toBuffer();
+    // Detect mime type by magic bytes
+    const mime = buf[0] === 0x89 ? "image/png" : "image/jpeg";
+    return `data:${mime};base64,${buf.toString("base64")}`;
   } catch {
-    // Fallback: gradient background using accent color
-    const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${accentHex}" stop-opacity="0.85"/>
-          <stop offset="100%" stop-color="#1a1c22"/>
-        </linearGradient>
-      </defs>
-      <rect width="${width}" height="${height}" fill="url(#bg)"/>
-    </svg>`;
-    return await sharp(Buffer.from(svg)).jpeg({ quality: 90 }).toBuffer();
-  }
-}
-
-async function buildOverlaySvg({ width, height, celebrationType, firstName, subLabel, accentHex, fontStyle }) {
-  const style = FONT_STYLES[fontStyle] || FONT_STYLES.script;
-  const isSquare = width === 1080 && height === 1080;
-  const headlineSize = style.headlineSizes[isSquare ? "square" : "story"];
-
-  const eyebrow = celebrationType === "birthday"
-    ? "HAPPY BIRTHDAY"
-    : "HAPPY WORK ANNIVERSARY";
-
-  const safe = s => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  // Load fonts (returns null on failure — SVG falls back to system font)
-  const headlineB64 = await getFontBase64(style.headlineFont);
-  const labelB64    = style.labelFont !== style.headlineFont
-    ? await getFontBase64(style.labelFont)
-    : headlineB64;
-
-  const fontFaces = [
-    headlineB64 ? `@font-face { font-family: '${style.headlineFont}'; src: url('${headlineB64}'); }` : "",
-    (labelB64 && style.labelFont !== style.headlineFont)
-      ? `@font-face { font-family: '${style.labelFont}'; src: url('${labelB64}'); }`
-      : "",
-  ].filter(Boolean).join("\n    ");
-
-  // Text block sits in the lower 38% of the image
-  const textStartY   = Math.round(height * 0.62);
-  const accentBarY   = textStartY - 20;
-  const eyebrowY     = textStartY + 4;
-  const nameY        = eyebrowY + headlineSize + 8;
-  const subLabelY    = nameY + 38;
-  const mpWatermarkY = height - 24;
-
-  return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <style>
-    ${fontFaces}
-    </style>
-    <linearGradient id="vignette" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="black" stop-opacity="0"/>
-      <stop offset="40%"  stop-color="black" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="black" stop-opacity="0.88"/>
-    </linearGradient>
-  </defs>
-
-  <!-- Full canvas vignette -->
-  <rect x="0" y="0" width="${width}" height="${height}" fill="url(#vignette)"/>
-
-  <!-- Accent bar above text -->
-  <rect x="48" y="${accentBarY}" width="72" height="3" fill="${safe(accentHex)}" rx="1.5"/>
-
-  <!-- Eyebrow label -->
-  <text x="48" y="${eyebrowY}"
-    font-family="'${safe(style.labelFont)}', 'Helvetica Neue', Helvetica, sans-serif"
-    font-size="17" font-weight="${style.labelWeight}"
-    fill="rgba(255,255,255,0.65)"
-    letter-spacing="${style.letterSpacing}">
-    ${safe(eyebrow)}
-  </text>
-
-  <!-- First name — styled headline -->
-  <text x="44" y="${nameY}"
-    font-family="'${safe(style.headlineFont)}', 'Helvetica Neue', Helvetica, sans-serif"
-    font-size="${headlineSize}" font-weight="${style.headlineWeight}"
-    fill="white">
-    ${safe(firstName)}
-  </text>
-
-  ${subLabel ? `
-  <!-- Anniversary sub-label -->
-  <text x="50" y="${subLabelY}"
-    font-family="'${safe(style.labelFont)}', 'Helvetica Neue', Helvetica, sans-serif"
-    font-size="24" font-weight="${style.labelWeight}"
-    fill="rgba(255,255,255,0.6)"
-    letter-spacing="2">
-    ${safe(subLabel)}
-  </text>` : ""}
-
-  <!-- #MostlyPostly watermark — bottom left -->
-  <text x="24" y="${mpWatermarkY}"
-    font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
-    font-size="13" font-weight="400"
-    fill="rgba(255,255,255,0.32)"
-    letter-spacing="0.5">
-    #MostlyPostly
-  </text>
-</svg>`;
-}
-
-async function buildLogoLayer(salonLogoPath, canvasWidth, canvasHeight) {
-  if (!salonLogoPath || !fs.existsSync(salonLogoPath)) return null;
-
-  try {
-    const LOGO_W  = 110;
-    const PADDING = 24;
-    const rawLogo = fs.readFileSync(salonLogoPath);
-
-    const logoResized = await sharp(rawLogo)
-      .resize(LOGO_W, null, { fit: "inside" })
-      .png()
-      .toBuffer();
-
-    const meta  = await sharp(logoResized).metadata();
-    const logoW = meta.width  || LOGO_W;
-    const logoH = meta.height || 60;
-
-    // Apply 70% opacity via a white overlay composite using dest-in blend
-    const tinted = await sharp({
-      create: { width: logoW, height: logoH, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 0.70 } },
-    })
-      .png()
-      .composite([{ input: logoResized, blend: "dest-in" }])
-      .png()
-      .toBuffer();
-
-    return {
-      input: tinted,
-      top:  canvasHeight - logoH - PADDING,
-      left: canvasWidth  - logoW  - PADDING,
-    };
-  } catch (err) {
-    console.warn("[celebrationImageGen] Logo layer failed:", err.message);
     return null;
   }
 }
 
-async function renderImage({ photoBuffer, svgOverlay, logoLayer }) {
-  const layers = [{ input: Buffer.from(svgOverlay), top: 0, left: 0 }];
-  if (logoLayer) layers.push(logoLayer);
+function buildHtml({ width, height, photoDataUri, logoDataUri, firstName, celebrationType, subLabel, accentHex, fontStyle }) {
+  const style = FONT_STYLES[fontStyle] || FONT_STYLES.script;
+  const eyebrow = celebrationType === "birthday" ? "Happy Birthday" : "Happy Work Anniversary";
+  const safe = s => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  return sharp(photoBuffer)
-    .composite(layers)
-    .jpeg({ quality: 88 })
-    .toBuffer();
+  // Responsive font size: clamp based on canvas height
+  // For 1080×1080: ~180px name. For 1080×1920: ~220px name.
+  const nameFontSize = Math.round(height * 0.165);
+  const eyebrowFontSize = Math.round(height * 0.022);
+  const subFontSize = Math.round(height * 0.028);
+
+  const photoBg = photoDataUri
+    ? `<img class="bg-photo" src="${photoDataUri}" />`
+    : `<div class="bg-gradient"></div>`;
+
+  const logoHtml = logoDataUri
+    ? `<img class="logo" src="${logoDataUri}" />`
+    : "";
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=${style.googleFonts}&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  width: ${width}px;
+  height: ${height}px;
+  overflow: hidden;
+  position: relative;
+  background: #1a1c22;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+.bg-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.bg-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, ${accentHex}cc 0%, #1a1c22 100%);
+}
+
+/* Vignette — heavier at bottom for text legibility */
+.vignette {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.05) 0%,
+    rgba(0,0,0,0.10) 35%,
+    rgba(0,0,0,0.55) 60%,
+    rgba(0,0,0,0.88) 80%,
+    rgba(0,0,0,0.95) 100%
+  );
+}
+
+/* Text content — pinned to bottom */
+.content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: ${Math.round(height * 0.05)}px ${Math.round(width * 0.055)}px ${Math.round(height * 0.07)}px;
+}
+
+.accent-bar {
+  width: ${Math.round(width * 0.075)}px;
+  height: ${Math.round(height * 0.004)}px;
+  background: ${accentHex};
+  border-radius: 2px;
+  margin-bottom: ${Math.round(height * 0.018)}px;
+}
+
+.eyebrow {
+  font-family: ${style.labelFont};
+  font-size: ${eyebrowFontSize}px;
+  font-weight: ${style.labelWeight || "400"};
+  color: rgba(255,255,255,0.75);
+  letter-spacing: ${style.letterSpacing};
+  text-transform: uppercase;
+  margin-bottom: ${Math.round(height * 0.01)}px;
+  line-height: 1.2;
+}
+
+.name {
+  font-family: ${style.headlineFont};
+  font-size: ${nameFontSize}px;
+  font-weight: ${style.headlineWeight || "normal"};
+  color: #ffffff;
+  line-height: 1.05;
+  text-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  letter-spacing: ${fontStyle === "editorial" ? "2px" : "0"};
+}
+
+.sub-label {
+  font-family: ${style.labelFont};
+  font-size: ${subFontSize}px;
+  font-weight: ${style.labelWeight || "400"};
+  color: rgba(255,255,255,0.65);
+  margin-top: ${Math.round(height * 0.014)}px;
+  letter-spacing: 2px;
+}
+
+/* Logo — bottom right */
+.logo {
+  position: absolute;
+  bottom: ${Math.round(height * 0.03)}px;
+  right: ${Math.round(width * 0.055)}px;
+  max-width: ${Math.round(width * 0.18)}px;
+  max-height: ${Math.round(height * 0.065)}px;
+  object-fit: contain;
+  opacity: 0.80;
+  filter: brightness(0) invert(1);
+}
+
+/* Watermark — bottom left */
+.watermark {
+  position: absolute;
+  bottom: ${Math.round(height * 0.022)}px;
+  left: ${Math.round(width * 0.055)}px;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: ${Math.round(height * 0.014)}px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.5px;
+}
+</style>
+</head>
+<body>
+  ${photoBg}
+  <div class="vignette"></div>
+
+  <div class="content">
+    <div class="accent-bar"></div>
+    <div class="eyebrow">${safe(eyebrow)}</div>
+    <div class="name">${safe(firstName)}</div>
+    ${subLabel ? `<div class="sub-label">${safe(subLabel)}</div>` : ""}
+  </div>
+
+  ${logoHtml}
+  <div class="watermark">#MostlyPostly</div>
+</body>
+</html>`;
 }
 
 /**
@@ -222,8 +225,8 @@ async function renderImage({ photoBuffer, svgOverlay, logoLayer }) {
  * @param {string}  [opts.salonLogoPath]         Absolute path to salon logo file
  * @param {string}  opts.firstName
  * @param {"birthday"|"anniversary"} opts.celebrationType
- * @param {number}  [opts.anniversaryYears]      e.g. 5
- * @param {string}  [opts.salonName]             Used in anniversary sub-label
+ * @param {number}  [opts.anniversaryYears]
+ * @param {string}  [opts.salonName]
  * @param {string}  [opts.accentColor]           Hex e.g. "#3B72B9"
  * @param {"script"|"editorial"|"playful"} [opts.fontStyle]
  * @returns {Promise<{ feedUrl: string, storyUrl: string }>}
@@ -242,27 +245,21 @@ export async function generateCelebrationImage({
     ? `${anniversaryYears} ${anniversaryYears === 1 ? "Year" : "Years"} · ${salonName}`
     : "";
 
+  // Load photo and logo as base64 in parallel
+  const [photoDataUri, logoDataUri] = await Promise.all([
+    toBase64DataUri(profilePhotoUrl),
+    salonLogoPath ? toBase64DataUri(salonLogoPath) : Promise.resolve(null),
+  ]);
+
   const SQUARE_W = 1080, SQUARE_H = 1080;
   const STORY_W  = 1080, STORY_H  = 1920;
 
-  // Load photos and logo layers in parallel
-  const [squarePhoto, storyPhoto, squareLogo, storyLogo] = await Promise.all([
-    loadPhotoBuffer(profilePhotoUrl, SQUARE_W, SQUARE_H, accentColor),
-    loadPhotoBuffer(profilePhotoUrl, STORY_W,  STORY_H,  accentColor),
-    buildLogoLayer(salonLogoPath, SQUARE_W, SQUARE_H),
-    buildLogoLayer(salonLogoPath, STORY_W,  STORY_H),
-  ]);
+  const sharedOpts = { photoDataUri, logoDataUri, firstName, celebrationType, subLabel, accentHex: accentColor, fontStyle };
 
-  // Build SVG overlays (font fetching happens here)
-  const [squareSvg, storySvg] = await Promise.all([
-    buildOverlaySvg({ width: SQUARE_W, height: SQUARE_H, celebrationType, firstName, subLabel, accentHex: accentColor, fontStyle }),
-    buildOverlaySvg({ width: STORY_W,  height: STORY_H,  celebrationType, firstName, subLabel, accentHex: accentColor, fontStyle }),
-  ]);
-
-  // Render both in parallel
+  // Render both formats in parallel
   const [squareBuf, storyBuf] = await Promise.all([
-    renderImage({ photoBuffer: squarePhoto, svgOverlay: squareSvg, logoLayer: squareLogo }),
-    renderImage({ photoBuffer: storyPhoto,  svgOverlay: storySvg,  logoLayer: storyLogo }),
+    renderHtmlToJpeg(buildHtml({ width: SQUARE_W, height: SQUARE_H, ...sharedOpts }), SQUARE_W, SQUARE_H),
+    renderHtmlToJpeg(buildHtml({ width: STORY_W,  height: STORY_H,  ...sharedOpts }), STORY_W,  STORY_H),
   ]);
 
   // Save to disk
