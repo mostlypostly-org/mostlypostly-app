@@ -223,6 +223,15 @@ router.get("/:id", validateToken, async (req, res) => {
 
     <!-- Submit -->
     <form method="POST" action="/stylist/${esc(post.id)}/submit?token=${esc(token)}">
+      <div class="mb-4">
+        <label class="block text-sm font-semibold text-mpCharcoal mb-1">
+          Add hashtags <span class="text-mpMuted font-normal">(optional, up to 2)</span>
+        </label>
+        <input type="text" name="extra_hashtags"
+          placeholder="#balayage #colorist"
+          class="w-full bg-mpBg border border-mpBorder rounded-xl px-3 py-2.5 text-sm text-mpCharcoal focus:outline-none focus:ring-2 focus:ring-mpAccent focus:border-mpAccent" />
+        <p class="text-[11px] text-mpMuted mt-1">Space or comma separated. These are added to the post's default hashtags.</p>
+      </div>
       <button type="submit"
         class="w-full bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-semibold py-3 rounded-full text-sm transition-colors shadow-sm">
         Submit for Manager Review →
@@ -438,6 +447,17 @@ router.post("/:id/submit", validateToken, async (req, res) => {
     // Running AI again here would discard the stylist's curated hashtags.
     let hashtags = [];
     try { hashtags = JSON.parse(post.hashtags || "[]"); } catch { }
+
+    // Merge up to 2 extra hashtags from stylist input; enforce 5-tag total max
+    const extraRaw = (req.body.extra_hashtags || "").split(/[,\s]+/)
+      .map(t => t.trim().replace(/^#+/, "")).filter(Boolean).slice(0, 2);
+    const existing = new Set(hashtags.map(h => h.toLowerCase().replace(/^#/, "")));
+    for (const tag of extraRaw) {
+      if (!existing.has(tag.toLowerCase()) && hashtags.length < 5) {
+        hashtags.push(`#${tag}`);
+        existing.add(tag.toLowerCase());
+      }
+    }
 
     // Moderation on the existing caption
     const modResult = await moderateAIOutput(

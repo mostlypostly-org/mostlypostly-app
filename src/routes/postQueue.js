@@ -32,12 +32,19 @@ function postTypeBadge(type) {
     before_after:     { label: "Before/After",  color: "bg-purple-100 text-purple-700" },
     before_after_post:{ label: "Before/After",  color: "bg-purple-100 text-purple-700" },
     availability:     { label: "Availability",  color: "bg-green-100 text-green-700" },
+    promotion:        { label: "Promotion",     color: "bg-orange-100 text-orange-700" },
     promotions:       { label: "Promotion",     color: "bg-orange-100 text-orange-700" },
     product_education:{ label: "Education",     color: "bg-teal-100 text-teal-700" },
     celebration:      { label: "Celebration",   color: "bg-pink-100 text-pink-700" },
+    celebration_story:{ label: "Celebration Story", color: "bg-pink-100 text-pink-700" },
   };
   const t = map[type] || { label: type || "Post", color: "bg-gray-100 text-gray-600" };
   return `<span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${t.color}">${t.label}</span>`;
+}
+
+function vendorBadge(stylistName) {
+  if (!stylistName || !stylistName.includes("(Campaign)")) return "";
+  return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-mpAccent/10 text-mpAccent border border-mpAccent/20">🏷️ Vendor</span>`;
 }
 
 // ── GET / — Queue page ────────────────────────────────────────────────────────
@@ -95,8 +102,9 @@ router.get("/", requireAuth, (req, res) => {
 
         <!-- Content -->
         <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-0.5">
+          <div class="flex items-center gap-2 mb-0.5 flex-wrap">
             ${postTypeBadge(p.post_type)}
+            ${vendorBadge(p.stylist_name)}
             <span class="text-xs text-mpMuted truncate">${safe(p.stylist_name || "Unknown")}</span>
           </div>
           <p class="text-sm text-mpCharcoal leading-snug line-clamp-1">${safe(preview)}</p>

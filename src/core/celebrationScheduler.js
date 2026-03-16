@@ -44,6 +44,7 @@ function yearsAgo(hireDateStr, timezone) {
 
 function resolveLogoPath(logoUrl) {
   if (!logoUrl) return null;
+  if (logoUrl.startsWith("http")) return logoUrl; // toBase64DataUri handles HTTP URLs
   if (logoUrl.startsWith("/uploads/")) {
     const abs = path.resolve("public" + logoUrl);
     return fs.existsSync(abs) ? abs : null;

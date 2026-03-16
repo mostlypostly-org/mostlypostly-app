@@ -278,7 +278,7 @@ window.admin = {
     const addBtn  = panel.querySelector("#hashtag-add-btn");
     const form    = panel.querySelector("#hashtags-form");
 
-    let tags = data.custom_hashtags ? [...data.custom_hashtags] : [];
+    let tags = data.custom_hashtags ? [...data.custom_hashtags].slice(0, 2) : [];
 
     function normalize(raw) {
       return "#" + raw.trim().replace(/^#+/, "");
@@ -332,7 +332,7 @@ window.admin = {
 
     function addTag() {
       const val = normalize(inputEl.value);
-      if (val === "#" || tags.length >= 4) return;
+      if (val === "#" || tags.length >= 2) return;
       if (!tags.includes(val)) { tags.push(val); sync(); renderChips(); }
       inputEl.value = "";
     }
@@ -344,8 +344,12 @@ window.admin = {
     });
     addBtn.addEventListener("click", addTag);
 
-    // Sync hidden field right before form submits
-    form.addEventListener("submit", sync);
+    // Sync hidden field right before form submits — include salon tag first
+    form.addEventListener("submit", () => {
+      const salonTagVal = data.salon_tag;
+      const full = salonTagVal ? [salonTagVal, ...tags] : [...tags];
+      hidden.value = JSON.stringify(full);
+    });
 
     sync();
     renderChips();

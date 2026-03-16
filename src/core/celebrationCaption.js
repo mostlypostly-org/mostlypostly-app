@@ -10,7 +10,7 @@ const FALLBACKS = {
   birthday: (name, salonName) =>
     `Happy Birthday ${name}! 🎂 We're so lucky to have you on our team. — ${salonName} #MostlyPostly`,
   anniversary: (name, years, salonName) =>
-    `Happy Work Anniversary ${name}! 🎉 ${years} incredible ${years === 1 ? "year" : "years"} — thank you for everything you bring to our team. — ${salonName} #MostlyPostly`,
+    `Happy Anniversary ${name}! 🎉 Thank you for everything you bring to our team. — ${salonName} #MostlyPostly`,
 };
 
 /**

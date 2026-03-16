@@ -33,6 +33,24 @@ export async function sendViaTwilio(to, body) {
   }
 }
 
+export async function sendViaRcs(to, body, buttons = []) {
+  try {
+    const rcsEnabled = process.env.RCS_ENABLED === "true";
+    const base = process.env.TWILIO_MESSAGING_SERVICE_SID
+      ? { messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID, to, body }
+      : { from: process.env.TWILIO_PHONE_NUMBER, to, body };
+
+    const opts = rcsEnabled && buttons.length
+      ? { ...base, persistentAction: buttons }
+      : base;
+
+    const resp = await client.messages.create(opts);
+    console.log(`[Twilio RCS → ${to}] id=${resp.sid} :: ${body.slice(0, 140)}`);
+  } catch (err) {
+    console.error("⚠️ [Twilio RCS Send Error]:", err.message);
+  }
+}
+
 const MessagingResponse = twilio.twiml.MessagingResponse;
 
 // ======================================================
@@ -109,7 +127,7 @@ export default function twilioRoute(drafts, _lookupStylist, generateCaption) {
       const twiml = new MessagingResponse();
 
       if (
-          /^(JOIN|CANCEL|SETUP|AGREE|APPROVE|DENY|EDIT|RESET)\b/i.test(text) ||
+          /^(JOIN|CANCEL|SETUP|AGREE|APPROVE|DENY|EDIT|RESET|REDO|REGENERATE)\b/i.test(text) ||
           joinSessions.has(from)
         ) {
           // 🧠 These are command flows — respond silently (no "Got it" message)
@@ -130,11 +148,11 @@ export default function twilioRoute(drafts, _lookupStylist, generateCaption) {
     try {
       // --- JOIN FLOW ---
       if (upperInit.startsWith("JOIN")) {
-        await handleJoinCommand(from, lookupStylist, text, (msg) => sendViaTwilio(from, msg));
+        await handleJoinCommand(from, lookupStylist, text, (msg, buttons = []) => sendViaRcs(from, msg, buttons));
         return;
       }
       if (joinSessions.has(from)) {
-        await continueJoinConversation(from, text, (msg) => sendViaTwilio(from, msg));
+        await continueJoinConversation(from, text, (msg, buttons = []) => sendViaRcs(from, msg, buttons));
         return;
       }
 
@@ -157,6 +175,7 @@ export default function twilioRoute(drafts, _lookupStylist, generateCaption) {
         moderateAIOutput,
         sendMessage: {
           sendText: async (target, msg) => sendViaTwilio(target || from, msg),
+          sendRcs: async (target, msg, buttons) => sendViaRcs(target || from, msg, buttons),
         },
         io: null,
       });

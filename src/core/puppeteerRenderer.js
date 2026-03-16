@@ -8,6 +8,7 @@ import { existsSync } from "fs";
 
 let browser = null;
 let chromeReady = false;
+let launchPromise = null; // mutex — prevents concurrent puppeteer.launch() calls
 
 async function ensureChrome() {
   if (chromeReady) return;
@@ -33,18 +34,30 @@ async function ensureChrome() {
 async function getBrowser() {
   await ensureChrome();
   if (browser) return browser;
-  browser = await puppeteer.launch({
+  // Return existing launch promise so concurrent calls share one Chrome instance
+  if (launchPromise) return launchPromise;
+  launchPromise = puppeteer.launch({
     headless: true,
+    timeout: 60000,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
+      "--no-zygote",
+      "--single-process",
       "--font-render-hinting=none",
     ],
+  }).then(b => {
+    browser = b;
+    launchPromise = null;
+    b.on("disconnected", () => { browser = null; launchPromise = null; chromeReady = false; });
+    return b;
+  }).catch(err => {
+    launchPromise = null;
+    throw err;
   });
-  browser.on("disconnected", () => { browser = null; chromeReady = false; });
-  return browser;
+  return launchPromise;
 }
 
 /**
@@ -56,8 +69,13 @@ export async function renderHtmlToJpeg(html, width, height) {
   const page = await b.newPage();
   try {
     await page.setViewport({ width, height, deviceScaleFactor: 1 });
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 25000 });
-    await page.evaluate(() => Promise.all([document.fonts.ready, new Promise(r => window.addEventListener('load', r, { once: true }))]));
+    // Use domcontentloaded — networkidle0 blocks on Google Fonts CDN and times out on Render
+    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 15000 });
+    // Give fonts up to 6s to load; proceed with screenshot even if CDN is slow
+    await Promise.race([
+      page.evaluate(() => document.fonts.ready),
+      new Promise(r => setTimeout(r, 6000)),
+    ]);
     const buf = await page.screenshot({ type: "jpeg", quality: 92, clip: { x: 0, y: 0, width, height } });
     return buf;
   } finally {

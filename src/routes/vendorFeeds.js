@@ -96,7 +96,7 @@ router.get("/", requireAuth, (req, res) => {
       const nonExpired = items.filter(c => !c.expires_at || c.expires_at >= today);
       const expired    = items.filter(c => c.expires_at && c.expires_at < today);
 
-      const campaignPreviews = nonExpired.slice(0, 3).map(c => {
+      const campaignPreviews = nonExpired.slice(0, 5).map(c => {
         const tags = parseHashtags(c.hashtags).slice(0, 4);
         return `
           <div class="rounded-xl border border-mpBorder bg-mpBg p-3 flex gap-3 items-start">
@@ -115,7 +115,7 @@ router.get("/", requireAuth, (req, res) => {
           </div>`;
       }).join("");
 
-      const moreCount = nonExpired.length - 3;
+      const moreCount = nonExpired.length - 5;
 
       // Right-side action: depends on approval state
       const actionArea = !isPro

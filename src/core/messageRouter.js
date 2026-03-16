@@ -583,9 +583,16 @@ async function processNewImageFlow({
       const baseUrl = process.env.PUBLIC_BASE_URL || "";
       const portalUrl = `${baseUrl}/stylist/${postId}?token=${portalToken}`;
 
-      await sendMessage.sendText(chatId,
-        `Your caption preview is ready! Review and edit it here:\n${portalUrl}\n\nOr reply APPROVE to submit now, or CANCEL to discard. (Link expires in 24 hours.)`
-      );
+      const previewMsg =
+        `Your caption preview is ready!\n\n` +
+        `Review or edit here:\n${portalUrl}\n\n` +
+        `Or tap a button below (or reply APPROVE/REDO/CANCEL). Link expires in 24 hours.`;
+
+      if (sendMessage.sendRcs) {
+        await sendMessage.sendRcs(chatId, previewMsg, ["reply:APPROVE", "reply:REDO", "reply:CANCEL"]);
+      } else {
+        await sendMessage.sendText(chatId, previewMsg);
+      }
     } catch (err) {
       console.warn("⚠️ Could not generate portal token, falling back to SMS preview:", err.message);
       await sendMessage.sendText(chatId, `Preview:\n\n${previewCaption}\n\nReply APPROVE to submit or CANCEL to discard.`);
@@ -858,7 +865,12 @@ export async function handleIncomingMessage({
         LIMIT 1
       `).get(salonSlug);
 
-      const requiresManager = Number(salonRow?.require_manager_approval) === 1;
+      // Per-stylist auto-approve overrides salon-level manager approval requirement
+      const stylistRow = db.prepare(`SELECT auto_approve FROM stylists WHERE phone = ? AND salon_id = ? LIMIT 1`)
+        .get(from, salonSlug);
+      const stylistAutoApprove = Number(stylistRow?.auto_approve) === 1;
+
+      const requiresManager = Number(salonRow?.require_manager_approval) === 1 && !stylistAutoApprove;
 
       console.log("🔐 Manager approval resolved from DB:", {
         salonSlug,
@@ -1155,7 +1167,7 @@ Log in to review: ${managerLink}
   }
 
   // REGENERATE — redirect to portal (editing now happens on the web)
-  if (command === "REGENERATE") {
+  if (command === "REGENERATE" || command === "REDO") {
     const draft = drafts.get(chatId) || (() => {
       const row = findLatestDraft(chatId);
       return row ? restoreDraftFromDb(row) : null;

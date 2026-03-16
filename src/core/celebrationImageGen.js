@@ -63,7 +63,7 @@ async function toBase64DataUri(source) {
 
 function buildHtml({ width, height, photoDataUri, logoDataUri, firstName, celebrationType, subLabel, accentHex, fontStyle }) {
   const style = FONT_STYLES[fontStyle] || FONT_STYLES.script;
-  const eyebrow = celebrationType === "birthday" ? "Happy Birthday" : "Happy Work Anniversary";
+  const eyebrow = celebrationType === "birthday" ? "Happy Birthday" : "Happy Anniversary";
   const safe = s => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   // Responsive font size: clamp based on canvas height
@@ -291,9 +291,7 @@ export async function generateCelebrationImage({
   accentColor = ACCENT_COLOR,
   fontStyle = "script",
 }) {
-  const subLabel = celebrationType === "anniversary" && anniversaryYears
-    ? `${anniversaryYears} ${anniversaryYears === 1 ? "Year" : "Years"} · ${salonName}`
-    : "";
+  const subLabel = "";
 
   // Load photo and logo as base64 in parallel
   const [photoDataUri, logoDataUri] = await Promise.all([

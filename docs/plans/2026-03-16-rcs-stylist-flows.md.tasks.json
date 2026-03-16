@@ -1,0 +1,11 @@
+{
+  "planPath": "docs/plans/2026-03-16-rcs-stylist-flows.md",
+  "tasks": [
+    {"id": 7, "subject": "Task 1: Add sendViaRcs to twilio.js", "status": "completed"},
+    {"id": 8, "subject": "Task 2: Upgrade consent welcome SMS to RCS", "status": "completed", "blockedBy": [7]},
+    {"id": 9, "subject": "Task 3: Add NONE chips to Join conversation", "status": "completed", "blockedBy": [7]},
+    {"id": 10, "subject": "Task 4: Upgrade post preview to RCS chips", "status": "completed", "blockedBy": [7]},
+    {"id": 11, "subject": "Task 5: Enable RCS_ENABLED on Render + smoke test", "status": "pending", "blockedBy": [8, 9, 10]}
+  ],
+  "lastUpdated": "2026-03-16T12:00:00.000Z"
+}
