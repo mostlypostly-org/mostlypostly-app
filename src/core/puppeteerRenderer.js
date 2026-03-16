@@ -57,7 +57,7 @@ export async function renderHtmlToJpeg(html, width, height) {
   try {
     await page.setViewport({ width, height, deviceScaleFactor: 1 });
     await page.setContent(html, { waitUntil: "networkidle0", timeout: 25000 });
-    await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(() => Promise.all([document.fonts.ready, new Promise(r => window.addEventListener('load', r, { once: true }))]));
     const buf = await page.screenshot({ type: "jpeg", quality: 92, clip: { x: 0, y: 0, width, height } });
     return buf;
   } finally {

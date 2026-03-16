@@ -72,12 +72,16 @@ function buildHtml({ width, height, photoDataUri, logoDataUri, firstName, celebr
   const eyebrowFontSize = Math.round(height * 0.022);
   const subFontSize = Math.round(height * 0.028);
 
-  const photoBg = photoDataUri
-    ? `<img class="bg-photo" src="${photoDataUri}" />`
-    : `<div class="bg-gradient"></div>`;
+  const pad = Math.round(width * 0.055);
+  const photoBg = photoDataUri ? `
+    <!-- Blurred fill layer — no zoom distortion -->
+    <img class="bg-blur" src="${photoDataUri}" />
+    <!-- Sharp photo contained — no cropping -->
+    <img class="bg-photo" src="${photoDataUri}" />
+  ` : `<div class="bg-gradient"></div>`;
 
   const logoHtml = logoDataUri
-    ? `<img class="logo" src="${logoDataUri}" />`
+    ? `<div class="logo-wrap"><img id="logo" src="${logoDataUri}" /></div>`
     : "";
 
   return `<!DOCTYPE html>
@@ -99,12 +103,25 @@ body {
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
+/* Blurred background fill — covers the whole canvas, no distortion */
+.bg-blur {
+  position: absolute;
+  inset: -30px;
+  width: calc(100% + 60px);
+  height: calc(100% + 60px);
+  object-fit: cover;
+  object-position: center top;
+  filter: blur(22px) brightness(0.45) saturate(1.1);
+}
+
+/* Sharp photo — contained (no crop), centered in top 68% of canvas */
 .bg-photo {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: 68%;
+  object-fit: contain;
   object-position: center top;
 }
 
@@ -114,17 +131,17 @@ body {
   background: linear-gradient(135deg, ${accentHex}cc 0%, #1a1c22 100%);
 }
 
-/* Vignette — heavier at bottom for text legibility */
+/* Vignette — transparent at top, heavy at bottom */
 .vignette {
   position: absolute;
   inset: 0;
   background: linear-gradient(
     to bottom,
-    rgba(0,0,0,0.05) 0%,
-    rgba(0,0,0,0.10) 35%,
-    rgba(0,0,0,0.55) 60%,
-    rgba(0,0,0,0.88) 80%,
-    rgba(0,0,0,0.95) 100%
+    rgba(0,0,0,0.0)  0%,
+    rgba(0,0,0,0.08) 30%,
+    rgba(0,0,0,0.60) 58%,
+    rgba(0,0,0,0.90) 75%,
+    rgba(0,0,0,0.97) 100%
   );
 }
 
@@ -134,7 +151,7 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: ${Math.round(height * 0.05)}px ${Math.round(width * 0.055)}px ${Math.round(height * 0.07)}px;
+  padding: ${Math.round(height * 0.05)}px ${pad}px ${Math.round(height * 0.07)}px;
 }
 
 .accent-bar {
@@ -175,23 +192,33 @@ body {
   letter-spacing: 2px;
 }
 
-/* Logo — bottom right */
-.logo {
+/* Logo — top right, frosted glass pill so it's legible on any background */
+.logo-wrap {
   position: absolute;
-  bottom: ${Math.round(height * 0.03)}px;
-  right: ${Math.round(width * 0.055)}px;
-  max-width: ${Math.round(width * 0.18)}px;
-  max-height: ${Math.round(height * 0.065)}px;
+  top: ${Math.round(height * 0.028)}px;
+  right: ${pad}px;
+  background: rgba(0,0,0,0.28);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: ${Math.round(height * 0.012)}px;
+  padding: ${Math.round(height * 0.012)}px ${Math.round(width * 0.022)}px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-wrap img {
+  max-width: ${Math.round(width * 0.20)}px;
+  max-height: ${Math.round(height * 0.055)}px;
   object-fit: contain;
-  opacity: 0.80;
-  filter: brightness(0) invert(1);
+  display: block;
 }
 
 /* Watermark — bottom left */
 .watermark {
   position: absolute;
   bottom: ${Math.round(height * 0.022)}px;
-  left: ${Math.round(width * 0.055)}px;
+  left: ${pad}px;
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-size: ${Math.round(height * 0.014)}px;
   font-weight: 400;
@@ -213,6 +240,29 @@ body {
 
   ${logoHtml}
   <div class="watermark">#MostlyPostly</div>
+
+  ${logoDataUri ? `<script>
+  // Sample brightness at the logo area (top-right) to decide white vs dark logo
+  window.addEventListener('load', function() {
+    var bgImg = document.querySelector('.bg-photo') || document.querySelector('.bg-blur');
+    var logo  = document.getElementById('logo');
+    if (!bgImg || !logo) return;
+    try {
+      var c = document.createElement('canvas');
+      c.width = 80; c.height = 40;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(bgImg, bgImg.naturalWidth * 0.65, 0, bgImg.naturalWidth * 0.35, bgImg.naturalHeight * 0.12, 0, 0, 80, 40);
+      var d = ctx.getImageData(0, 0, 80, 40).data;
+      var brightness = 0;
+      for (var i = 0; i < d.length; i += 4) brightness += (d[i] * 299 + d[i+1] * 587 + d[i+2] * 114) / 1000;
+      brightness /= (d.length / 4);
+      // Light background → dark logo; dark background → white logo
+      logo.style.filter = brightness > 140 ? 'brightness(0)' : 'brightness(0) invert(1)';
+    } catch(e) {
+      logo.style.filter = 'brightness(0) invert(1)'; // fallback white
+    }
+  });
+  </script>` : ''}
 </body>
 </html>`;
 }
