@@ -44,7 +44,13 @@ function yearsAgo(hireDateStr, timezone) {
 
 function resolveLogoPath(logoUrl) {
   if (!logoUrl) return null;
-  if (logoUrl.startsWith("http")) return logoUrl; // toBase64DataUri handles HTTP URLs
+  const PUBLIC_BASE = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+  if (PUBLIC_BASE && logoUrl.startsWith(PUBLIC_BASE + "/uploads/")) {
+    const rel = logoUrl.slice(PUBLIC_BASE.length);
+    const abs = path.resolve("public" + rel);
+    return fs.existsSync(abs) ? abs : logoUrl;
+  }
+  if (logoUrl.startsWith("http")) return logoUrl;
   if (logoUrl.startsWith("/uploads/")) {
     const abs = path.resolve("public" + logoUrl);
     return fs.existsSync(abs) ? abs : null;
@@ -161,6 +167,7 @@ export async function runCelebrationCheck() {
             anniversaryYears: stylist.anniversaryYears,
             salonName: salon.name,
             accentColor,
+            primaryColor: palette.primary || null,
             template,
           });
 
