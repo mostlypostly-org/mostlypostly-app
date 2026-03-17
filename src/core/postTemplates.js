@@ -85,44 +85,54 @@ body{width:${width}px;height:${height}px;overflow:hidden;position:relative;backg
 }
 
 // ─── Template 2: editorial — Magazine Split ────────────────────────────────
+// Left-right split: clean white editorial panel left, full-bleed photo right.
 
-function buildHtml_editorial({ width, height, photoDataUri, logoDataUri, firstName, celebrationType, subLabel, accentHex, bandHex = "#1a1c22" }) {
-  const pad = Math.round(width * 0.07);
-  const splitPct = 0.56;
-  const photoH = Math.round(height * splitPct);
-  const bandH  = height - photoH;
-  const nameFontSize   = Math.round(bandH * 0.38);
-  const eyebrowFontSize = Math.round(bandH * 0.10);
-  const subFontSize    = Math.round(bandH * 0.115);
-  const eyebrow = celebrationType === "birthday" ? "HAPPY BIRTHDAY" : "HAPPY ANNIVERSARY";
+function buildHtml_editorial({ width, height, photoDataUri, logoDataUri, firstName, celebrationType, subLabel, accentHex }) {
+  const panelW        = Math.round(width * 0.44);
+  const pad           = Math.round(panelW * 0.13);
+  const nameFontSize  = Math.round(panelW * 0.21);
+  const eyebrowSize   = Math.round(panelW * 0.046);
+  const subFontSize   = Math.round(panelW * 0.052);
+  const eyebrow = celebrationType === "birthday" ? "Happy Birthday" : "Happy Anniversary";
 
-  const photoBg = photoDataUri
-    ? `<img style="position:absolute;top:0;left:0;width:100%;height:${photoH}px;object-fit:cover;object-position:center top;" src="${photoDataUri}" />`
-    : `<div style="position:absolute;top:0;left:0;width:100%;height:${photoH}px;background:linear-gradient(135deg,${accentHex}99 0%,#1a1c22 100%);"></div>`;
+  const photo = photoDataUri
+    ? `<img style="position:absolute;right:0;top:0;width:${width - panelW}px;height:100%;object-fit:cover;object-position:center top;" src="${photoDataUri}" />`
+    : `<div style="position:absolute;right:0;top:0;width:${width - panelW}px;height:100%;background:linear-gradient(160deg,${accentHex}88 0%,#1a1c22 100%);"></div>`;
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,700&family=Lato:wght@300;400&display=swap" rel="stylesheet">
 <style>*{margin:0;padding:0;box-sizing:border-box}
-body{width:${width}px;height:${height}px;overflow:hidden;position:relative;background:#1a1c22;}</style>
+body{width:${width}px;height:${height}px;overflow:hidden;position:relative;background:#fff;}</style>
 </head><body>
-  ${photoBg}
-  <!-- Accent bar at split edge -->
-  <div style="position:absolute;top:${photoH - 3}px;left:0;right:0;height:5px;background:${accentHex};"></div>
-  <!-- Color band -->
-  <div style="position:absolute;bottom:0;left:0;right:0;height:${bandH}px;background:${bandHex};
-    display:flex;flex-direction:column;justify-content:center;padding:0 ${pad}px;">
-    <div style="font-family:'Montserrat',sans-serif;font-size:${eyebrowFontSize}px;font-weight:400;
-      color:${mutedOnBg(bandHex)};letter-spacing:${Math.round(eyebrowFontSize * 0.5)}px;
-      text-transform:uppercase;margin-bottom:${Math.round(bandH * 0.04)}px;">${safe(eyebrow)}</div>
-    <div style="font-family:'Montserrat',sans-serif;font-size:${nameFontSize}px;font-weight:800;
-      color:${textOnBg(bandHex)};text-transform:uppercase;letter-spacing:2px;line-height:0.9;">${safe(firstName)}</div>
-    ${subLabel ? `<div style="font-family:'Montserrat',sans-serif;font-size:${subFontSize}px;font-weight:400;
-      color:${mutedOnBg(bandHex)};margin-top:${Math.round(bandH*0.06)}px;letter-spacing:3px;text-transform:uppercase;">${safe(subLabel)}</div>` : ""}
+  ${photo}
+  <!-- Feather blend: white panel bleeds softly into photo -->
+  <div style="position:absolute;left:${panelW - 2}px;top:0;width:${Math.round(panelW * 0.14)}px;height:100%;
+    background:linear-gradient(to right,#fff 0%,transparent 100%);z-index:1;pointer-events:none;"></div>
+  <!-- Left white editorial panel -->
+  <div style="position:absolute;top:0;left:0;width:${panelW}px;height:100%;background:#fff;z-index:1;
+    display:flex;flex-direction:column;justify-content:center;
+    padding:${Math.round(height * 0.07)}px ${pad}px;">
+    <div style="font-family:'Lato',sans-serif;font-size:${eyebrowSize}px;font-weight:300;
+      color:rgba(26,28,34,0.40);letter-spacing:${Math.round(eyebrowSize * 0.22)}px;
+      text-transform:uppercase;margin-bottom:${Math.round(height * 0.022)}px;">${safe(eyebrow)}</div>
+    <div style="width:${Math.round(panelW * 0.15)}px;height:2px;background:${accentHex};
+      margin-bottom:${Math.round(height * 0.022)}px;"></div>
+    <div style="font-family:'Playfair Display',serif;font-style:italic;font-size:${nameFontSize}px;font-weight:700;
+      color:#1a1c22;line-height:1.0;word-break:break-word;">${safe(firstName)}</div>
+    ${subLabel ? `<div style="font-family:'Lato',sans-serif;font-size:${subFontSize}px;font-weight:300;
+      color:rgba(26,28,34,0.45);letter-spacing:1px;text-transform:uppercase;
+      margin-top:${Math.round(height * 0.028)}px;
+      border-top:1px solid rgba(26,28,34,0.12);padding-top:${Math.round(height * 0.018)}px;">${safe(subLabel)}</div>` : ""}
   </div>
-  ${logoHtml(logoDataUri, width, height, Math.round(width * 0.055))}
-  ${watermarkHtml(height, pad)}
+  <!-- Logo over photo, top-right -->
+  ${logoHtml(logoDataUri, width, height, Math.round(width * 0.03))}
+  <!-- Watermark: dark text, sits on white panel -->
+  <div style="position:absolute;bottom:${Math.round(height * 0.022)}px;left:${pad}px;z-index:2;
+    font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    font-size:${Math.round(height * 0.013)}px;font-weight:400;
+    color:rgba(26,28,34,0.22);letter-spacing:0.5px;">#MostlyPostly</div>
 </body></html>`;
 }
 
@@ -281,7 +291,7 @@ body{width:${width}px;height:${height}px;overflow:hidden;position:relative;backg
 export const TEMPLATE_META = {
   celebration: {
     script:    { label: "Handwritten Elegance", desc: "Script font · Photo-first" },
-    editorial: { label: "Magazine Split",       desc: "Bold type · Color band" },
+    editorial: { label: "Magazine Split",       desc: "White panel · Serif italic · Photo right" },
     bold:      { label: "Vertical Statement",   desc: "High-impact · Vertical name" },
     luxury:    { label: "Frosted Card",         desc: "Frosted glass · Serif italic" },
     minimal:   { label: "Moody Centered",       desc: "Minimal · Dark mood" },
