@@ -82,7 +82,11 @@ router.get("/checkout", requireAuth, async (req, res) => {
     success_url: `${PUBLIC_BASE_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}${offerTrial ? "&trial=1" : ""}${salon.status === "setup_incomplete" ? "&new=1" : ""}`,
     cancel_url:  `${PUBLIC_BASE_URL}/manager/billing`,
     metadata: { salon_id, plan, cycle },
-    allow_promotion_codes: true,
+    // Founder flow: auto-apply coupon if STRIPE_FOUNDER_COUPON_ID is set.
+    // Can't combine discounts[] with allow_promotion_codes — Stripe rejects it.
+    ...(req.session.offer === "founder" && process.env.STRIPE_FOUNDER_COUPON_ID
+      ? { discounts: [{ coupon: process.env.STRIPE_FOUNDER_COUPON_ID }] }
+      : { allow_promotion_codes: true }),
   };
 
   if (salon.stripe_customer_id) {
