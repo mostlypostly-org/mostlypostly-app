@@ -1896,15 +1896,11 @@ router.get("/test-celebration", requireAuth, async (req, res) => {
     }
 
     const salon = db.prepare(`
-      SELECT name, tone, brand_palette, celebration_font_styles, celebration_font_index, logo_url
+      SELECT name, tone, brand_palette, celebration_template, logo_url
       FROM salons WHERE slug = ?
     `).get(salon_id);
 
-    const styles = (() => {
-      try { return JSON.parse(salon.celebration_font_styles || '["script"]'); }
-      catch { return ["script"]; }
-    })();
-    const fontStyle = styles[(salon.celebration_font_index || 0) % styles.length];
+    const template = salon.celebration_template || "script";
 
     const palette = (() => {
       try { return JSON.parse(salon.brand_palette || "{}"); }
@@ -1934,7 +1930,7 @@ router.get("/test-celebration", requireAuth, async (req, res) => {
       anniversaryYears,
       salonName: salon.name,
       accentColor,
-      fontStyle,
+      template,
     });
 
     const caption = await generateCelebrationCaption({
