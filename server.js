@@ -143,7 +143,7 @@ app.use(
 // Auth routes — strict limit to prevent brute force
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10,
+  max: APP_ENV === "production" ? 10 : 50,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many attempts. Please try again in 15 minutes." },
