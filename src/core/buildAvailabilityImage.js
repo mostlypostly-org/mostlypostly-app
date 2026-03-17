@@ -129,7 +129,8 @@ async function toBase64DataUri(source) {
     }
     const mime = buf[0] === 0x89 ? "image/png" : "image/jpeg";
     return `data:${mime};base64,${buf.toString("base64")}`;
-  } catch {
+  } catch (err) {
+    console.warn("[Availability] toBase64DataUri failed for source:", (source || "").slice(0, 80), err?.message);
     return null;
   }
 }
@@ -203,7 +204,13 @@ export async function buildAvailabilityImage({ text, slots: prebuiltSlots, styli
 
   // 7. Build HTML and render via Puppeteer
   const html = buildHtml({ width: W, height: H, photoDataUri, logoDataUri, stylistName, salonName, slots, bookingCta, instagramHandle, accentHex, bandHex });
-  const buf  = await renderHtmlToJpeg(html, W, H);
+  let buf;
+  try {
+    buf = await renderHtmlToJpeg(html, W, H);
+  } catch (err) {
+    console.error("[Availability] Puppeteer render failed:", err.message);
+    throw err;
+  }
 
   // 8. Save and return public URL
   const fileName = `availability-${crypto.randomUUID()}.jpg`;
