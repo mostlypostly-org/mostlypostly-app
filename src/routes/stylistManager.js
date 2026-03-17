@@ -520,13 +520,18 @@ router.post("/add", requireAuth, photoUpload.single("photo"), async (req, res) =
 // ── GET /edit/:id ─────────────────────────────────────────────────────────────
 router.get("/edit/:id", requireAuth, (req, res) => {
   const salon_id = req.manager.salon_id;
-  const salon = db.prepare("SELECT tone FROM salons WHERE slug = ?").get(salon_id);
+  const salon = db.prepare("SELECT tone, name FROM salons WHERE slug = ?").get(salon_id);
   const stylist = db.prepare("SELECT * FROM stylists WHERE id = ? AND salon_id = ?").get(req.params.id, salon_id);
   if (!stylist) return res.redirect(`/manager/stylists?salon=${encodeURIComponent(salon_id)}`);
 
+  const welcomed = req.query.welcomed || null;
+
   res.send(pageShell({
     title: "Edit Stylist",
-    body: buildStylistForm({ salon_id, salonTone: salon?.tone, stylist, isEdit: true }),
+    body: `${welcomed ? `
+      <div class="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-xs text-green-800">
+        ✅ Welcome SMS sent to <strong>${safe(welcomed)}</strong>.
+      </div>` : ""}` + buildStylistForm({ salon_id, salonTone: salon?.tone, stylist, isEdit: true }),
     salon_id,
     current: "team",
   }));
@@ -775,6 +780,20 @@ router.post("/delete/:id", requireAuth, (req, res) => {
   res.redirect(`/manager/stylists?salon=${encodeURIComponent(salon_id)}`);
 });
 
+// ── POST /resend-welcome/:id ───────────────────────────────────────────────────
+router.post("/resend-welcome/:id", requireAuth, async (req, res) => {
+  const salon_id = req.manager.salon_id;
+  const stylist = db.prepare("SELECT * FROM stylists WHERE id = ? AND salon_id = ?").get(req.params.id, salon_id);
+  if (!stylist) return res.redirect(`/manager/stylists?salon=${encodeURIComponent(salon_id)}`);
+
+  const salon = db.prepare("SELECT name FROM salons WHERE slug = ?").get(salon_id);
+  try {
+    await sendWelcomeSms(stylist, salon?.name || "your salon");
+  } catch (err) {
+    console.error("[resend-welcome] error:", err.message);
+  }
+  res.redirect(`/manager/stylists/edit/${stylist.id}?salon=${encodeURIComponent(salon_id)}&welcomed=${encodeURIComponent(stylist.first_name || stylist.name || "stylist")}`);
+});
 
 // ── GET /template — CSV download ──────────────────────────────────────────────
 router.get("/template", requireAuth, (_req, res) => {
@@ -875,10 +894,19 @@ function buildStylistForm({ salon_id, salonTone, stylist, isEdit }) {
         </p>
       </div>
       ${isEdit ? `
-      <a href="/manager/stylists/edit/${safe(s.id)}/photos${qs}"
-         class="inline-flex items-center gap-1.5 rounded-full bg-mpAccent px-4 py-2 text-xs font-semibold text-white hover:bg-mpCharcoalDark transition-colors flex-shrink-0">
-        📷 Photo Library
-      </a>` : ""}
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <form method="POST" action="/manager/stylists/resend-welcome/${safe(s.id)}${qs}"
+              onsubmit="return confirm('Resend welcome SMS to ${safe(s.first_name || s.name)}?')">
+          <button type="submit"
+                  class="inline-flex items-center gap-1.5 rounded-full border border-mpBorder bg-white px-4 py-2 text-xs font-semibold text-mpCharcoal hover:bg-mpBg transition-colors">
+            💬 Resend Welcome
+          </button>
+        </form>
+        <a href="/manager/stylists/edit/${safe(s.id)}/photos${qs}"
+           class="inline-flex items-center gap-1.5 rounded-full bg-mpAccent px-4 py-2 text-xs font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
+          📷 Photo Library
+        </a>
+      </div>` : ""}
     </div>
 
     <form method="POST" action="${action}" enctype="multipart/form-data">
