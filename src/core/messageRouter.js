@@ -697,6 +697,14 @@ export async function handleIncomingMessage({
     return;
   }
 
+  // 📍 Track stylist activity on every inbound message
+  const _stylistId = stylist?.id || stylist?.stylist_id;
+  if (_stylistId) {
+    try {
+      db.prepare(`UPDATE stylists SET last_activity_at = datetime('now') WHERE id = ?`).run(_stylistId);
+    } catch {}
+  }
+
   // 🧾 Enforce salon-level consent policy
   const salonRequiresConsent = !!salon?.salon_info?.compliance?.stylist_sms_consent_required;
   const stylistOptedIn =

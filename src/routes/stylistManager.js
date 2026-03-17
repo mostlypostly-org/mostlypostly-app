@@ -108,6 +108,20 @@ function toneBadge(s) {
   return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-mpAccentLight text-mpAccent font-medium">${safe(meta?.label || s.tone_variant)}</span>`;
 }
 
+function activityDot(lastActivityAt) {
+  if (!lastActivityAt) {
+    return `<span title="No activity recorded" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#EF4444;flex-shrink:0;"></span>`;
+  }
+  const diffDays = (Date.now() - new Date(lastActivityAt + "Z").getTime()) / (1000 * 60 * 60 * 24);
+  if (diffDays < 7) {
+    return `<span title="Active within 7 days" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22C55E;flex-shrink:0;"></span>`;
+  }
+  if (diffDays <= 30) {
+    return `<span title="Active within 30 days" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#EAB308;flex-shrink:0;"></span>`;
+  }
+  return `<span title="No activity in 30+ days" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#EF4444;flex-shrink:0;"></span>`;
+}
+
 function celebBadge(birthday, hireDate) {
   const parts = [];
   if (birthday) parts.push(`<span title="Birthday: ${safe(birthday)}" class="text-base">🎂</span>`);
@@ -140,7 +154,7 @@ router.get("/", requireAuth, (req, res) => {
     SELECT id, name, first_name, last_name, phone, instagram_handle,
            specialties, photo_url, tone_variant,
            birthday_mmdd, hire_date, bio, profile_url,
-           celebrations_enabled
+           celebrations_enabled, last_activity_at
     FROM stylists WHERE salon_id = ? ORDER BY COALESCE(first_name, name) ASC
   `).all(salon_id);
 
@@ -195,6 +209,7 @@ router.get("/", requireAuth, (req, res) => {
           <div class="flex items-start justify-between gap-2">
             <div>
               <div class="flex items-center gap-1.5 flex-wrap">
+                ${activityDot(s.last_activity_at)}
                 <p class="text-sm font-semibold text-mpCharcoal">${safe(displayName)}</p>
                 <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-mpBg text-mpMuted">Stylist</span>
                 ${roleBadge}
