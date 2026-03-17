@@ -150,7 +150,7 @@ async function toBase64DataUri(source) {
  * @param {string}   [opts.submittedImageUrl] - Photo submitted with the message (wins over stock)
  * @returns {Promise<string>}  Public URL of the saved story JPEG
  */
-export async function buildAvailabilityImage({ text, slots: prebuiltSlots, stylistName, salonName, salonId, stylistId, instagramHandle, bookingCta, submittedImageUrl }) {
+export async function buildAvailabilityImage({ text, slots: prebuiltSlots, stylistName, salonName, salonId, stylistId, instagramHandle, bookingCta, submittedImageUrl, templateKey }) {
   console.log("[Availability] Building story image…");
 
   // 1. Parse slots — skip GPT if pre-structured slots provided (e.g. from Zenoti sync)
@@ -167,7 +167,7 @@ export async function buildAvailabilityImage({ text, slots: prebuiltSlots, styli
     `SELECT availability_template, brand_palette, logo_url FROM salons WHERE slug = ?`
   ).get(salonId) || {};
 
-  const template = salonRow.availability_template || FALLBACK_TEMPLATE;
+  const template = templateKey || salonRow.availability_template || FALLBACK_TEMPLATE;
   let palette = {};
   try { if (salonRow.brand_palette) palette = JSON.parse(salonRow.brand_palette); } catch {}
 

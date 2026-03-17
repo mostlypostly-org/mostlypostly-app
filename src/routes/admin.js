@@ -2109,27 +2109,24 @@ router.get("/availability-preview", requireAuth, async (req, res) => {
   const stylist = db.prepare(`SELECT * FROM stylists WHERE id = ? AND salon_id = ?`).get(stylistId, salon_id);
   if (!stylist) return res.redirect("/manager/admin?tab=branding&err=Stylist+not+found");
 
-  // Temporarily set the requested template, generate image, restore original
-  const originalTemplate = db.prepare(`SELECT availability_template FROM salons WHERE slug = ?`).get(salon_id)?.availability_template || "script";
-  db.prepare(`UPDATE salons SET availability_template = ? WHERE slug = ?`).run(template, salon_id);
-
+  const salon = db.prepare(`SELECT name FROM salons WHERE slug = ?`).get(salon_id);
   const MOCK_SLOTS = ["Tuesday: 2:00pm · Color", "Wednesday: 10:00am · Haircut", "Friday: 3:30pm · Blowout"];
   try {
     const imageUrl = await buildAvailabilityImage({
       slots:           MOCK_SLOTS,
       stylistName:     stylist.name,
-      salonName:       db.prepare(`SELECT name FROM salons WHERE slug = ?`).get(salon_id)?.name || "",
+      salonName:       salon?.name || "",
       salonId:         salon_id,
       stylistId:       stylist.id,
       instagramHandle: stylist.instagram_handle || null,
       bookingCta:      "Book via link in bio",
+      templateKey:     template,
     });
-    db.prepare(`UPDATE salons SET availability_template = ? WHERE slug = ?`).run(originalTemplate, salon_id);
     res.redirect(imageUrl);
   } catch (err) {
-    db.prepare(`UPDATE salons SET availability_template = ? WHERE slug = ?`).run(originalTemplate, salon_id);
     console.error("[Admin] Availability preview failed:", err.message);
-    res.status(500).send(`<p style="font-family:sans-serif;padding:2rem">Preview failed: ${err.message}</p>`);
+    const safeMsg = String(err.message || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    res.status(500).send(`<p style="font-family:sans-serif;padding:2rem">Preview failed: ${safeMsg}</p>`);
   }
 });
 
