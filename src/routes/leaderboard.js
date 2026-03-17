@@ -261,11 +261,12 @@ router.get("/:token", (req, res) => {
       .lb-main { flex-direction: column !important; overflow: visible !important; }
       .lb-hero {
         width: 100% !important;
-        min-height: 0 !important;
+        min-height: 320px !important;
         overflow: visible !important;
         flex-shrink: 0 !important;
-        padding: 1rem 1rem 0 !important;
+        padding: 1rem 1rem 1rem !important;
       }
+      .lb-podium { flex: none !important; }
       .lb-list {
         flex: none !important;
         overflow: visible !important;
@@ -334,7 +335,7 @@ router.get("/:token", (req, res) => {
       </p>
 
       <!-- Podium -->
-      <div style="display:flex;align-items:flex-end;justify-content:center;gap:1rem;flex:1;position:relative;">
+      <div class="lb-podium" style="display:flex;align-items:flex-end;justify-content:center;gap:1rem;flex:1;position:relative;">
         ${podiumCards}
       </div>` : ""}
     </div>
