@@ -67,9 +67,9 @@ router.get("/checkout", requireAuth, async (req, res) => {
 
   const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || process.env.BASE_URL || "http://localhost:3000";
 
-  // Only offer trial if this salon has never activated one before
-  // Founders get 30 days — revert TRIAL_DAYS to 7 after the founders window closes
-  const TRIAL_DAYS = 30;
+  // Only offer trial if this salon has never activated one before.
+  // Founders (signed up via /founders.html with ?offer=founder) get 30 days; everyone else gets 7.
+  const TRIAL_DAYS = req.session.offer === "founder" ? 30 : 7;
   const offerTrial = !salon.trial_used;
 
   const sessionParams = {

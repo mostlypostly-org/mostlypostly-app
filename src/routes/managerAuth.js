@@ -317,7 +317,8 @@ router.get("/login", (req, res) => {
    Split layout signup page
 ---------------------------------*/
 router.get("/signup", (req, res) => {
-  const planHint = ["starter","growth","pro"].includes(req.query.plan) ? req.query.plan : "";
+  const planHint  = ["starter","growth","pro"].includes(req.query.plan)  ? req.query.plan  : "";
+  const offerHint = req.query.offer === "founder" ? "founder" : "";
   const googleKey = process.env.GOOGLE_PLACES_API_KEY || "";
   const termsError = req.query.error === "terms"
     ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 14px;font-size:12px;color:#B91C1C;margin-bottom:16px;">You must agree to the Terms and Privacy Policy to create an account.</div>`
@@ -455,7 +456,8 @@ router.get("/signup", (req, res) => {
         </div>
 
         <input type="text" name="company" style="display:none" />
-        <input type="hidden" name="plan" value="${planHint}" />
+        <input type="hidden" name="plan"  value="${planHint}" />
+        <input type="hidden" name="offer" value="${offerHint}" />
 
         <div id="terms-error" style="display:none;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 14px;font-size:12px;color:#B91C1C;margin-bottom:12px;">
           You must agree to the Terms and Privacy Policy to create an account.
@@ -517,7 +519,8 @@ router.get("/signup", (req, res) => {
 router.post("/signup", (req, res, next) => salonLogoUpload(req, res, next), async (req, res) => {
   try {
     const body = req.body || {};
-    const planHint = ["starter","growth","pro"].includes(body.plan) ? body.plan : null;
+    const planHint  = ["starter","growth","pro"].includes(body.plan)  ? body.plan  : null;
+    const offerHint = body.offer === "founder" ? "founder" : null;
     console.log("🔎 Signup body payload:", body);
 
     // Normalize possible field names (defensive against old HTML / typos)
@@ -662,7 +665,8 @@ router.post("/signup", (req, res, next) => salonLogoUpload(req, res, next), asyn
     req.session.pending_salon_id = salonSlug;
     req.session.pending_group_id = groupId;
     req.session.pending_email = email;
-    req.session.pending_plan_hint = planHint;
+    req.session.pending_plan_hint  = planHint;
+    req.session.pending_offer      = offerHint;
     req.session.pending_salon_name = businessName;
     req.session.pending_name = name || businessName;
 
@@ -827,8 +831,13 @@ router.get("/verify-email", async (req, res) => {
   delete req.session.pending_group_id;
   delete req.session.pending_email;
 
-  const planHint = req.session.pending_plan_hint || "";
+  const planHint  = req.session.pending_plan_hint || "";
+  const offerHint = req.session.pending_offer     || "";
   delete req.session.pending_plan_hint;
+  delete req.session.pending_offer;
+
+  // Carry offer into the active session so billing checkout can read it
+  if (offerHint) req.session.offer = offerHint;
 
   req.session.save(() => {
     const billingUrl = `/manager/billing?new=1&salon=${encodeURIComponent(manager.salon_id)}${planHint ? `&plan=${planHint}` : ""}`;
