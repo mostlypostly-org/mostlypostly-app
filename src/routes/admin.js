@@ -17,6 +17,7 @@ import { PLAN_LIMITS } from "./billing.js";
 import { sendWelcomeSms } from "../core/stylistWelcome.js";
 import { generateCelebrationImage } from "../core/celebrationImageGen.js";
 import { generateCelebrationCaption } from "../core/celebrationCaption.js";
+import { TEMPLATE_META } from "../core/postTemplates.js";
 
 const managerPhotoUpload = multer({
   storage: multer.diskStorage({
@@ -208,10 +209,7 @@ router.get("/", requireAuth, (req, res) => {
     if (salonRow.brand_palette) brandPalette = JSON.parse(salonRow.brand_palette);
   } catch {}
 
-  const celebStyles = (() => {
-    try { return JSON.parse(salonRow.celebration_font_styles || '["script"]'); }
-    catch { return ["script"]; }
-  })();
+  const celebTemplate = salonRow.celebration_template || "script";
 
   // Normalize hashtags
   let defaultHashtags = [];
@@ -623,29 +621,69 @@ router.get("/", requireAuth, (req, res) => {
     <section class="mb-6">
       <div class="rounded-2xl border border-mpBorder bg-white px-5 py-5">
         <h2 class="text-sm font-semibold text-mpCharcoal mb-1">Celebration Post Style</h2>
-        <p class="text-xs text-mpMuted mb-4">Font styles used for birthday and anniversary posts. If multiple are selected, MostlyPostly cycles through them.</p>
-        <form method="POST" action="/manager/admin/celebration-styles" class="space-y-3">
-          ${[
-            { key: "script",    label: "Script + Elegant",  desc: "Flowing, luxury feel" },
-            { key: "editorial", label: "Modern Editorial",  desc: "Bold, high-fashion" },
-            { key: "playful",   label: "Warm & Playful",    desc: "Friendly, approachable" },
-          ].map(({ key, label, desc }) => `
-          <label class="flex items-start gap-3 cursor-pointer">
-            <input type="checkbox" name="styles" value="${key}"
-              ${celebStyles.includes(key) ? "checked" : ""}
-              class="mt-0.5 h-4 w-4 rounded border-gray-300" />
-            <span>
-              <span class="text-sm font-medium text-mpCharcoal">${label}</span>
-              <span class="ml-1 text-xs text-mpMuted">— ${desc}</span>
-            </span>
-          </label>`).join("")}
-          <div class="pt-2">
+        <p class="text-xs text-mpMuted mb-4">Choose a visual template for birthday and anniversary posts. Preview any template with a test stylist before saving.</p>
+
+        <!-- Template cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
+          ${Object.entries(TEMPLATE_META.celebration).map(([key, meta]) => {
+            const isActive = key === celebTemplate;
+            return `
+            <div class="relative rounded-xl border-2 p-4
+              ${isActive ? "border-mpAccent bg-mpAccentLight" : "border-mpBorder bg-mpBg"}">
+              ${isActive ? `<div class="absolute top-2 right-2 w-5 h-5 rounded-full bg-mpAccent flex items-center justify-center">
+                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                </svg>
+              </div>` : ""}
+              <p class="text-sm font-semibold text-mpCharcoal pr-6">${meta.label}</p>
+              <p class="text-xs text-mpMuted mt-0.5 mb-3">${meta.desc}</p>
+              <form method="POST" action="/manager/admin/celebration-template">
+                <input type="hidden" name="template" value="${key}" />
+                <button type="submit"
+                  class="text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors
+                    ${isActive
+                      ? "border-mpAccent bg-mpAccent text-white cursor-default"
+                      : "border-mpBorder bg-white text-mpCharcoal hover:border-mpAccent hover:text-mpAccent"}">
+                  ${isActive ? "Active" : "Set as Default"}
+                </button>
+              </form>
+            </div>`;
+          }).join("")}
+        </div>
+
+        <!-- Preview generator -->
+        <div class="rounded-xl border border-mpBorder bg-mpBg px-4 py-4">
+          <p class="text-xs font-semibold text-mpCharcoal mb-3">Generate a test preview (opens in new tab — no post created)</p>
+          <form method="GET" action="/manager/admin/celebration-preview" target="_blank"
+                class="flex flex-wrap gap-3 items-end">
+            <div>
+              <label class="block text-[11px] text-mpMuted mb-1">Template</label>
+              <select name="template" class="rounded-lg border border-mpBorder bg-white px-3 py-2 text-sm text-mpCharcoal focus:outline-none focus:border-mpAccent">
+                ${Object.entries(TEMPLATE_META.celebration).map(([key, meta]) =>
+                  `<option value="${key}" ${key === celebTemplate ? "selected" : ""}>${meta.label}</option>`
+                ).join("")}
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] text-mpMuted mb-1">Stylist</label>
+              <select name="stylist" class="rounded-lg border border-mpBorder bg-white px-3 py-2 text-sm text-mpCharcoal focus:outline-none focus:border-mpAccent">
+                ${db.prepare("SELECT id, name FROM stylists WHERE salon_id = ? ORDER BY name ASC").all(salon_id)
+                  .map(s => `<option value="${s.id}">${s.name}</option>`).join("") || '<option value="">No stylists yet</option>'}
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] text-mpMuted mb-1">Type</label>
+              <select name="type" class="rounded-lg border border-mpBorder bg-white px-3 py-2 text-sm text-mpCharcoal focus:outline-none focus:border-mpAccent">
+                <option value="birthday">Birthday</option>
+                <option value="anniversary">Anniversary</option>
+              </select>
+            </div>
             <button type="submit"
-              class="inline-flex items-center px-4 py-2 rounded-lg bg-mpCharcoal text-white text-xs font-semibold hover:bg-mpCharcoalDark transition-colors">
-              Save Style Preferences
+              class="rounded-full bg-mpCharcoal px-5 py-2 text-sm font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
+              Preview →
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </section>
 
@@ -1465,26 +1503,6 @@ router.post("/update-hashtags", requireAuth, (req, res) => {
 });
 
 // -------------------------------------------------------
-// POST: Save celebration font styles
-// -------------------------------------------------------
-router.post("/celebration-styles", requireAuth, (req, res) => {
-  const salon_id = req.manager.salon_id;
-  const isOwner  = req.manager.role === "owner";
-  if (!isOwner) return res.redirect("/manager/admin?notice=Not+authorized");
-
-  let styles = req.body.styles || [];
-  if (!Array.isArray(styles)) styles = [styles];
-  const valid = ["script", "editorial", "playful"];
-  styles = styles.filter(s => valid.includes(s));
-  if (styles.length === 0) styles = ["script"];
-
-  db.prepare(`UPDATE salons SET celebration_font_styles = ? WHERE slug = ?`)
-    .run(JSON.stringify(styles), salon_id);
-
-  res.redirect("/manager/admin#branding");
-});
-
-// -------------------------------------------------------
 // POST: Add Member
 // -------------------------------------------------------
 router.post("/add-stylist", (req, res) => {
@@ -1878,15 +1896,11 @@ router.get("/test-celebration", requireAuth, async (req, res) => {
     }
 
     const salon = db.prepare(`
-      SELECT name, tone, brand_palette, celebration_font_styles, celebration_font_index, logo_url
+      SELECT name, tone, brand_palette, celebration_template, logo_url
       FROM salons WHERE slug = ?
     `).get(salon_id);
 
-    const styles = (() => {
-      try { return JSON.parse(salon.celebration_font_styles || '["script"]'); }
-      catch { return ["script"]; }
-    })();
-    const fontStyle = styles[(salon.celebration_font_index || 0) % styles.length];
+    const template = salon.celebration_template || "script";
 
     const palette = (() => {
       try { return JSON.parse(salon.brand_palette || "{}"); }
@@ -1916,7 +1930,7 @@ router.get("/test-celebration", requireAuth, async (req, res) => {
       anniversaryYears,
       salonName: salon.name,
       accentColor,
-      fontStyle,
+      template,
     });
 
     const caption = await generateCelebrationCaption({
@@ -1954,6 +1968,55 @@ router.get("/test-celebration", requireAuth, async (req, res) => {
     console.error("[Admin] test-celebration error:", err.message);
     res.status(500).send(`Error generating test post: ${err.message}`);
   }
+});
+
+// GET: Celebration template preview (opens image in new tab, no post created)
+router.get("/celebration-preview", requireAuth, async (req, res) => {
+  const salon_id = req.manager.salon_id;
+  const validTemplates = Object.keys(TEMPLATE_META.celebration);
+  const rawTemplate = req.query.template;
+  const template = validTemplates.includes(rawTemplate) ? rawTemplate : "script";
+  const { stylist: stylistId, type = "birthday" } = req.query;
+
+  if (!stylistId) return res.redirect("/manager/admin?tab=branding&err=No+stylist+selected");
+
+  const stylist = db.prepare(`SELECT * FROM stylists WHERE id = ? AND salon_id = ?`).get(stylistId, salon_id);
+  if (!stylist) return res.redirect("/manager/admin?tab=branding&err=Stylist+not+found");
+
+  const salon = db.prepare(`SELECT name, brand_palette, logo_url FROM salons WHERE slug = ?`).get(salon_id);
+  const palette = (() => { try { return JSON.parse(salon.brand_palette || "{}"); } catch { return {}; } })();
+  const accentColor = palette.cta || palette.accent || "#3B72B9";
+  const logoPath = salon.logo_url
+    ? (salon.logo_url.startsWith("http") ? salon.logo_url : path.resolve("public" + salon.logo_url))
+    : null;
+  const firstName = stylist.first_name || stylist.name?.split(" ")[0] || stylist.name || "Team";
+  const celebrationType = type === "anniversary" ? "anniversary" : "birthday";
+
+  try {
+    const { feedUrl } = await generateCelebrationImage({
+      profilePhotoUrl: stylist.photo_url,
+      salonLogoPath:   logoPath,
+      firstName,
+      celebrationType,
+      anniversaryYears: celebrationType === "anniversary" ? 3 : undefined,
+      salonName: salon.name,
+      accentColor,
+      template,
+    });
+    res.redirect(feedUrl);
+  } catch (err) {
+    console.error("[Admin] Celebration preview failed:", err.message);
+    res.status(500).send(`<p style="font-family:sans-serif;padding:2rem">Preview failed: ${err.message}</p>`);
+  }
+});
+
+// POST: Save celebration template selection
+router.post("/celebration-template", requireAuth, (req, res) => {
+  const salon_id = req.manager.salon_id;
+  const valid = Object.keys(TEMPLATE_META.celebration);
+  const template = valid.includes(req.body.template) ? req.body.template : "script";
+  db.prepare(`UPDATE salons SET celebration_template = ? WHERE slug = ?`).run(template, salon_id);
+  res.redirect("/manager/admin#branding");
 });
 
 // ───────────────────────────────────────────────────────────
