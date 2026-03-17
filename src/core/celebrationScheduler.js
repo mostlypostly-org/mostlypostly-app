@@ -81,7 +81,7 @@ function insertPost({ salonId, stylistName, stylistId, imageUrl, caption, postTy
 export async function runCelebrationCheck() {
   const salons = db.prepare(`
     SELECT slug, name, timezone, tone,
-           brand_palette, celebration_font_styles, celebration_font_index,
+           brand_palette, celebration_template,
            logo_url
     FROM salons
   `).all();
@@ -108,11 +108,7 @@ export async function runCelebrationCheck() {
         continue;
       }
 
-      const styles = (() => {
-        try { return JSON.parse(salon.celebration_font_styles || '["script"]'); }
-        catch { return ["script"]; }
-      })();
-      const fontStyle = styles[(salon.celebration_font_index || 0) % styles.length];
+      const template = salon.celebration_template || "script";
 
       const palette = (() => {
         try { return JSON.parse(salon.brand_palette || "{}"); }
@@ -151,8 +147,6 @@ export async function runCelebrationCheck() {
         continue;
       }
 
-      let fontIndexBump = 0;
-
       for (const stylist of allCelebrations) {
         const firstName = stylist.first_name || stylist.name?.split(" ")[0] || stylist.name || "Team Member";
 
@@ -167,7 +161,7 @@ export async function runCelebrationCheck() {
             anniversaryYears: stylist.anniversaryYears,
             salonName: salon.name,
             accentColor,
-            fontStyle,
+            template,
           });
 
           const caption = await generateCelebrationCaption({
@@ -199,7 +193,6 @@ export async function runCelebrationCheck() {
             delayMinutes: delay + randomDelay(1, 5),
           });
 
-          fontIndexBump++;
           console.log(`[CelebrationScheduler] ${salon.slug}: Queued ${stylist.celebrationType} posts for ${firstName}`);
 
           // Manager SMS
@@ -225,11 +218,6 @@ export async function runCelebrationCheck() {
         } catch (err) {
           console.error(`[CelebrationScheduler] Failed for ${firstName}:`, err.message);
         }
-      }
-
-      if (fontIndexBump > 0) {
-        db.prepare(`UPDATE salons SET celebration_font_index = celebration_font_index + ? WHERE slug = ?`)
-          .run(fontIndexBump, salon.slug);
       }
 
       ranToday.set(todayKey, true);
