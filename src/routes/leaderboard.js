@@ -261,30 +261,19 @@ router.get("/:token", (req, res) => {
       .lb-main { flex-direction: column !important; overflow: visible !important; }
       .lb-hero {
         width: 100% !important;
-        min-height: 0 !important;
+        min-height: 320px !important;
         overflow: visible !important;
         flex-shrink: 0 !important;
-        padding: 1rem 1rem 0 !important;
+        padding: 1rem 1rem 1rem !important;
       }
+      .lb-podium { flex: none !important; }
       .lb-list {
         flex: none !important;
         overflow: visible !important;
         border-left: none !important;
-        border-top: 1px solid rgba(255,255,255,0.08) !important;
-        background: #0F172A !important;
+        border-top: 2px solid #E2E8F0 !important;
+        background: #F8FAFC !important;
       }
-      .lb-list .lb-row {
-        background: rgba(255,255,255,0.04) !important;
-        border-bottom-color: rgba(255,255,255,0.08) !important;
-      }
-      .lb-list .lb-row:nth-child(even) {
-        background: rgba(255,255,255,0.07) !important;
-      }
-      .lb-list .lb-row-rank { background: rgba(255,255,255,0.1) !important; border-color: rgba(255,255,255,0.15) !important; color: #CBD5E1 !important; }
-      .lb-list .lb-row-name { color: #fff !important; }
-      .lb-list .lb-row-sub { color: #94A3B8 !important; }
-      .lb-list .lb-row-bar-track { background: rgba(255,255,255,0.1) !important; }
-      .lb-list .lb-row-posts { color: #64748B !important; }
       .lb-list-header { display: none !important; }
       .lb-footer { display: none !important; }
       .lb-header { padding: 0.75rem 1rem !important; }
@@ -346,7 +335,7 @@ router.get("/:token", (req, res) => {
       </p>
 
       <!-- Podium -->
-      <div style="display:flex;align-items:flex-end;justify-content:center;gap:1rem;flex:1;position:relative;">
+      <div class="lb-podium" style="display:flex;align-items:flex-end;justify-content:center;gap:1rem;flex:1;position:relative;">
         ${podiumCards}
       </div>` : ""}
     </div>
