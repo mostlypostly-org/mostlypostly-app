@@ -54,6 +54,7 @@ export async function generateCelebrationImage({
   anniversaryYears,
   salonName = "",
   accentColor = ACCENT_COLOR,
+  primaryColor = null,
   template = FALLBACK_TEMPLATE,
 }) {
   const buildHtml = TEMPLATES.celebration[template] || TEMPLATES.celebration[FALLBACK_TEMPLATE];
@@ -73,7 +74,8 @@ export async function generateCelebrationImage({
   const SQUARE_W = 1080, SQUARE_H = 1080;
   const STORY_W  = 1080, STORY_H  = 1920;
 
-  const sharedOpts = { photoDataUri, logoDataUri, firstName, celebrationType, subLabel, accentHex: accentColor };
+  const bandHex = primaryColor || "#1a1c22";
+  const sharedOpts = { photoDataUri, logoDataUri, firstName, celebrationType, subLabel, accentHex: accentColor, bandHex };
 
   const [squareBuf, storyBuf] = await Promise.all([
     renderHtmlToJpeg(buildHtml({ width: SQUARE_W, height: SQUARE_H, ...sharedOpts }), SQUARE_W, SQUARE_H),

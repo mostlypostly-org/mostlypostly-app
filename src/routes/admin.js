@@ -1986,9 +1986,20 @@ router.get("/celebration-preview", requireAuth, async (req, res) => {
   const salon = db.prepare(`SELECT name, brand_palette, logo_url FROM salons WHERE slug = ?`).get(salon_id);
   const palette = (() => { try { return JSON.parse(salon.brand_palette || "{}"); } catch { return {}; } })();
   const accentColor = palette.cta || palette.accent || "#3B72B9";
-  const logoPath = salon.logo_url
-    ? (salon.logo_url.startsWith("http") ? salon.logo_url : path.resolve("public" + salon.logo_url))
-    : null;
+  const PUBLIC_BASE = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+  let logoPath = null;
+  if (salon.logo_url) {
+    if (PUBLIC_BASE && salon.logo_url.startsWith(PUBLIC_BASE + "/uploads/")) {
+      const rel = salon.logo_url.slice(PUBLIC_BASE.length);
+      const abs = path.resolve("public" + rel);
+      logoPath = fs.existsSync(abs) ? abs : salon.logo_url;
+    } else if (salon.logo_url.startsWith("http")) {
+      logoPath = salon.logo_url;
+    } else if (salon.logo_url.startsWith("/uploads/")) {
+      const abs = path.resolve("public" + salon.logo_url);
+      logoPath = fs.existsSync(abs) ? abs : null;
+    }
+  }
   const firstName = stylist.first_name || stylist.name?.split(" ")[0] || stylist.name || "Team";
   const celebrationType = type === "anniversary" ? "anniversary" : "birthday";
 
@@ -2001,6 +2012,7 @@ router.get("/celebration-preview", requireAuth, async (req, res) => {
       anniversaryYears: celebrationType === "anniversary" ? 3 : undefined,
       salonName: salon.name,
       accentColor,
+      primaryColor: palette.primary || null,
       template,
     });
     res.redirect(feedUrl);

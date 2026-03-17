@@ -8,6 +8,24 @@ function safe(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// ─── Color helpers ──────────────────────────────────────────────────────────
+
+function hexLuminance(hex) {
+  if (!hex || !/^#[0-9a-f]{6}$/i.test(hex)) return 0;
+  const r = parseInt(hex.slice(1,3), 16) / 255;
+  const g = parseInt(hex.slice(3,5), 16) / 255;
+  const b = parseInt(hex.slice(5,7), 16) / 255;
+  const toLinear = c => c <= 0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
+  return 0.2126*toLinear(r) + 0.7152*toLinear(g) + 0.0722*toLinear(b);
+}
+// White text on dark bg, dark text on light bg
+function textOnBg(bgHex) {
+  return hexLuminance(bgHex) > 0.25 ? "#1a1c22" : "#ffffff";
+}
+function mutedOnBg(bgHex) {
+  return hexLuminance(bgHex) > 0.25 ? "rgba(26,28,34,0.55)" : "rgba(255,255,255,0.55)";
+}
+
 // ─── Shared helpers ────────────────────────────────────────────────────────
 
 function logoHtml(logoDataUri, width, height, pad) {
@@ -68,7 +86,7 @@ body{width:${width}px;height:${height}px;overflow:hidden;position:relative;backg
 
 // ─── Template 2: editorial — Magazine Split ────────────────────────────────
 
-function buildHtml_editorial({ width, height, photoDataUri, logoDataUri, firstName, celebrationType, subLabel, accentHex }) {
+function buildHtml_editorial({ width, height, photoDataUri, logoDataUri, firstName, celebrationType, subLabel, accentHex, bandHex = "#1a1c22" }) {
   const pad = Math.round(width * 0.07);
   const splitPct = 0.56;
   const photoH = Math.round(height * splitPct);
@@ -93,15 +111,15 @@ body{width:${width}px;height:${height}px;overflow:hidden;position:relative;backg
   <!-- Accent bar at split edge -->
   <div style="position:absolute;top:${photoH - 3}px;left:0;right:0;height:5px;background:${accentHex};"></div>
   <!-- Color band -->
-  <div style="position:absolute;bottom:0;left:0;right:0;height:${bandH}px;background:#1a1c22;
+  <div style="position:absolute;bottom:0;left:0;right:0;height:${bandH}px;background:${bandHex};
     display:flex;flex-direction:column;justify-content:center;padding:0 ${pad}px;">
     <div style="font-family:'Montserrat',sans-serif;font-size:${eyebrowFontSize}px;font-weight:400;
-      color:rgba(255,255,255,0.5);letter-spacing:${Math.round(eyebrowFontSize * 0.5)}px;
+      color:${mutedOnBg(bandHex)};letter-spacing:${Math.round(eyebrowFontSize * 0.5)}px;
       text-transform:uppercase;margin-bottom:${Math.round(bandH * 0.04)}px;">${safe(eyebrow)}</div>
     <div style="font-family:'Montserrat',sans-serif;font-size:${nameFontSize}px;font-weight:800;
-      color:#fff;text-transform:uppercase;letter-spacing:2px;line-height:0.9;">${safe(firstName)}</div>
+      color:${textOnBg(bandHex)};text-transform:uppercase;letter-spacing:2px;line-height:0.9;">${safe(firstName)}</div>
     ${subLabel ? `<div style="font-family:'Montserrat',sans-serif;font-size:${subFontSize}px;font-weight:400;
-      color:rgba(255,255,255,0.55);margin-top:${Math.round(bandH*0.06)}px;letter-spacing:3px;text-transform:uppercase;">${safe(subLabel)}</div>` : ""}
+      color:${mutedOnBg(bandHex)};margin-top:${Math.round(bandH*0.06)}px;letter-spacing:3px;text-transform:uppercase;">${safe(subLabel)}</div>` : ""}
   </div>
   ${logoHtml(logoDataUri, width, height, Math.round(width * 0.055))}
   ${watermarkHtml(height, pad)}
@@ -117,7 +135,7 @@ function buildHtml_bold({ width, height, photoDataUri, logoDataUri, firstName, c
   const eyebrowFontSize = Math.round(panelW * 0.09);
   const typeFontSize   = Math.round(panelW * 0.13);
   const eyebrow = celebrationType === "birthday" ? "HAPPY BIRTHDAY" : "HAPPY ANNIVERSARY";
-  const typeWord = celebrationType === "birthday" ? "BIRTHDAY" : "ANNIVERSARY";
+  const typeWord = celebrationType === "birthday" ? "CELEBRATING" : "MILESTONE";
 
   const photoBg = photoDataUri ? `
     <img style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(0.65);" src="${photoDataUri}" />`
@@ -181,7 +199,7 @@ body{width:${width}px;height:${height}px;overflow:hidden;position:relative;backg
 </head><body>
   ${photoBg}
   <!-- Frosted glass card, centered -->
-  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  <div style="position:absolute;left:50%;top:63%;transform:translate(-50%,-50%);
     width:${cardW}px;
     background:rgba(255,255,255,0.11);
     backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
