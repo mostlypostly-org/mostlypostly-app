@@ -145,7 +145,7 @@ function buildHtml_bold({ width, height, photoDataUri, logoDataUri, firstName, c
   const eyebrowFontSize = Math.round(panelW * 0.09);
   const typeFontSize   = Math.round(panelW * 0.10);
   const eyebrow = celebrationType === "birthday" ? "HAPPY BIRTHDAY" : "HAPPY ANNIVERSARY";
-  const typeWord = celebrationType === "birthday" ? "CELEBRATING" : "MILESTONE";
+  const typeWord = celebrationType === "birthday" ? "CELEBRATING" : "THANK YOU";
 
   const photoBg = photoDataUri ? `
     <img style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(0.65);" src="${photoDataUri}" />`
