@@ -32,6 +32,7 @@ import { composeFinalCaption } from "./composeFinalCaption.js";
 import { classifyPostType } from "./classifyPostType.js";
 import { buildBeforeAfterCollage } from "./buildBeforeAfterCollage.js";
 import { buildAvailabilityImage } from "./buildAvailabilityImage.js";
+import { resolveDisplayName } from "./salonLookup.js";
 import { isAvailabilityRequest, hasDateHint, parseDateRange } from "./availabilityRequest.js";
 import {
   getZenotiClientForSalon,
@@ -447,7 +448,7 @@ async function processNewImageFlow({
 
       const storyImageUrl = await buildAvailabilityImage({
         text: text || "",
-        stylistName: getStylistName(stylist),
+        stylistName: resolveDisplayName(stylist, salon?.salon_id || salon?.id || ""),
         salonName,
         salonId: salon?.salon_id || salon?.id || "",
         stylistId: stylist?.stylist_id || stylist?.id || null,

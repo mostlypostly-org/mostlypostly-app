@@ -517,6 +517,37 @@ export function saveConsentToDb(identifier, payload = {}) {
   return { ok: false, error: "Not found in stylists or managers" };
 }
 
+/**
+ * Returns the display name for a stylist in branded post images.
+ * Uses first name only. Appends "L." last initial only when another
+ * active stylist at the same salon shares the same first name.
+ *
+ * @param {{ first_name?: string, last_name?: string, name?: string, id?: string, stylist_id?: string }} stylist
+ * @param {string} salonId
+ * @returns {string}
+ */
+export function resolveDisplayName(stylist, salonId) {
+  const id = stylist.id || stylist.stylist_id || "";
+  const first = (stylist.first_name || (stylist.name || "").split(" ")[0] || "").trim();
+  if (!first) return stylist.name || "Team Member";
+
+  const others = db.prepare(
+    `SELECT name, first_name FROM stylists WHERE salon_id = ? AND id != ?`
+  ).all(salonId, id);
+
+  const hasDuplicate = others.some(s => {
+    const otherFirst = (s.first_name || (s.name || "").split(" ")[0] || "").trim();
+    return otherFirst.toLowerCase() === first.toLowerCase();
+  });
+
+  if (hasDuplicate) {
+    const last = (stylist.last_name || (stylist.name || "").split(" ").slice(1).join(" ") || "").trim();
+    if (last) return `${first} ${last[0].toUpperCase()}.`;
+  }
+
+  return first;
+}
+
 export function reloadSalonsNow() {
   return loadSalons().then(() => ({
     lastLoadedAt,

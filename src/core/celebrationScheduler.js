@@ -10,6 +10,7 @@ import path from "path";
 import fs from "fs";
 import { generateCelebrationImage } from "./celebrationImageGen.js";
 import { generateCelebrationCaption } from "./celebrationCaption.js";
+import { resolveDisplayName } from "./salonLookup.js";
 
 // Track which salons have already run today (in-memory, resets on restart)
 // Key: "salonSlug-YYYY-MM-DD", Value: true
@@ -154,7 +155,7 @@ export async function runCelebrationCheck() {
       }
 
       for (const stylist of allCelebrations) {
-        const firstName = stylist.first_name || stylist.name?.split(" ")[0] || stylist.name || "Team Member";
+        const firstName = resolveDisplayName(stylist, salon.slug);
 
         console.log(`[CelebrationScheduler] ${salon.slug}: ${stylist.celebrationType} for ${firstName}`);
 

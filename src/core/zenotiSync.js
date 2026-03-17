@@ -17,6 +17,7 @@ import {
   formatBlockWithCategory,
 } from './zenotiAvailability.js';
 import { buildAvailabilityImage } from './buildAvailabilityImage.js';
+import { resolveDisplayName } from './salonLookup.js';
 
 // ─── 30-minute availability pool ─────────────────────────────────────────────
 // Shape: Map<salonId, {
@@ -267,7 +268,7 @@ export async function generateAndSaveAvailabilityPost({
   const imageUrl = await buildAvailabilityImage({
     slots,
     text: slots.join('\n'),
-    stylistName:     stylist.name,
+    stylistName:     resolveDisplayName(stylist, salonId),
     salonName:       salon.name || salonId,
     salonId,
     stylistId:       stylist.id,
