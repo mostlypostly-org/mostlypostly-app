@@ -435,6 +435,11 @@ export async function runSchedulerOnce() {
             )
           );
 
+          // Guard: Instagram and Facebook photo posts require at least one image
+          if (allImages.length === 0 || !allImages[0]) {
+            throw new Error("No image URL available for this post — cannot publish to Instagram or Facebook");
+          }
+
           const isMulti = allImages.length > 1;
           console.log(`📸 [Scheduler] Publishing ${allImages.length} image(s) for ${post.id} (${postType}, ${isMulti ? "carousel" : "single"})`);
 

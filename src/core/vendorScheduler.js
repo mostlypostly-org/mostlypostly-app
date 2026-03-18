@@ -256,7 +256,13 @@ async function processCampaign(campaign, salon, thisMonth, affiliateUrl) {
     return false;
   }
 
-  // 6. Generate AI caption adapted to salon's tone
+  // 6. Require a photo — both FB and IG need an image URL
+  if (!campaign.photo_url) {
+    log.warn(`  Skipping campaign ${campaign.id} ("${campaign.campaign_name}") — no photo_url set`);
+    return false;
+  }
+
+  // Generate AI caption adapted to salon's tone
   log.info(`  Generating caption for salon ${salonId} / campaign "${campaign.campaign_name}"`);
   const caption = await generateVendorCaption({ campaign, salon, affiliateUrl });
 
