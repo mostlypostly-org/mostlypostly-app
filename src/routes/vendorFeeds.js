@@ -358,10 +358,12 @@ router.post("/settings", requireAuth, (req, res) => {
   const { vendor_name, affiliate_url } = req.body;
   if (!vendor_name) return res.redirect("/manager/vendors");
 
-  const categoryFilters = Array.isArray(req.body["category_filters[]"])
-    ? req.body["category_filters[]"]
-    : req.body["category_filters[]"]
-    ? [req.body["category_filters[]"]]
+  // qs strips [] from key names: category_filters[] → category_filters
+  const rawFilters = req.body["category_filters[]"] ?? req.body.category_filters;
+  const categoryFilters = Array.isArray(rawFilters)
+    ? rawFilters
+    : rawFilters
+    ? [rawFilters]
     : [];
 
   // Upsert so settings are saved even if no feed row exists yet
