@@ -261,11 +261,20 @@ async function recoverMissedPosts() {
 
     const now = DateTime.utc();
     for (const post of missed) {
-      const salon = getSalonPolicy(post.salon_id);
-      const min   = salon?.spacing_min ?? 20;
-      const max   = salon?.spacing_max ?? 45;
-      const delay = randomDelay(min, max);
-      const newTime = toSqliteTimestamp(now.plus({ minutes: delay }));
+      const salon          = getSalonPolicy(post.salon_id);
+      const min            = salon?.spacing_min ?? 20;
+      const max            = salon?.spacing_max ?? 45;
+      const delay          = randomDelay(min, max);
+      const tz             = salon?.timezone || "America/Indiana/Indianapolis";
+      const windowStartT   = salon?.posting_start_time || "09:00";
+      const windowEndT     = salon?.posting_end_time   || "19:00";
+      const postingSched   = salon?.posting_schedule   || null;
+      let   scheduledUtc   = now.plus({ minutes: delay });
+      const localScheduled = scheduledUtc.setZone(tz);
+      if (!withinScheduleWindow(localScheduled, postingSched, windowStartT, windowEndT)) {
+        scheduledUtc = nextScheduledWindow(localScheduled, postingSched, windowStartT, windowEndT).toUTC();
+      }
+      const newTime = toSqliteTimestamp(scheduledUtc);
 
       db.prepare(
         `UPDATE posts
@@ -579,13 +588,28 @@ export function enqueuePost(post) {
     }
   }
 
-  const scheduled = toSqliteTimestamp(DateTime.utc().plus({ minutes: delay }));
+  const tz              = salon?.timezone || "America/Indiana/Indianapolis";
+  const windowStartTime = salon?.posting_start_time || "09:00";
+  const windowEndTime   = salon?.posting_end_time   || "19:00";
+  const postingSchedule = salon?.posting_schedule   || null;
+
+  let scheduledUtc = DateTime.utc().plus({ minutes: delay });
+
+  // If the computed time falls outside the posting window, push it to the next window open
+  const localScheduled = scheduledUtc.setZone(tz);
+  if (!withinScheduleWindow(localScheduled, postingSchedule, windowStartTime, windowEndTime)) {
+    const nextWindow = nextScheduledWindow(localScheduled, postingSchedule, windowStartTime, windowEndTime);
+    scheduledUtc = nextWindow.toUTC();
+    console.log(`📅 [Enqueue] ${post.id} outside posting window → pushed to ${scheduledUtc.toISO()} (${nextWindow.toISO()} local)`);
+  }
+
+  const scheduled = toSqliteTimestamp(scheduledUtc);
 
   db.prepare(
     `UPDATE posts SET status='manager_approved', scheduled_for=? WHERE id=?`
   ).run(scheduled, post.id);
 
-  console.log(`🪵 [Enqueue] ${post.id} → ${scheduled} (${delay}min, type: ${post.post_type || "standard_post"})`);
+  console.log(`🪵 [Enqueue] ${post.id} → ${scheduled} (${delay}min delay, type: ${post.post_type || "standard_post"})`);
   return { ...post, status: "manager_approved", scheduled_for: scheduled };
 }
 
