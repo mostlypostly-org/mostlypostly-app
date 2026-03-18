@@ -345,7 +345,8 @@ router.get("/", requireSecret, requirePin, (req, res) => {
               <div class="flex items-center gap-2 shrink-0">
                 ${statusBadge}
                 ${renewBtn}
-                <button type="button" onclick="toggleEditForm('${editKey}')"
+                <button type="button"
+                        onclick="var f=document.getElementById('edit-form-${editKey}');f.style.display=f.style.display==='none'?'block':'none';"
                         class="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</button>
                 <form method="POST" action="/internal/vendors/delete/${safe(c.id)}${qs(req)}"
                       onsubmit="return confirm('Delete campaign: ${safe(c.campaign_name)}?')" class="inline">
@@ -439,7 +440,8 @@ router.get("/", requireSecret, requirePin, (req, res) => {
               </div>
             </div>
             <div class="flex justify-end gap-2">
-              <button type="button" onclick="toggleEditForm('${editKey}')"
+              <button type="button"
+                      onclick="document.getElementById('edit-form-${editKey}').style.display='none';"
                       class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
               <button type="submit"
                       class="text-xs bg-gray-900 text-white rounded-lg px-4 py-1.5 font-semibold">

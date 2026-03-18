@@ -194,7 +194,7 @@ router.get("/", requireAuth, (req, res) => {
               <span id="arrow_${safe(vendorName.replace(/\s+/g, "_"))}">▶</span>
               Preview content
             </button>
-            <div id="preview_${safe(vendorName.replace(/\s+/g, "_"))}" class="hidden space-y-2">
+            <div id="preview_${safe(vendorName.replace(/\s+/g, "_"))}" style="display:none;" class="space-y-2">
               ${campaignPreviews}
               ${moreCount > 0 ? `<p class="text-xs text-mpMuted pl-1">+ ${moreCount} more campaign${moreCount !== 1 ? "s" : ""}</p>` : ""}
             </div>
@@ -310,11 +310,12 @@ router.get("/", requireAuth, (req, res) => {
 
     <script>
       function togglePreview(key) {
-        const el    = document.getElementById('preview_' + key);
-        const arrow = document.getElementById('arrow_' + key);
+        var el    = document.getElementById('preview_' + key);
+        var arrow = document.getElementById('arrow_' + key);
         if (!el) return;
-        const hidden = el.classList.toggle('hidden');
-        if (arrow) arrow.textContent = hidden ? '▶' : '▼';
+        var isHidden = el.style.display === 'none' || el.style.display === '';
+        el.style.display = isHidden ? 'block' : 'none';
+        if (arrow) arrow.textContent = isHidden ? '▼' : '▶';
       }
       function toggleSettings(vKey) {
         var p = document.getElementById('sp-' + vKey);
