@@ -187,20 +187,17 @@ router.get("/:token", (req, res) => {
         return `<span style="font-size:.6rem;background:#EBF3FF;color:#3B72B9;padding:.15rem .45rem;border-radius:9999px;white-space:nowrap;">${label} ×${cnt}</span>`;
       }).join("");
 
-    const rankCircle = ringClr
-      ? `<div style="width:32px;height:32px;border-radius:50%;background:#0F172A;border:2px solid ${ringClr};display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:900;color:${ringClr};">${s.rank}</div>`
+    // Top 3: show medal emoji as the rank indicator; others: plain numbered circle
+    const rankCell = medal
+      ? `<div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;line-height:1;">${medal}</div>`
       : `<div style="width:32px;height:32px;border-radius:50%;background:#F1F5F9;border:1.5px solid #E2E8F0;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;color:#475569;">${s.rank}</div>`;
 
     return `
       <div class="lb-row" style="display:flex;align-items:center;gap:1rem;padding:.75rem 1.25rem;background:${isEven ? "#fff" : "#F8FAFC"};border-bottom:1px solid #E2E8F0;">
-        <!-- Rank circle + movement arrow -->
+        <!-- Rank / medal + movement arrow -->
         <div style="display:flex;flex-direction:column;align-items:center;gap:.15rem;flex-shrink:0;width:32px;">
-          ${rankCircle}
+          ${rankCell}
           ${arrow}
-        </div>
-        <!-- Medal (top 3 only) or spacer -->
-        <div style="width:20px;text-align:center;flex-shrink:0;font-size:1rem;line-height:1;">
-          ${medal || ""}
         </div>
         <!-- Avatar -->
         <div style="width:40px;height:40px;border-radius:50%;background:${ringClr ? "#1e293b" : "#F1F5F9"};border:2px solid ${ringClr || "#E2E8F0"};display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:800;color:${ringClr || "#94A3B8"};flex-shrink:0;">
@@ -358,7 +355,6 @@ router.get("/:token", (req, res) => {
       <!-- List header -->
       <div class="lb-list-header" style="display:flex;align-items:center;gap:1rem;padding:.625rem 1.25rem;background:#F1F5F9;border-bottom:2px solid #E2E8F0;flex-shrink:0;">
         <div style="width:32px;"></div>
-        <div style="width:20px;"></div>
         <div style="width:40px;"></div>
         <div style="flex:1;font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;">Stylist</div>
         <div style="width:80px;text-align:center;font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;">Streak</div>
