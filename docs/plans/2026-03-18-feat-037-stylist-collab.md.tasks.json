@@ -1,0 +1,13 @@
+{
+  "planPath": "docs/plans/2026-03-18-feat-037-stylist-collab.md",
+  "tasks": [
+    {"id": 53, "subject": "Task 1: Migration 041 — ig_collab column on stylists", "status": "pending"},
+    {"id": 54, "subject": "Task 2: COLLAB/NOCOLLAB SMS keyword handlers in messageRouter.js", "status": "pending", "blockedBy": [53]},
+    {"id": 55, "subject": "Task 3: Welcome SMS — add COLLAB mention to both message paths", "status": "pending", "blockedBy": [53]},
+    {"id": 56, "subject": "Task 4: Admin toggle — ig_collab checkbox on stylist edit form", "status": "pending", "blockedBy": [53]},
+    {"id": 57, "subject": "Task 5: Instagram publisher — collaborators field (non-blocking)", "status": "pending", "blockedBy": [53]},
+    {"id": 58, "subject": "Task 6: Caption bug fix — Book in bio IG-only, suppress blank Book CTA", "status": "pending"},
+    {"id": 59, "subject": "Task 7: Push to dev and main, update FEATURES.md and CLAUDE.md", "status": "pending", "blockedBy": [54, 55, 56, 57, 58]}
+  ],
+  "lastUpdated": "2026-03-18T12:00:00.000Z"
+}
