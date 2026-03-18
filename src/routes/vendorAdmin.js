@@ -16,9 +16,13 @@ import multer from "multer";
 import crypto from "crypto";
 import path from "path";
 import fs from "fs";
+import fetch from "node-fetch";
+import OpenAI from "openai";
 import db from "../../db.js";
 import { UPLOADS_DIR } from "../core/uploadPath.js";
 import { enforceStaffLimits } from "./billing.js";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const router = express.Router();
 
@@ -33,6 +37,21 @@ const proofUpload = multer({
   }),
   limits: { fileSize: 10 * 1024 * 1024 },
 }).single("proof_file");
+
+const VENDOR_PHOTOS_DIR = path.join(UPLOADS_DIR, "vendor-photos");
+fs.mkdirSync(VENDOR_PHOTOS_DIR, { recursive: true });
+
+const vendorCampaignUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, VENDOR_PHOTOS_DIR),
+    filename: (_req, file, cb) => cb(null, `campaign-${Date.now()}${path.extname(file.originalname)}`),
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Only image files allowed"));
+  },
+}).single("photo_file");
 
 // CSV column spec
 const CSV_HEADERS = [
@@ -310,34 +329,124 @@ router.get("/", requireSecret, requirePin, (req, res) => {
         <input type="hidden" name="campaign_id" value="${safe(c.id)}" />
         <button type="submit" class="text-xs text-blue-500 hover:text-blue-700 font-medium">Renew +30d</button>
       </form>` : "";
+      const editKey = safe(c.id.replace(/-/g, ""));
       return `
-      <div class="border rounded-xl p-4 bg-white flex gap-4 items-start">
-        ${c.photo_url
-          ? `<img src="${safe(c.photo_url)}" class="w-14 h-14 object-cover rounded-lg border flex-shrink-0" onerror="this.style.display='none'" />`
-          : `<div class="w-14 h-14 rounded-lg border bg-gray-50 flex-shrink-0 flex items-center justify-center text-xl">&#127991;</div>`}
-        <div class="flex-1 min-w-0">
-          <div class="flex items-start justify-between gap-2">
-            <div>
-              <p class="font-semibold text-sm">${safe(c.campaign_name)}</p>
-              <p class="text-xs text-gray-500">${safe(c.product_name || "")}${c.category ? ` &middot; ${safe(c.category)}` : ""}</p>
+      <div class="border rounded-xl bg-white overflow-hidden">
+        <div class="p-4 flex gap-4 items-start">
+          ${c.photo_url
+            ? `<img src="${safe(c.photo_url)}" class="w-14 h-14 object-cover rounded-lg border flex-shrink-0" onerror="this.style.display='none'" />`
+            : `<div class="w-14 h-14 rounded-lg border bg-gray-50 flex-shrink-0 flex items-center justify-center text-xl">&#127991;</div>`}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-semibold text-sm">${safe(c.campaign_name)}</p>
+                <p class="text-xs text-gray-500">${safe(c.product_name || "")}${c.category ? ` &middot; ${safe(c.category)}` : ""}</p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                ${statusBadge}
+                ${renewBtn}
+                <button type="button" onclick="toggleEditForm('${editKey}')"
+                        class="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</button>
+                <form method="POST" action="/internal/vendors/delete/${safe(c.id)}${qs(req)}"
+                      onsubmit="return confirm('Delete campaign: ${safe(c.campaign_name)}?')" class="inline">
+                  <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
+                </form>
+              </div>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-              ${statusBadge}
-              ${renewBtn}
-              <form method="POST" action="/internal/vendors/delete/${safe(c.id)}${qs(req)}"
-                    onsubmit="return confirm('Delete campaign: ${safe(c.campaign_name)}?')" class="inline">
-                <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
-              </form>
+            <p class="text-xs text-gray-500 mt-1 line-clamp-2">${safe(c.product_description || "")}</p>
+            <div class="mt-1.5 flex flex-wrap gap-3 text-xs text-gray-400">
+              <span>Expires: <strong class="text-gray-600">${safe(c.expires_at || "&#8212;")}</strong></span>
+              <span>Cap: <strong class="text-gray-600">${safe(c.frequency_cap || 4)}/mo</strong></span>
+              ${c.category ? `<span>Category: <strong class="text-gray-600">${safe(c.category)}</strong></span>` : ""}
+              ${c.product_hashtag ? `<span>Tag: <strong class="text-gray-600">${safe(c.product_hashtag)}</strong></span>` : ""}
             </div>
+            ${c.cta_instructions ? `<p class="text-xs text-blue-500 mt-1">CTA: ${safe(c.cta_instructions)}</p>` : ""}
           </div>
-          <p class="text-xs text-gray-500 mt-1 line-clamp-2">${safe(c.product_description || "")}</p>
-          <div class="mt-1.5 flex flex-wrap gap-3 text-xs text-gray-400">
-            <span>Expires: <strong class="text-gray-600">${safe(c.expires_at || "&#8212;")}</strong></span>
-            <span>Cap: <strong class="text-gray-600">${safe(c.frequency_cap || 4)}/mo</strong></span>
-            ${c.category ? `<span>Category: <strong class="text-gray-600">${safe(c.category)}</strong></span>` : ""}
-            ${c.product_hashtag ? `<span>Tag: <strong class="text-gray-600">${safe(c.product_hashtag)}</strong></span>` : ""}
-          </div>
-          ${c.cta_instructions ? `<p class="text-xs text-blue-500 mt-1">CTA: ${safe(c.cta_instructions)}</p>` : ""}
+        </div>
+        <!-- Inline Edit Form -->
+        <div id="edit-form-${editKey}" style="display:none;" class="border-t bg-gray-50 p-4">
+          <p class="text-xs font-bold text-gray-700 mb-3">Edit Campaign</p>
+          <form method="POST" action="/internal/vendors/campaign/edit${qs(req)}" enctype="multipart/form-data" class="space-y-3">
+            <input type="hidden" name="campaign_id" value="${safe(c.id)}" />
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">Campaign Name *</label>
+                <input type="text" name="campaign_name" required value="${safe(c.campaign_name)}"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">Category *</label>
+                <input type="text" name="category" required value="${safe(c.category || "")}"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">Product Name *</label>
+                <input type="text" name="product_name" required value="${safe(c.product_name || "")}"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">Product Hashtag</label>
+                <input type="text" name="product_hashtag" value="${safe((c.product_hashtag || "").replace(/^#/, ""))}"
+                       placeholder="#FullSpectrum" maxlength="60"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              </div>
+              <div class="col-span-2">
+                <div class="flex items-center justify-between mb-1">
+                  <label class="text-xs text-gray-500">Product Description *</label>
+                  <button type="button"
+                          onclick="aiGenerateDesc(this, '${safe(c.vendor_name)}', '${safe(c.product_name || "")}', 'edit-desc-${editKey}')"
+                          class="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1">
+                    ✨ AI Generate
+                  </button>
+                </div>
+                <textarea id="edit-desc-${editKey}" name="product_description" rows="3" required
+                          class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white">${safe(c.product_description || "")}</textarea>
+              </div>
+              <div class="col-span-2">
+                <label class="text-xs text-gray-500 block mb-1">Photo</label>
+                <div class="flex gap-2 items-center">
+                  <input type="text" name="photo_url" value="${safe(c.photo_url || "")}"
+                         placeholder="https://... (or upload below)"
+                         class="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+                  <input type="file" name="photo_file" accept="image/*"
+                         class="text-xs text-gray-600 file:mr-2 file:rounded file:border-0 file:bg-gray-100 file:px-2 file:py-1 file:text-xs file:font-medium" />
+                </div>
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">Tone Direction</label>
+                <input type="text" name="tone_direction" value="${safe(c.tone_direction || "")}"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">CTA Instructions</label>
+                <input type="text" name="cta_instructions" value="${safe(c.cta_instructions || "")}"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">Service Pairing Notes</label>
+                <input type="text" name="service_pairing_notes" value="${safe(c.service_pairing_notes || "")}"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">Expires At</label>
+                <input type="date" name="expires_at" value="${safe(c.expires_at || "")}"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">Frequency Cap (posts/month)</label>
+                <input type="number" name="frequency_cap" value="${safe(c.frequency_cap || 4)}" min="1" max="30"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              </div>
+            </div>
+            <div class="flex justify-end gap-2">
+              <button type="button" onclick="toggleEditForm('${editKey}')"
+                      class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
+              <button type="submit"
+                      class="text-xs bg-gray-900 text-white rounded-lg px-4 py-1.5 font-semibold">
+                Save Changes
+              </button>
+            </div>
+          </form>
         </div>
       </div>`;
     }).join("");
@@ -529,17 +638,17 @@ router.get("/", requireSecret, requirePin, (req, res) => {
     <!-- Platform Issues -->
     <div class="border rounded-2xl bg-white overflow-hidden">
       <div class="px-6 py-4 border-b">
-        <h2 class="font-bold">Stylist Issues
+        <h2 class="font-bold">Issues
           ${openIssueCount > 0 ? `<span class="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">${openIssueCount} open</span>` : ""}
         </h2>
-        <p class="text-xs text-gray-500 mt-0.5">Flagged by stylists via SMS (e.g. "WRONG" reply to no-availability). Investigate and inform the salon manager.</p>
+        <p class="text-xs text-gray-500 mt-0.5">Issues reported by stylists (SMS) or managers (admin panel). Investigate and follow up as needed.</p>
       </div>
       ${issues.length === 0 ? `<div class="px-6 py-8 text-center text-sm text-gray-400">No issues reported</div>` : `
       <table class="w-full text-sm">
         <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
           <tr>
             <th class="px-6 py-2 text-left">Salon</th>
-            <th class="px-6 py-2 text-left">Stylist</th>
+            <th class="px-6 py-2 text-left">From</th>
             <th class="px-6 py-2 text-left">Type</th>
             <th class="px-6 py-2 text-left">Description</th>
             <th class="px-6 py-2 text-left">Reported</th>
@@ -551,8 +660,10 @@ router.get("/", requireSecret, requirePin, (req, res) => {
           ${issues.map(issue => `
             <tr class="hover:bg-gray-50">
               <td class="px-6 py-3 font-medium">${safe(issue.salon_name || issue.salon_id)}</td>
-              <td class="px-6 py-3">${safe(issue.stylist_name || "—")}<br><span class="text-xs text-gray-400">${safe(issue.stylist_phone || "")}</span></td>
-              <td class="px-6 py-3"><span class="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">${safe(issue.issue_type.replace(/_/g, " "))}</span></td>
+              <td class="px-6 py-3">${issue.issue_type === 'manager_report'
+                ? `<span class="text-xs font-semibold text-blue-600">Manager</span>`
+                : `${safe(issue.stylist_name || "Stylist")}<br><span class="text-xs text-gray-400">${safe(issue.stylist_phone || "")}</span>`}</td>
+              <td class="px-6 py-3"><span class="text-xs px-2 py-0.5 rounded-full ${issue.issue_type === 'manager_report' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}">${safe(issue.issue_type.replace(/_/g, " "))}</span></td>
               <td class="px-6 py-3 text-gray-600 max-w-xs text-xs">${safe(issue.description || "—")}</td>
               <td class="px-6 py-3 text-xs text-gray-400">${new Date(issue.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
               <td class="px-6 py-3">
@@ -819,11 +930,11 @@ router.get("/", requireSecret, requirePin, (req, res) => {
       <!-- Top-level Add Campaign form (always visible, works without existing vendors) -->
       <div id="top-add-campaign-form" style="display:none" class="mb-6 border rounded-xl bg-gray-50 p-4">
         <p class="text-xs font-bold text-gray-700 mb-3">New Campaign</p>
-        <form method="POST" action="/internal/vendors/campaign/add${qs(req)}" class="space-y-3">
+        <form method="POST" action="/internal/vendors/campaign/add${qs(req)}" enctype="multipart/form-data" class="space-y-3">
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="text-xs text-gray-500 block mb-1">Brand / Vendor Name *</label>
-              <input type="text" name="vendor_name" required placeholder="Aveda"
+              <input type="text" name="vendor_name" id="top-form-vendor-name" required placeholder="Aveda"
                      class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
               <p class="text-[11px] text-gray-400 mt-0.5">Creates the brand automatically if it doesn't exist yet.</p>
             </div>
@@ -846,7 +957,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
             </div>
             <div>
               <label class="text-xs text-gray-500 block mb-1">Product Name *</label>
-              <input type="text" name="product_name" required placeholder="Full Spectrum Color"
+              <input type="text" name="product_name" id="top-form-product-name" required placeholder="Full Spectrum Color"
                      class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
             </div>
             <div>
@@ -860,14 +971,26 @@ router.get("/", requireSecret, requirePin, (req, res) => {
                      class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
             </div>
             <div class="col-span-2">
-              <label class="text-xs text-gray-500 block mb-1">Product Description</label>
-              <textarea name="product_description" rows="2" placeholder="1-2 sentence description"
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-xs text-gray-500">Product Description *</label>
+                <button type="button"
+                        onclick="aiGenerateDesc(this, document.getElementById('top-form-vendor-name').value, document.getElementById('top-form-product-name').value, 'top-form-desc')"
+                        class="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1">
+                  ✨ AI Generate
+                </button>
+              </div>
+              <textarea id="top-form-desc" name="product_description" rows="3" required placeholder="1–2 sentence description identifying a pain point or benefit"
                         class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white"></textarea>
             </div>
-            <div>
-              <label class="text-xs text-gray-500 block mb-1">Photo URL</label>
-              <input type="text" name="photo_url" placeholder="https://..."
-                     class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+            <div class="col-span-2">
+              <label class="text-xs text-gray-500 block mb-1">Photo *</label>
+              <div class="flex gap-2 items-center">
+                <input type="text" name="photo_url" placeholder="https://... (or upload a file)"
+                       class="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+                <input type="file" name="photo_file" accept="image/*"
+                       class="text-xs text-gray-600 file:mr-2 file:rounded file:border-0 file:bg-gray-100 file:px-2 file:py-1 file:text-xs file:font-medium" />
+              </div>
+              <p class="text-[11px] text-gray-400 mt-0.5">Provide a URL or upload an image file. Uploaded file takes priority.</p>
             </div>
             <div>
               <label class="text-xs text-gray-500 block mb-1">Tone Direction</label>
@@ -924,6 +1047,46 @@ router.get("/", requireSecret, requirePin, (req, res) => {
     });
   }
 })();
+
+function toggleEditForm(key) {
+  var el = document.getElementById('edit-form-' + key);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function aiGenerateDesc(btn, vendorName, productName, targetId) {
+  if (!vendorName || !productName) {
+    alert('Enter vendor name and product name first.');
+    return;
+  }
+  var target = document.getElementById(targetId);
+  if (!target) return;
+  // If already has content, skip lookup
+  if (target.value.trim()) {
+    if (!confirm('Description already has content. Replace it with AI-generated text?')) return;
+  }
+  var origText = btn.textContent;
+  btn.textContent = '⏳ Generating…';
+  btn.disabled = true;
+  try {
+    var secret = new URLSearchParams(window.location.search).get('secret') || '';
+    var resp = await fetch('/internal/vendors/campaign/ai-description?secret=' + encodeURIComponent(secret), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vendor_name: vendorName, product_name: productName })
+    });
+    var data = await resp.json();
+    if (data.description) {
+      target.value = data.description;
+    } else {
+      alert('Could not generate description: ' + (data.error || 'Unknown error'));
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+}
 </script>
 
 </body></html>`;
@@ -1157,7 +1320,7 @@ router.post("/brand-config", requireSecret, requirePin, (req, res) => {
 });
 
 // ── POST /campaign/add — Manually add a campaign ─────────────────────────────
-router.post("/campaign/add", requireSecret, requirePin, (req, res) => {
+router.post("/campaign/add", requireSecret, requirePin, vendorCampaignUpload, (req, res) => {
   const {
     vendor_name, campaign_name, category, product_name,
     product_description, photo_url, tone_direction,
@@ -1165,7 +1328,7 @@ router.post("/campaign/add", requireSecret, requirePin, (req, res) => {
   } = req.body;
   const frequency_cap = parseInt(req.body.frequency_cap, 10) || 4;
 
-  if (!vendor_name || !campaign_name || !category || !product_name) {
+  if (!vendor_name || !campaign_name || !category || !product_name || !product_description) {
     return res.redirect(`/internal/vendors${qs(req)}&error=missing_fields`);
   }
   if (category === "Promotion" && !expires_at) {
@@ -1174,6 +1337,12 @@ router.post("/campaign/add", requireSecret, requirePin, (req, res) => {
 
   const rawTag = (req.body.product_hashtag || "").trim();
   const product_hashtag = rawTag ? (rawTag.startsWith("#") ? rawTag : `#${rawTag}`) : null;
+
+  // Uploaded file takes priority over URL
+  let finalPhotoUrl = photo_url || null;
+  if (req.file) {
+    finalPhotoUrl = `/uploads/vendor-photos/${req.file.filename}`;
+  }
 
   db.prepare(`INSERT OR IGNORE INTO vendor_brands (vendor_name) VALUES (?)`).run(vendor_name);
 
@@ -1185,12 +1354,111 @@ router.post("/campaign/add", requireSecret, requirePin, (req, res) => {
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
   `).run(
     crypto.randomUUID(), vendor_name, campaign_name, category, product_name,
-    product_description || null, photo_url || null, product_hashtag,
+    product_description || null, finalPhotoUrl, product_hashtag,
     tone_direction || null, cta_instructions || null,
     service_pairing_notes || null, expires_at || null, frequency_cap,
   );
 
   res.redirect(`/internal/vendors${qs(req)}&added=1`);
+});
+
+// ── POST /campaign/edit — Update an existing campaign ────────────────────────
+router.post("/campaign/edit", requireSecret, requirePin, vendorCampaignUpload, (req, res) => {
+  const {
+    campaign_id, campaign_name, category, product_name,
+    product_description, photo_url, tone_direction,
+    cta_instructions, service_pairing_notes, expires_at,
+  } = req.body;
+  const frequency_cap = parseInt(req.body.frequency_cap, 10) || 4;
+
+  if (!campaign_id || !campaign_name || !product_name || !product_description) {
+    return res.redirect(`/internal/vendors${qs(req)}&error=missing_fields`);
+  }
+
+  const rawTag = (req.body.product_hashtag || "").trim();
+  const product_hashtag = rawTag ? (rawTag.startsWith("#") ? rawTag : `#${rawTag}`) : null;
+
+  // Uploaded file takes priority over URL
+  let finalPhotoUrl = photo_url || null;
+  if (req.file) {
+    finalPhotoUrl = `/uploads/vendor-photos/${req.file.filename}`;
+  }
+
+  db.prepare(`
+    UPDATE vendor_campaigns SET
+      campaign_name = ?, category = ?, product_name = ?, product_description = ?,
+      photo_url = ?, product_hashtag = ?, tone_direction = ?, cta_instructions = ?,
+      service_pairing_notes = ?, expires_at = ?, frequency_cap = ?
+    WHERE id = ?
+  `).run(
+    campaign_name, category || null, product_name, product_description || null,
+    finalPhotoUrl, product_hashtag, tone_direction || null, cta_instructions || null,
+    service_pairing_notes || null, expires_at || null, frequency_cap, campaign_id,
+  );
+
+  res.redirect(`/internal/vendors${qs(req)}&saved=1`);
+});
+
+// ── POST /campaign/ai-description — Generate product description via OpenAI ──
+router.post("/campaign/ai-description", requireSecret, requirePin, async (req, res) => {
+  const { vendor_name, product_name } = req.body;
+  if (!vendor_name || !product_name) {
+    return res.json({ error: "vendor_name and product_name required" });
+  }
+
+  try {
+    // Option A: Try to fetch vendor website for real product info
+    let websiteContent = "";
+    try {
+      const vendorSlug = vendor_name.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const websiteUrl = `https://www.${vendorSlug}.com`;
+      const siteResp = await Promise.race([
+        fetch(websiteUrl, { headers: { "User-Agent": "Mozilla/5.0" } }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 4000)),
+      ]);
+      if (siteResp.ok) {
+        const html = await siteResp.text();
+        // Extract visible text (rough)
+        websiteContent = html
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s{2,}/g, " ")
+          .trim()
+          .slice(0, 3000);
+      }
+    } catch (_) {
+      // Website fetch failed — fall through to GPT knowledge only (Option C)
+    }
+
+    const systemPrompt = `You are a product marketing writer for professional beauty brands.
+Write a compelling 2-3 sentence product description for salon social media posts.
+The description should: identify a specific hair problem or pain point the product solves,
+explain the benefit clearly, and sound professional but approachable.
+Do NOT include pricing, calls to action, or hashtags.`;
+
+    const userPrompt = websiteContent
+      ? `Vendor: ${vendor_name}\nProduct: ${product_name}\n\nWebsite context:\n${websiteContent}\n\nWrite a 2-3 sentence product description for salon social posts.`
+      : `Vendor: ${vendor_name}\nProduct: ${product_name}\n\nUsing your knowledge of ${vendor_name} products, write a 2-3 sentence product description for salon social posts.`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 150,
+      temperature: 0.7,
+    });
+
+    const description = completion.choices[0]?.message?.content?.trim();
+    if (!description) throw new Error("Empty response from OpenAI");
+
+    return res.json({ description });
+  } catch (err) {
+    console.error("[vendorAdmin] AI description error:", err.message);
+    return res.json({ error: err.message });
+  }
 });
 
 // ── POST /campaign/renew — Extend expired campaign +30 days ──────────────────

@@ -160,16 +160,16 @@ router.get("/", requireAuth, (req, res) => {
      WHERE manager_id = ? ORDER BY created_at DESC LIMIT 10`
   ).all(req.manager.id);
 
-  // Open issues for this salon flagged by stylists
+  // Open issues for this salon flagged by stylists (availability SMS reports)
   const openIssues = (() => {
     try {
       return db.prepare(
-        `SELECT * FROM platform_issues WHERE salon_id = ? AND status != 'resolved' ORDER BY created_at DESC`
+        `SELECT * FROM platform_issues WHERE salon_id = ? AND issue_type != 'manager_report' AND status != 'resolved' ORDER BY created_at DESC`
       ).all(salon_id);
     } catch { return []; }
   })();
 
-  // Feature requests for this salon
+  // Feature requests for this salon (for voting)
   const allRequests = (() => {
     try {
       return db.prepare(`
@@ -183,8 +183,21 @@ router.get("/", requireAuth, (req, res) => {
     } catch { return []; }
   })();
 
-  const statusLabel = { submitted: 'Submitted', under_review: 'Under Review', planned: '📅 Planned', live: '✅ Live', declined: 'Declined' };
-  const statusColor = { submitted: 'bg-gray-100 text-gray-600', under_review: 'bg-blue-100 text-blue-700', planned: 'bg-purple-100 text-purple-700', live: 'bg-green-100 text-green-700', declined: 'bg-red-100 text-red-600' };
+  // This salon's own submitted issues and feature requests
+  const mySubmissions = (() => {
+    try {
+      const issues = db.prepare(
+        `SELECT id, 'issue' AS sub_type, description AS title, description, status, created_at FROM platform_issues WHERE salon_id = ? AND issue_type = 'manager_report' ORDER BY created_at DESC`
+      ).all(salon_id);
+      const requests = db.prepare(
+        `SELECT id, 'feature' AS sub_type, title, description, status, created_at FROM feature_requests WHERE submitted_by = ? ORDER BY created_at DESC`
+      ).all(salon_id);
+      return [...issues, ...requests].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    } catch { return []; }
+  })();
+
+  const statusLabel = { submitted: 'Submitted', under_review: 'Under Review', planned: '📅 Planned', live: '✅ Live', declined: 'Declined', open: 'Open', acknowledged: 'Acknowledged', resolved: 'Resolved' };
+  const statusColor = { submitted: 'bg-gray-100 text-gray-600', under_review: 'bg-blue-100 text-blue-700', planned: 'bg-purple-100 text-purple-700', live: 'bg-green-100 text-green-700', declined: 'bg-red-100 text-red-600', open: 'bg-orange-100 text-orange-700', acknowledged: 'bg-yellow-100 text-yellow-700', resolved: 'bg-green-100 text-green-700' };
 
   const featureRequestsHtml = allRequests.length === 0
     ? `<div class="px-6 py-8 text-center text-sm text-mpMuted">No requests yet — be the first to submit an idea!</div>`
@@ -962,34 +975,75 @@ router.get("/", requireAuth, (req, res) => {
     </section>
     ` : ""}
 
-    <!-- Feature Requests -->
+    <!-- Submit Issue or Feature Request -->
     <section class="mb-6">
       <div class="rounded-2xl border border-mpBorder bg-white overflow-hidden">
         <div class="px-6 py-4 border-b">
-          <h2 class="font-semibold text-mpCharcoal">Feature Requests &amp; Ideas</h2>
-          <p class="text-xs text-mpMuted mt-0.5">Submit ideas, vote on what matters most. Our team reviews all submissions.</p>
+          <h2 class="font-semibold text-mpCharcoal">Submit an Issue or Feature Request</h2>
+          <p class="text-xs text-mpMuted mt-0.5">Our team reviews all submissions and will follow up if needed.</p>
         </div>
-
-        <!-- Submit new request form -->
-        <div class="px-6 py-4 border-b bg-gray-50">
-          <form method="POST" action="/manager/admin/feature-requests" class="space-y-3">
+        <div class="px-6 py-4 bg-gray-50">
+          <form method="POST" action="/manager/admin/feedback" class="space-y-3">
             <div>
-              <label class="block text-xs font-medium text-mpCharcoal mb-1">Your idea (required)</label>
-              <input type="text" name="title" required maxlength="120" placeholder="e.g. Auto-schedule posts for peak engagement times"
+              <label class="block text-xs font-medium text-mpCharcoal mb-1">Type</label>
+              <select name="feedback_type" required class="w-full border border-mpBorder rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-mpAccent/20">
+                <option value="">-- Select --</option>
+                <option value="issue">Report an Issue</option>
+                <option value="feature">Request a Feature</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-mpCharcoal mb-1">Title (required)</label>
+              <input type="text" name="title" required maxlength="120" placeholder="Brief summary of the issue or idea"
                 class="w-full border border-mpBorder rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-mpAccent/20">
             </div>
             <div>
-              <label class="block text-xs font-medium text-mpCharcoal mb-1">More detail (optional)</label>
-              <textarea name="description" rows="2" maxlength="500" placeholder="Describe the problem it solves or how you'd use it..."
+              <label class="block text-xs font-medium text-mpCharcoal mb-1">Description (optional)</label>
+              <textarea name="description" rows="3" maxlength="1000" placeholder="What happened? What would you like to see?"
                 class="w-full border border-mpBorder rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-mpAccent/20 resize-none"></textarea>
             </div>
             <button type="submit" class="px-4 py-2 bg-mpAccent text-white text-sm font-medium rounded-lg hover:bg-mpCharcoalDark transition-colors">
-              Submit Idea
+              Submit
             </button>
           </form>
         </div>
+      </div>
+    </section>
 
-        <!-- Feature request list (loaded server-side) -->
+    <!-- Your Submissions -->
+    <section class="mb-6">
+      <div class="rounded-2xl border border-mpBorder bg-white overflow-hidden">
+        <div class="px-6 py-4 border-b">
+          <h2 class="font-semibold text-mpCharcoal">Your Submissions</h2>
+          <p class="text-xs text-mpMuted mt-0.5">Issues and feature requests you've submitted.</p>
+        </div>
+        ${mySubmissions.length === 0
+          ? `<div class="px-6 py-8 text-center text-sm text-mpMuted">Nothing submitted yet.</div>`
+          : `<div class="divide-y">${mySubmissions.map(s => `
+          <div class="px-6 py-4 flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs px-2 py-0.5 rounded-full font-semibold ${s.sub_type === 'issue' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}">
+                  ${s.sub_type === 'issue' ? '⚠️ Issue' : '💡 Feature'}
+                </span>
+              </div>
+              <p class="text-sm font-medium text-mpCharcoal">${(s.title || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</p>
+              ${s.description && s.sub_type !== 'issue' ? `<p class="text-xs text-mpMuted mt-0.5">${s.description.replace(/&/g,'&amp;').replace(/</g,'&lt;').slice(0,120)}${s.description.length > 120 ? '…' : ''}</p>` : ''}
+              <p class="text-xs text-mpMuted mt-1">${new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+            </div>
+            <span class="text-xs px-2 py-0.5 rounded-full shrink-0 font-semibold ${statusColor[s.status] || statusColor.submitted}">${statusLabel[s.status] || s.status}</span>
+          </div>
+        `).join('')}</div>`}
+      </div>
+    </section>
+
+    <!-- Feature Requests & Ideas (community voting) -->
+    <section class="mb-6">
+      <div class="rounded-2xl border border-mpBorder bg-white overflow-hidden">
+        <div class="px-6 py-4 border-b">
+          <h2 class="font-semibold text-mpCharcoal">Community Ideas</h2>
+          <p class="text-xs text-mpMuted mt-0.5">Vote on ideas from other salons. Most-voted features get prioritized.</p>
+        </div>
         ${featureRequestsHtml}
       </div>
     </section>
@@ -1854,6 +1908,38 @@ router.post("/resend-welcome/:stylistId", requireAuth, async (req, res) => {
     console.error("[Admin] resend-welcome failed:", err.message);
     return res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// ───────────────────────────────────────────────────────────
+// POST /feedback — Unified issue/feature submission form
+// ───────────────────────────────────────────────────────────
+router.post("/feedback", requireAuth, (req, res) => {
+  const salon_id = req.manager?.salon_id;
+  const { feedback_type, title, description } = req.body;
+  if (!title?.trim() || !feedback_type) return res.redirect("/manager/admin#feedback");
+
+  const now = new Date().toISOString();
+  try {
+    if (feedback_type === "issue") {
+      db.prepare(`
+        INSERT INTO platform_issues (id, salon_id, issue_type, description, status, created_at)
+        VALUES (?, ?, 'manager_report', ?, 'open', ?)
+      `).run(crypto.randomUUID(), salon_id, `${title.trim().slice(0, 120)}${description?.trim() ? ': ' + description.trim().slice(0, 500) : ''}`, now);
+    } else if (feedback_type === "feature") {
+      const id = crypto.randomUUID();
+      db.prepare(`
+        INSERT INTO feature_requests (id, title, description, submitted_by, status, public, vote_count, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 'submitted', 0, 1, ?, ?)
+      `).run(id, title.trim().slice(0, 120), (description || '').trim().slice(0, 500), salon_id, now, now);
+      db.prepare(`
+        INSERT OR IGNORE INTO feature_request_votes (id, feature_request_id, salon_id, created_at)
+        VALUES (?, ?, ?, ?)
+      `).run(crypto.randomUUID(), id, salon_id, now);
+    }
+  } catch (err) {
+    console.error('[Admin] Feedback submit failed:', err.message);
+  }
+  res.redirect("/manager/admin#feedback");
 });
 
 // ───────────────────────────────────────────────────────────

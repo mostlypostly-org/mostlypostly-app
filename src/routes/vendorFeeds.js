@@ -116,7 +116,7 @@ router.get("/", requireAuth, (req, res) => {
       const isApproved     = approvalStatus === "approved";
       const isPending      = approvalStatus === "pending";
       const isDenied       = approvalStatus === "denied";
-      const canToggle      = isPro && isApproved;
+      const canToggle      = isPro; // Pro plan is the gate — no separate approval required
 
       // Task 3: brand config and vendor settings per vendor
       const brandCfg      = brandConfigMap[vendorName] || {};
@@ -151,36 +151,20 @@ router.get("/", requireAuth, (req, res) => {
 
       const moreCount = nonExpired.length - 5;
 
-      // Right-side action: depends on approval state
+      // Right-side action: Pro = toggle available
       const actionArea = !isPro
         ? `<span class="text-xs text-mpMuted">Pro required</span>`
-        : isApproved
-          ? `<form method="POST" action="/manager/vendors/toggle?salon=${salon_id}" class="flex items-center gap-3">
-               <input type="hidden" name="vendor_name" value="${safe(vendorName)}" />
-               <input type="hidden" name="enabled" value="${enabled ? "0" : "1"}" />
-               <span class="text-xs font-medium ${enabled ? "text-mpAccent" : "text-mpMuted"}">${enabled ? "Active" : "Off"}</span>
-               <button type="submit"
-                 class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none
-                        ${enabled ? "bg-mpAccent" : "bg-mpBorder"} cursor-pointer">
-                 <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform
-                              ${enabled ? "translate-x-6" : "translate-x-1"}"></span>
-               </button>
-             </form>`
-          : isPending
-            ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-yellow-50 border border-yellow-200 px-3 py-1 text-xs font-semibold text-yellow-700">
-                 ⏳ Approval Pending
-               </span>`
-            : isDenied
-              ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-semibold text-red-600">
-                   Not Approved
-                 </span>`
-              : `<form method="POST" action="/manager/vendors/request-access">
-                   <input type="hidden" name="vendor_name" value="${safe(vendorName)}" />
-                   <button type="submit"
-                     class="inline-flex items-center gap-1.5 rounded-full bg-mpCharcoal px-3 py-1.5 text-xs font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
-                     Request Access →
-                   </button>
-                 </form>`;
+        : `<form method="POST" action="/manager/vendors/toggle?salon=${salon_id}" class="flex items-center gap-3">
+             <input type="hidden" name="vendor_name" value="${safe(vendorName)}" />
+             <input type="hidden" name="enabled" value="${enabled ? "0" : "1"}" />
+             <span class="text-xs font-medium ${enabled ? "text-mpAccent" : "text-mpMuted"}">${enabled ? "Active" : "Off"}</span>
+             <button type="submit"
+               class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none
+                      ${enabled ? "bg-mpAccent" : "bg-mpBorder"} cursor-pointer">
+               <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform
+                            ${enabled ? "translate-x-6" : "translate-x-1"}"></span>
+             </button>
+           </form>`;
 
       // Approval status badge (shown below vendor name)
       const approvalBadge = isApproved
@@ -188,22 +172,20 @@ router.get("/", requireAuth, (req, res) => {
         : "";
 
       return `
-        <div class="rounded-2xl border ${isApproved && enabled ? "border-mpAccent bg-mpAccentLight/20" : "border-mpBorder bg-white"} overflow-hidden transition-colors">
+        <div class="rounded-2xl border ${enabled ? "border-mpAccent bg-mpAccentLight/20" : "border-mpBorder bg-white"} overflow-hidden transition-colors">
           <div class="px-5 py-4 flex items-center justify-between gap-4">
             <div>
               <p class="font-bold text-mpCharcoal">${safe(vendorName)}</p>
               <div class="flex items-center gap-2 mt-0.5 flex-wrap">
-                ${isApproved
-                  ? `<span class="text-xs text-mpMuted">${nonExpired.length} active campaign${nonExpired.length !== 1 ? "s" : ""}${expired.length ? ` · ${expired.length} expired` : ""}</span>`
-                  : `<span class="text-xs text-mpMuted">Approved partners can view campaign content</span>`}
+                <span class="text-xs text-mpMuted">${nonExpired.length} active campaign${nonExpired.length !== 1 ? "s" : ""}${expired.length ? ` · ${expired.length} expired` : ""}</span>
                 ${approvalBadge}
               </div>
             </div>
             <div class="flex-shrink-0">${actionArea}</div>
           </div>
 
-          <!-- Campaign previews — approved only -->
-          ${isApproved && nonExpired.length > 0 ? `
+          <!-- Campaign previews — Pro only -->
+          ${isPro && nonExpired.length > 0 ? `
           <div class="border-t border-mpBorder px-5 py-4">
             <button type="button"
                     data-vkey="${safe(vendorName.replace(/\s+/g, "_"))}"
@@ -218,8 +200,8 @@ router.get("/", requireAuth, (req, res) => {
             </div>
           </div>` : ""}
 
-          <!-- Expired campaigns (approved only) -->
-          ${isApproved && expired.length > 0 ? `
+          <!-- Expired campaigns (Pro only) -->
+          ${isPro && expired.length > 0 ? `
           <div class="border-t border-mpBorder px-5 py-4">
             <p class="text-[11px] text-mpMuted font-semibold uppercase tracking-wide mb-2">Expired Campaigns</p>
             <div class="space-y-2">
@@ -248,8 +230,8 @@ router.get("/", requireAuth, (req, res) => {
             </div>
           </div>` : ""}
 
-          <!-- Settings section (approved only, collapsed by default) -->
-          ${isApproved ? `
+          <!-- Settings section (Pro only, collapsed by default) -->
+          ${isPro ? `
           <div class="border-t border-mpBorder px-5 py-4">
             <button type="button"
                     data-vkey="${vKey}"
@@ -358,11 +340,7 @@ router.post("/toggle", requireAuth, (req, res) => {
   const { vendor_name, enabled } = req.body;
   if (!vendor_name) return res.redirect(`/manager/vendors`);
 
-  // Must be approved
-  const approval = db.prepare(
-    "SELECT status FROM salon_vendor_approvals WHERE salon_id = ? AND vendor_name = ?"
-  ).get(salon_id, vendor_name);
-  if (approval?.status !== "approved") return res.redirect(`/manager/vendors`);
+  // Pro plan is the only requirement — no separate approval gate
 
   const enabledInt = enabled === "1" ? 1 : 0;
   db.prepare(`

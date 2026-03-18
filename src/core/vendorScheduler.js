@@ -178,14 +178,12 @@ async function processSalon(salon, thisMonth) {
   const salonId = salon.slug;
   let created = 0;
 
-  // 2. Get enabled vendor feeds for this salon that are also approved
+  // 2. Get enabled vendor feeds for this salon (Pro plan is the gate)
   const enabledVendors = db.prepare(`
     SELECT f.vendor_name, f.affiliate_url, f.category_filters
     FROM salon_vendor_feeds f
-    JOIN salon_vendor_approvals a ON a.salon_id = f.salon_id AND a.vendor_name = f.vendor_name
     WHERE f.salon_id = ?
       AND f.enabled = 1
-      AND a.status = 'approved'
   `).all(salonId);
 
   if (enabledVendors.length === 0) return 0;
