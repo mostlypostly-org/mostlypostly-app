@@ -79,6 +79,12 @@ function requirePin(req, res, next) {
   if (!pin) return next();
   if (req.session?.console_authed === true) return next();
 
+  // For POST/non-GET requests, redirect to GET with session-expired message
+  // so the user re-authenticates cleanly (avoids PIN wall as a POST response)
+  if (req.method !== "GET") {
+    return res.redirect(`/internal/vendors${qs(req)}&session_expired=1`);
+  }
+
   // Show PIN entry form
   return res.send(`<!DOCTYPE html>
 <html lang="en"><head>
@@ -275,6 +281,8 @@ router.get("/", requireSecret, requirePin, (req, res) => {
     ? `<div class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium mb-6">Vendor name, campaign name, category, and product name are required.</div>`
     : req.query.error === "promotion_needs_expiry"
     ? `<div class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium mb-6">Promotion campaigns require an expiration date.</div>`
+    : req.query.session_expired
+    ? `<div class="rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-800 font-medium mb-6">Your session expired (server restarted). Please re-enter your PIN above to continue.</div>`
     : "";
 
   const today = new Date().toISOString().slice(0, 10);
