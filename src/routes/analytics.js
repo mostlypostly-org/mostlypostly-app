@@ -322,7 +322,8 @@ router.get("/", (req, res) => {
         <h2 class="text-base font-bold text-mpCharcoal">Recent Published Posts</h2>
         <p class="text-xs text-mpMuted mt-0.5">Last 20 posts with performance data.</p>
       </div>
-      <form method="POST" action="/analytics/sync">
+      <form method="POST" action="/analytics/sync"
+            onsubmit="var b=this.querySelector('button');b.disabled=true;b.textContent='Syncing…';">
         <input type="hidden" name="salon" value="${salon_id}" />
         <button type="submit" class="rounded-full border border-mpBorder bg-mpBg px-4 py-1.5 text-xs font-semibold text-mpCharcoal hover:border-mpAccent hover:bg-white transition-colors">
           Sync Insights
@@ -388,7 +389,8 @@ router.get("/", (req, res) => {
             Reset &amp; Relink FB
           </button>
         </form>
-        <form method="POST" action="/analytics/sync">
+        <form method="POST" action="/analytics/sync"
+              onsubmit="var b=this.querySelector('button');b.disabled=true;b.textContent='Syncing…';">
           <input type="hidden" name="salon" value="${salon_id}" />
           <button type="submit" class="shrink-0 rounded-full bg-mpCharcoal px-5 py-2.5 text-sm font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
             Sync Insights
