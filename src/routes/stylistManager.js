@@ -16,6 +16,7 @@ const router = express.Router();
 import { UPLOADS_DIR, toUploadUrl } from "../core/uploadPath.js";
 import { PLAN_LIMITS } from "./billing.js";
 import { sendViaTwilio } from "./twilio.js";
+import { sendWelcomeSms } from "../core/stylistWelcome.js";
 
 function normalizePhone(raw) {
   if (!raw) return null;
