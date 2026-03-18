@@ -121,7 +121,7 @@ router.get("/", requireAuth, async (req, res) => {
   const salonName = getSalonName(salon_id) || "Your Salon";
 
   // Plan usage stats + booking URL for approve preview
-  const salonRow = db.prepare("SELECT plan, plan_status, booking_url, phone FROM salons WHERE slug = ?").get(salon_id);
+  const salonRow = db.prepare("SELECT plan, plan_status, booking_url, phone, google_location_id FROM salons WHERE slug = ?").get(salon_id);
   const salonBookingUrl = salonRow?.booking_url || "";
   const planLimits = PLAN_LIMITS[salonRow?.plan] || PLAN_LIMITS.trial;
   const monthStart = DateTime.utc().startOf("month").toFormat("yyyy-LL-dd");
@@ -268,12 +268,28 @@ router.get("/", requireAuth, async (req, res) => {
   /* -------------------------------------------------------------
      RECENT CARDS — exact old simple list
   ------------------------------------------------------------- */
+  const gmbConnected = !!salonRow?.google_location_id;
+
   const recentCards =
   recent.length === 0
     ? `<div class="text-mpMuted text-sm italic">No recent posts.</div>`
     : recent.map((p) => {
         const caption = esc(p.final_caption || p.caption || "")
           .replace(/\n/g, "<br/>");
+
+        const platformBadges = (() => {
+          const badges = [];
+          if (p.ig_media_id) badges.push(`<span class="text-[10px] rounded-full bg-gradient-to-br from-purple-500 to-pink-400 text-white px-2 py-0.5 font-bold">IG</span>`);
+          if (p.fb_post_id) badges.push(`<span class="text-[10px] rounded-full bg-blue-600 text-white px-2 py-0.5 font-bold">FB</span>`);
+          if (gmbConnected) {
+            if (p.google_post_id) {
+              badges.push(`<span title="Published to Google Business Profile" class="inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-bold" style="background:#4285F4;">G</span>`);
+            } else {
+              badges.push(`<span title="Not published to Google Business Profile" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-300 text-white text-xs font-bold">G</span>`);
+            }
+          }
+          return badges.join(" ");
+        })();
 
           return `
           <div class="recent-card rounded-xl bg-white border border-mpBorder p-4 mb-4">
@@ -284,9 +300,12 @@ router.get("/", requireAuth, async (req, res) => {
               <div class="flex-1">
 
                 <div class="flex items-center justify-between gap-2 mb-1">
-                  <p class="text-xs text-mpMuted">
-                    Status: <span class="font-semibold">${esc(p.status)}</span> • Post #${esc(p.salon_post_number) || "—"}
-                  </p>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <p class="text-xs text-mpMuted">
+                      Status: <span class="font-semibold">${esc(p.status)}</span> • Post #${esc(p.salon_post_number) || "—"}
+                    </p>
+                    ${platformBadges ? `<div class="flex items-center gap-1">${platformBadges}</div>` : ""}
+                  </div>
                   ${p.status === "manager_approved" || p.status === "failed" ? `
                     <a href="/manager/cancel-post?post=${p.id}"
                        onclick="return confirm('Cancel this post and remove it from the queue?')"

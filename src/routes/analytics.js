@@ -92,6 +92,9 @@ router.get("/", (req, res) => {
   const salonPolicy = getSalonPolicy(salon_id) || {};
   const tz = salonPolicy?.timezone || "America/Indiana/Indianapolis";
 
+  const salonMeta = db.prepare(`SELECT google_location_id FROM salons WHERE slug=?`).get(salon_id);
+  const gmbConnected = !!salonMeta?.google_location_id;
+
   // Volume
   const totalPublished = db.prepare(`SELECT COUNT(*) as c FROM posts WHERE salon_id=? AND status='published'`).get(salon_id).c;
   const thisMonth = db.prepare(`
@@ -152,16 +155,32 @@ router.get("/", (req, res) => {
 
   // Recent published posts
   const recent = db.prepare(`
-    SELECT p.id, p.stylist_name, p.post_type, p.published_at, p.fb_post_id, p.ig_media_id,
+    SELECT p.id, p.stylist_name, p.post_type, p.published_at, p.fb_post_id, p.ig_media_id, p.google_post_id,
            pi_ig.engagement_rate as ig_er, pi_ig.likes as ig_likes, pi_ig.reach as ig_reach,
            pi_ig.saves as ig_saves, pi_fb.reactions as fb_reactions,
-           pi_fb.link_clicks as fb_clicks, pi_fb.reach as fb_reach
+           pi_fb.link_clicks as fb_clicks, pi_fb.reach as fb_reach,
+           MAX(CASE WHEN pi.platform = 'google' THEN pi.impressions END) as gmb_views,
+           MAX(CASE WHEN pi.platform = 'google' THEN pi.link_clicks END) as gmb_clicks
     FROM posts p
     LEFT JOIN post_insights pi_ig ON pi_ig.post_id=p.id AND pi_ig.platform='instagram'
     LEFT JOIN post_insights pi_fb ON pi_fb.post_id=p.id AND pi_fb.platform='facebook'
+    LEFT JOIN post_insights pi ON pi.post_id=p.id
     WHERE p.salon_id=? AND p.status='published'
+    GROUP BY p.id
     ORDER BY datetime(p.published_at) DESC LIMIT 20
   `).all(salon_id);
+
+  // GMB monthly stats
+  const gmbStats = gmbConnected ? db.prepare(`
+    SELECT
+      COALESCE(SUM(pi.impressions), 0) as total_views,
+      COALESCE(SUM(pi.link_clicks), 0) as total_clicks
+    FROM post_insights pi
+    JOIN posts p ON pi.post_id = p.id
+    WHERE p.salon_id = ?
+      AND pi.platform = 'google'
+      AND p.published_at >= date('now', 'start of month')
+  `).get(salon_id) : null;
 
   // ── HTML ──────────────────────────────────────────────────────────
 
@@ -182,6 +201,16 @@ router.get("/", (req, res) => {
       </form>
     </div>` : "";
 
+  const gmbSummaryCard = gmbConnected ? `
+  <div class="bg-white border border-gray-200 rounded-2xl p-5">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-xs font-bold" style="background:#4285F4;">G</span>
+      <span class="text-sm text-mpMuted">Google Business</span>
+    </div>
+    <p class="text-2xl font-bold text-mpCharcoal">${(gmbStats?.total_views || 0).toLocaleString()}</p>
+    <p class="text-xs text-mpMuted mt-0.5">${gmbStats?.total_clicks || 0} clicks · this month</p>
+  </div>` : "";
+
   const summaryCards = `
   <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
     ${statCard("Published Posts", fmt(totalPublished), `${thisMonth} this month`)}
@@ -194,6 +223,7 @@ router.get("/", (req, res) => {
     ${statCard("IG Comments", fmt(igAgg?.comments || 0), "All time")}
     ${statCard("IG Saves", fmt(igAgg?.saves || 0), "All time")}
     ${statCard("Book Now Clicks", fmt(totalLinkClicks), "Link clicks from FB posts")}
+    ${gmbSummaryCard}
   </div>`;
 
   const platformSplit = `
@@ -311,6 +341,7 @@ router.get("/", (req, res) => {
             <th class="px-4 py-3 text-right">Saves</th>
             <th class="px-4 py-3 text-right">Eng. %</th>
             <th class="px-4 py-3 text-right">Link Clicks</th>
+            ${gmbConnected ? `<th class="px-4 py-3 text-right">GMB Views</th><th class="px-4 py-3 text-right">GMB Clicks</th>` : ""}
             <th class="px-4 py-3 text-left">Published</th>
           </tr>
         </thead>
@@ -320,6 +351,9 @@ router.get("/", (req, res) => {
             const platforms = [
               p.ig_media_id ? `<span class="text-[10px] rounded-full bg-gradient-to-br from-purple-500 to-pink-400 text-white px-2 py-0.5 font-bold">IG</span>` : "",
               p.fb_post_id  ? `<span class="text-[10px] rounded-full bg-blue-600 text-white px-2 py-0.5 font-bold">FB</span>` : "",
+              gmbConnected ? (p.google_post_id
+                ? `<span title="Published to Google Business Profile" class="inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-bold" style="background:#4285F4;">G</span>`
+                : `<span title="Not published to Google Business Profile" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-300 text-white text-xs font-bold">G</span>`) : "",
             ].filter(Boolean).join(" ");
             return `
             <tr class="border-t border-mpBorder hover:bg-mpBg/60">
@@ -331,9 +365,10 @@ router.get("/", (req, res) => {
               <td class="px-4 py-3 text-right text-mpMuted">${fmt(p.ig_saves || 0)}</td>
               <td class="px-4 py-3 text-right font-semibold ${p.ig_er ? "text-mpAccent" : "text-mpMuted"}">${pct(p.ig_er)}</td>
               <td class="px-4 py-3 text-right text-mpMuted">${fmt(p.fb_clicks || 0)}</td>
+              ${gmbConnected ? `<td class="px-4 py-3 text-right text-mpMuted">${p.gmb_views != null ? fmt(p.gmb_views) : "—"}</td><td class="px-4 py-3 text-right text-mpMuted">${p.gmb_clicks != null ? fmt(p.gmb_clicks) : "—"}</td>` : ""}
               <td class="px-4 py-3 text-xs text-mpMuted">${pubDate}</td>
             </tr>`;
-          }).join("") || `<tr><td colspan="9" class="px-4 py-8 text-center text-mpMuted text-sm">No published posts yet.</td></tr>`}
+          }).join("") || `<tr><td colspan="${gmbConnected ? 11 : 9}" class="px-4 py-8 text-center text-mpMuted text-sm">No published posts yet.</td></tr>`}
         </tbody>
       </table>
     </div>
