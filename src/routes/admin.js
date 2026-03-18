@@ -473,69 +473,42 @@ router.get("/", requireAuth, (req, res) => {
     <!-- POSTING TAB -->
     <div id="admin-panel-posting" class="admin-panel hidden">
 
-    <!-- POSTING RULES — moved to Scheduler page -->
-    <section class="mb-6 grid gap-4 md:grid-cols-2">
-      <!-- Scheduler link card -->
-      <div class="rounded-2xl border border-mpBorder bg-white px-4 py-4 flex flex-col justify-between">
+    <section class="mb-6 space-y-4">
+
+      <!-- Posting Window — configure in Scheduler -->
+      <div class="rounded-2xl border border-mpBorder bg-white px-4 py-4 flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <div class="flex items-center justify-between mb-1">
-            <h2 class="text-sm font-semibold text-mpCharcoal">Posting Availability</h2>
-          </div>
-          <p class="text-xs text-mpMuted mb-3">Days and times when posts can be published, in your salon's timezone.</p>
-          <dl class="space-y-1 text-xs text-mpCharcoal mb-4">
-            ${(() => {
-              const days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
-              const labels = { monday:"Mon", tuesday:"Tue", wednesday:"Wed", thursday:"Thu", friday:"Fri", saturday:"Sat", sunday:"Sun" };
-              const sched = postingSchedule;
-              return days.map(d => {
-                const cfg = sched[d];
-                if (!cfg || !cfg.enabled) {
-                  return `<div class="flex justify-between"><dt class="text-mpMuted">${labels[d]}</dt><dd class="text-gray-400">Off</dd></div>`;
-                }
-                return `<div class="flex justify-between"><dt class="text-mpMuted">${labels[d]}</dt><dd>${fmtTime(cfg.start)} – ${fmtTime(cfg.end)}</dd></div>`;
-              }).join("");
-            })()}
-            <div class="flex justify-between pt-1 border-t border-mpBorder mt-1">
-              <dt class="text-mpMuted">Spacing</dt>
-              <dd>${settings.random_delay_minutes.min}–${settings.random_delay_minutes.max} min</dd>
-            </div>
-          </dl>
+          <h2 class="text-sm font-semibold text-mpCharcoal mb-0.5">Posting Window</h2>
+          <p class="text-xs text-mpMuted">
+            ${fmtTime(settings.posting_window.start)} – ${fmtTime(settings.posting_window.end)} &middot;
+            ${salonRow.spacing_min ?? 20}–${salonRow.spacing_max ?? 45} min spacing &middot;
+            ${salonRow.timezone || "America/Indiana/Indianapolis"}
+          </p>
         </div>
         <a href="/manager/scheduler?salon=${salon_id}"
-           class="inline-flex items-center gap-1.5 rounded-full bg-mpCharcoal px-4 py-2 text-xs font-semibold text-white hover:bg-mpCharcoalDark transition-colors self-start">
-          Open Scheduler Settings
+           class="inline-flex items-center gap-1.5 rounded-full bg-mpCharcoal px-4 py-2 text-xs font-semibold text-white hover:bg-mpCharcoalDark transition-colors shrink-0">
+          Edit in Scheduler &rarr;
         </a>
       </div>
 
       <!-- Manager Rules -->
       <div class="rounded-2xl border border-mpBorder bg-white px-4 py-4">
         <div class="flex items-center justify-between mb-2">
-          <h2 class="text-sm font-semibold text-mpCharcoal">Manager Rules</h2>
+          <h2 class="text-sm font-semibold text-mpCharcoal">Approval &amp; Publishing</h2>
           <a href="/manager/admin/edit/manager-rules" class="text-xs text-mpAccent hover:text-mpCharcoal font-medium">Edit</a>
         </div>
-
         <dl class="space-y-1 text-xs text-mpCharcoal">
           <div class="flex justify-between">
             <dt class="text-mpMuted">Require Manager Approval</dt>
             <dd>${salonRow.require_manager_approval ? "Enabled" : "Disabled"}</dd>
           </div>
-
-          <div class="flex justify-between">
-            <dt class="text-mpMuted">Notify member on approval</dt>
-            <dd>${salonRow.notify_on_approval ? "Enabled" : "Disabled"}</dd>
-          </div>
-
-          <div class="flex justify-between">
-            <dt class="text-mpMuted">Notify member on denial</dt>
-            <dd>${salonRow.notify_on_denial ? "Enabled" : "Disabled"}</dd>
-          </div>
-
           <div class="flex justify-between">
             <dt class="text-mpMuted">Auto Publish</dt>
             <dd>${info.auto_publish ? "Enabled" : "Disabled"}</dd>
           </div>
         </dl>
       </div>
+
     </section>
 
     </div><!-- end admin-panel-posting -->
