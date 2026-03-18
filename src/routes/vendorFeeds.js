@@ -438,11 +438,11 @@ router.post("/renew-campaign", requireAuth, (req, res) => {
   `).get(campaign_id);
   if (!campaign) return res.redirect("/manager/vendors");
 
-  // IDOR guard: salon must have approved+enabled access to this vendor
+  // IDOR guard: salon must have approved access to this vendor
   const feed = db.prepare(`
-    SELECT f.enabled FROM salon_vendor_feeds f
+    SELECT f.salon_id FROM salon_vendor_feeds f
     JOIN salon_vendor_approvals a ON a.salon_id = f.salon_id AND a.vendor_name = f.vendor_name
-    WHERE f.salon_id = ? AND f.vendor_name = ? AND a.status = 'approved' AND f.enabled = 1
+    WHERE f.salon_id = ? AND f.vendor_name = ? AND a.status = 'approved'
   `).get(salon_id, campaign.vendor_name);
   if (!feed) return res.redirect("/manager/vendors");
 
