@@ -1,0 +1,14 @@
+{
+  "planPath": "docs/plans/2026-03-18-gmb-publishing.md",
+  "tasks": [
+    {"id": 35, "subject": "Task 1: Migration 039 — GMB columns on salons + posts", "status": "pending"},
+    {"id": 36, "subject": "Task 2: Google token refresh helper + OAuth route", "status": "pending", "blockedBy": [35]},
+    {"id": 37, "subject": "Task 3: GMB publisher — publishWhatsNewToGmb + publishOfferToGmb", "status": "pending", "blockedBy": [36]},
+    {"id": 38, "subject": "Task 4: Wire GMB into scheduler.js", "status": "pending", "blockedBy": [37]},
+    {"id": 39, "subject": "Task 5: GMB insights sync — fetchGmbInsights.js", "status": "pending", "blockedBy": [38]},
+    {"id": 40, "subject": "Task 6: Integrations page redesign", "status": "pending", "blockedBy": [35]},
+    {"id": 41, "subject": "Task 7: GMB badge on post cards + analytics dashboard", "status": "pending", "blockedBy": [38, 39]},
+    {"id": 0,  "subject": "Task 8: Push to dev, smoke test, push to prod", "status": "pending", "blockedBy": [41, 40]}
+  ],
+  "lastUpdated": "2026-03-18T00:00:00.000Z"
+}
