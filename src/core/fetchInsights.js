@@ -1,6 +1,7 @@
-// src/core/fetchInsights.js — Fetch FB + IG post-level insights and cache in DB
+// src/core/fetchInsights.js — Fetch FB + IG + GMB post-level insights and cache in DB
 import { db } from "../../db.js";
 import crypto from "crypto";
+import { syncGmbInsights } from "./fetchGmbInsights.js";
 
 const GRAPH = "https://graph.facebook.com/v22.0";
 
@@ -282,6 +283,11 @@ export async function syncSalonInsights(salon) {
       // No igBusinessId configured — skip IG sync
       errors.push(`IG ${post.ig_media_id}: no instagram_business_id configured for salon`);
     }
+  }
+
+  // ── Google Business Profile ────────────────────────────────────────────────
+  if (salon.google_location_id && salon.google_refresh_token) {
+    await syncGmbInsights(salon);
   }
 
   return { synced, errors };
