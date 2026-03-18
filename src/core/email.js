@@ -45,10 +45,10 @@ function emailWrapper({ preheader, body }) {
           <table width="100%" cellpadding="0" cellspacing="0">
 
             <!-- Blue header band with logo -->
-            <tr><td style="background:#3B72B9;padding:20px 32px;">
+            <tr><td style="background:#3B72B9;padding:24px 32px;">
               <img src="https://mostlypostly.com/logo/MostlyPostly%20Logo%20-%20White%20Transparent.svg"
-                   alt="MostlyPostly" height="28"
-                   style="display:block;border:0;outline:none;text-decoration:none;" />
+                   alt="MostlyPostly" height="44" width="auto"
+                   style="display:block;border:0;outline:none;text-decoration:none;height:44px;width:auto;" />
             </td></tr>
 
             <!-- Body content -->
