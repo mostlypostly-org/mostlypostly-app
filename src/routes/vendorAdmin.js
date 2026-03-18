@@ -485,6 +485,15 @@ router.get("/", requireSecret, requirePin, (req, res) => {
     .stat-val  { font-size:28px; font-weight:800; color:#111827; line-height:1; }
     .stat-lbl  { font-size:12px; color:#6b7280; margin-top:4px; }
   </style>
+  <script>
+    function toggleTopAddForm() {
+      var f = document.getElementById('top-add-campaign-form');
+      f.style.display = f.style.display === 'none' ? 'block' : 'none';
+    }
+    function hideTopAddForm() {
+      document.getElementById('top-add-campaign-form').style.display = 'none';
+    }
+  </script>
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen">
 
@@ -801,7 +810,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
           <span class="ml-2 text-sm font-normal text-gray-400">${totalCampaigns} total</span>
         </h2>
         <button type="button"
-                onclick="var f=document.getElementById('top-add-campaign-form'); f.style.display=f.style.display==='none'?'block':'none';"
+                onclick="toggleTopAddForm()"
                 class="text-xs bg-gray-900 text-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-700">
           + Add Campaign
         </button>
@@ -883,7 +892,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
           </div>
           <div class="flex justify-end gap-2">
             <button type="button"
-                    onclick="document.getElementById('top-add-campaign-form').style.display='none';"
+                    onclick="hideTopAddForm()"
                     class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
             <button type="submit"
                     class="text-xs bg-gray-900 text-white rounded-lg px-4 py-1.5 font-semibold hover:bg-gray-700">
