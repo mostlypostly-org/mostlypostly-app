@@ -39,6 +39,7 @@ import { run as run035 } from "./035_posts_service_type.js";
 import { run as run036 } from "./036_celebration_template.js";
 import { run as run037 } from "./037_availability_template.js";
 import { run as run038 } from "./038_stylist_last_activity.js";
+import { run as run039 } from "./039_gmb.js";
 
 export const migrations = [
   { name: "001_baseline_patches",        run: run001 },
@@ -79,4 +80,5 @@ export const migrations = [
   { name: "036_celebration_template",        run: run036 },
   { name: "037_availability_template",       run: run037 },
   { name: "038_stylist_last_activity",       run: run038 },
+  { name: "039_gmb",                         run: run039 },
 ];
