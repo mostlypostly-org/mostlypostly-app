@@ -227,8 +227,8 @@ export function lookupStylist(identifier) {
         sl.booking_url
       FROM stylists s
       JOIN salons sl ON sl.slug = s.salon_id
-      WHERE s.phone = ?
-        OR s.chat_id = ?
+      WHERE (s.phone = ? OR s.chat_id = ?)
+        AND (s.active IS NULL OR s.active = 1)
       LIMIT 1
     `
     )
@@ -263,7 +263,8 @@ export function lookupStylist(identifier) {
         sl.booking_url
       FROM managers m
       JOIN salons sl ON sl.slug = m.salon_id
-      WHERE m.phone = ? OR CAST(m.chat_id AS TEXT) = ?
+      WHERE (m.phone = ? OR CAST(m.chat_id AS TEXT) = ?)
+        AND (m.active IS NULL OR m.active = 1)
       LIMIT 1
     `
       ).get(phoneNorm, idStr);

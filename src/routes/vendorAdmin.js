@@ -18,6 +18,7 @@ import path from "path";
 import fs from "fs";
 import db from "../../db.js";
 import { UPLOADS_DIR } from "../core/uploadPath.js";
+import { enforceStaffLimits } from "./billing.js";
 
 const router = express.Router();
 
@@ -175,6 +176,7 @@ router.post("/set-plan", requireSecret, requirePin, (req, res) => {
     UPDATE salons SET plan = ?, plan_status = ?, trial_used = ?, updated_at = datetime('now') WHERE slug = ?
   `).run(plan, effectiveStatus, markTrialUsed, salon_slug);
 
+  enforceStaffLimits(salon_slug);
   console.log(`[vendorAdmin] Set ${salon_slug} → plan:${plan} status:${plan_status}`);
   res.redirect(`/internal/vendors${qs(req)}`);
 });
@@ -496,10 +498,12 @@ router.get("/", requireSecret, requirePin, (req, res) => {
   <script>
     function toggleTopAddForm() {
       var f = document.getElementById('top-add-campaign-form');
-      f.style.display = f.style.display === 'none' ? 'block' : 'none';
+      if (!f) return;
+      f.hidden = !f.hidden;
     }
     function hideTopAddForm() {
-      document.getElementById('top-add-campaign-form').style.display = 'none';
+      var f = document.getElementById('top-add-campaign-form');
+      if (f) f.hidden = true;
     }
   </script>
 </head>
@@ -825,7 +829,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
       </div>
 
       <!-- Top-level Add Campaign form (always visible, works without existing vendors) -->
-      <div id="top-add-campaign-form" style="display:none;" class="mb-6 border rounded-xl bg-gray-50 p-4">
+      <div id="top-add-campaign-form" hidden class="mb-6 border rounded-xl bg-gray-50 p-4">
         <p class="text-xs font-bold text-gray-700 mb-3">New Campaign</p>
         <form method="POST" action="/internal/vendors/campaign/add${qs(req)}" class="space-y-3">
           <div class="grid grid-cols-2 gap-3">

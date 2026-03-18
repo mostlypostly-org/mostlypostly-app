@@ -80,24 +80,25 @@ export function composeFinalCaption({
   if (cleanedText) parts.push(cleanedText);
 
 
-  // --- 2️⃣ "Styled by" credit ---
-  let credit = "Styled by a stylist";
+  // --- 2️⃣ "Styled By:" credit ---
+  // FB: full name; IG: @handle; fallback: name or generic
+  let credit = creditName ? `Styled By: ${creditName}` : "Styled By: Team Member";
 
   if (platform === "instagram") {
-    // IG → always show @handle if available
+    // IG → @handle if available, else full name
     if (handle) {
-      credit = `Styled by @${handle}`;
+      credit = `Styled By: @${handle}`;
     } else if (creditName) {
-      credit = `Styled by ${creditName}`;
+      credit = `Styled By: ${creditName}`;
     }
   } else {
-    // Other platforms preserve HTML option
-    if (handle) {
+    // FB / generic: full name preferred over handle
+    if (creditName) {
       credit = asHtml
-        ? `Styled by <a href="https://instagram.com/${handle}">@${handle}</a>`
-        : `Styled by @${handle}`;
-    } else if (creditName) {
-      credit = `Styled by ${creditName}`;
+        ? `Styled By: <a href="https://instagram.com/${handle || ""}">${creditName}</a>`
+        : `Styled By: ${creditName}`;
+    } else if (handle) {
+      credit = `Styled By: @${handle}`;
     }
   }
 

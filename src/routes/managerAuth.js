@@ -896,6 +896,15 @@ router.post("/login", (req, res) => {
       .send("Invalid credentials.");
   }
 
+  // Deactivated accounts (plan downgrade exceeded seat limit)
+  if (manager.active === 0) {
+    logSecurityEvent({ eventType: "login_failure", managerId: manager.id, salonId: manager.salon_id, req, metadata: { email, reason: "account_deactivated" } });
+    return res
+      .status(403)
+      .type("html")
+      .send("Your account has been deactivated. Please contact the account owner.");
+  }
+
   // Check if MFA is enrolled — if so, don't complete login yet
   const mfaRow = db.prepare("SELECT manager_id FROM manager_mfa WHERE manager_id = ?").get(manager.id);
   if (mfaRow) {

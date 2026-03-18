@@ -172,6 +172,8 @@ export async function publishToInstagramCarousel({ salon_id, caption, imageUrls 
   let igCaption = (caption || "").trim();
   igCaption = igCaption.replace(/<a[^>]*href="https?:\/\/instagram\.com\/([^"]+)"[^>]*>@[^<]+<\/a>/gi, "@$1");
   igCaption = igCaption.replace(/https?:\/\/\S+/gi, "").trim();
+  igCaption = igCaption.replace(/^(?:IG|Book(?:\s*now)?):\s*$/gim, "");
+  igCaption = igCaption.replace(/\n{3,}/g, "\n\n").trim();
   if (!/book via link in bio/i.test(igCaption)) {
     igCaption += (igCaption ? "\n\n" : "") + "Book via link in bio.";
   }
@@ -326,6 +328,10 @@ export async function publishToInstagram(input) {
   );
 
   igCaption = igCaption.replace(/https?:\/\/\S+/gi, "").trim();
+
+  // Clean up label remnants left after URL stripping (e.g. "Book: " or "IG: ")
+  igCaption = igCaption.replace(/^(?:IG|Book(?:\s*now)?):\s*$/gim, "");
+  igCaption = igCaption.replace(/\n{3,}/g, "\n\n").trim();
 
   if (!/book via link in bio/i.test(igCaption)) {
     igCaption += (igCaption ? "\n\n" : "") + "Book via link in bio.";

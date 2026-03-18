@@ -178,9 +178,9 @@ router.get("/", requireAuth, (req, res) => {
   // Plan limits
   const planLimits = PLAN_LIMITS[salon.plan] || PLAN_LIMITS.trial;
   const stylistLimit = planLimits.stylists; // null = unlimited (Pro)
-  // Manager seats: only counts role='manager' — coordinators are always unlimited
+  // Portal seat limit applies to both managers AND coordinators combined
   const managerSeatLimit = planLimits.managers; // null = unlimited
-  const usedManagerSeats = portalMembers.filter(m => m.role === 'manager').length;
+  const usedManagerSeats = portalMembers.filter(m => m.role === 'manager' || m.role === 'coordinator').length;
   const managerSeatsAvailable = managerSeatLimit === null || usedManagerSeats < managerSeatLimit;
   const atLimit = stylistLimit !== null && stylists.length >= stylistLimit;
   const nearLimit = stylistLimit !== null && !atLimit && stylists.length >= stylistLimit - 1;
@@ -407,7 +407,7 @@ router.get("/add", requireAuth, (req, res) => {
   const salon = db.prepare("SELECT tone, plan FROM salons WHERE slug = ?").get(salon_id);
   const planLimits = PLAN_LIMITS[salon?.plan] || PLAN_LIMITS.trial;
   const managerSeatLimit = planLimits.managers;
-  const usedSeats = db.prepare("SELECT COUNT(*) as c FROM managers WHERE salon_id = ? AND role = 'manager'").get(salon_id)?.c || 0;
+  const usedSeats = db.prepare("SELECT COUNT(*) as c FROM managers WHERE salon_id = ? AND role IN ('manager','coordinator')").get(salon_id)?.c || 0;
   const managerSeatsAvailable = managerSeatLimit === null || usedSeats < managerSeatLimit;
 
   res.send(pageShell({
@@ -432,6 +432,17 @@ router.post("/add", requireAuth, photoUpload.single("photo"), async (req, res) =
     // Create portal account
     if (!email || !temp_password) {
       return res.redirect(`/manager/stylists/add${qs}&error=Email+and+password+required+for+Manager+and+Coordinator`);
+    }
+    // Enforce portal seat limit (managers + coordinators share the same cap)
+    const salonForLimit = db.prepare("SELECT plan FROM salons WHERE slug = ?").get(salon_id);
+    const portalLimits = PLAN_LIMITS[salonForLimit?.plan] || PLAN_LIMITS.trial;
+    if (portalLimits.managers !== null) {
+      const usedPortalSeats = db.prepare(
+        "SELECT COUNT(*) as c FROM managers WHERE salon_id = ? AND role IN ('manager','coordinator')"
+      ).get(salon_id)?.c || 0;
+      if (usedPortalSeats >= portalLimits.managers) {
+        return res.redirect(`/manager/stylists/add${qs}&error=Portal+seat+limit+reached+for+your+plan.+Upgrade+to+add+more.`);
+      }
     }
     try {
       const password_hash = await bcrypt.hash(temp_password, 10);
@@ -506,7 +517,7 @@ router.post("/add", requireAuth, photoUpload.single("photo"), async (req, res) =
     console.error("[stylistManager] add error:", err);
     const planLimits = PLAN_LIMITS[salon?.plan] || PLAN_LIMITS.trial;
     const managerSeatLimit = planLimits.managers;
-    const usedSeats = db.prepare("SELECT COUNT(*) as c FROM managers WHERE salon_id = ? AND role = 'manager'").get(salon_id)?.c || 0;
+    const usedSeats = db.prepare("SELECT COUNT(*) as c FROM managers WHERE salon_id = ? AND role IN ('manager','coordinator')").get(salon_id)?.c || 0;
     const managerSeatsAvailable = managerSeatLimit === null || usedSeats < managerSeatLimit;
     res.send(pageShell({
       title: "Add Team Member",

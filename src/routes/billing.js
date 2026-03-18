@@ -35,6 +35,50 @@ export const PLAN_LIMITS = {
   trial:   { posts: 20,  stylists: 4,    locations: 1, managers: 0    },
 };
 
+/** Map a Stripe price ID back to a plan name. Returns null if unknown. */
+function planFromPriceId(priceId) {
+  if (!priceId) return null;
+  const map = {};
+  if (process.env.STRIPE_PRICE_STARTER_MONTHLY) map[process.env.STRIPE_PRICE_STARTER_MONTHLY] = "starter";
+  if (process.env.STRIPE_PRICE_STARTER_ANNUAL)  map[process.env.STRIPE_PRICE_STARTER_ANNUAL]  = "starter";
+  if (process.env.STRIPE_PRICE_GROWTH_MONTHLY)  map[process.env.STRIPE_PRICE_GROWTH_MONTHLY]  = "growth";
+  if (process.env.STRIPE_PRICE_GROWTH_ANNUAL)   map[process.env.STRIPE_PRICE_GROWTH_ANNUAL]   = "growth";
+  if (process.env.STRIPE_PRICE_PRO_MONTHLY)     map[process.env.STRIPE_PRICE_PRO_MONTHLY]     = "pro";
+  if (process.env.STRIPE_PRICE_PRO_ANNUAL)      map[process.env.STRIPE_PRICE_PRO_ANNUAL]      = "pro";
+  return map[priceId] || null;
+}
+
+/**
+ * Enforce plan-level staff limits after a plan change.
+ * Deactivates most-recently-added stylists / managers that exceed the new plan's caps.
+ * Owners and coordinators are never auto-deactivated.
+ */
+export function enforceStaffLimits(salon_id) {
+  const salon = db.prepare("SELECT plan FROM salons WHERE slug = ?").get(salon_id);
+  if (!salon) return;
+  const limits = PLAN_LIMITS[salon.plan] || PLAN_LIMITS.trial;
+
+  // Stylists — oldest kept (rowid ASC), newest deactivated when over limit
+  const stylists = db.prepare(
+    "SELECT id FROM stylists WHERE salon_id = ? ORDER BY rowid ASC"
+  ).all(salon_id);
+  stylists.forEach((s, i) => {
+    const active = (limits.stylists === null || i < limits.stylists) ? 1 : 0;
+    db.prepare("UPDATE stylists SET active = ? WHERE id = ?").run(active, s.id);
+  });
+
+  // Managers + coordinators share the same portal seat limit; owners are never touched
+  const portalUsers = db.prepare(
+    "SELECT id FROM managers WHERE salon_id = ? AND role IN ('manager','coordinator') ORDER BY rowid ASC"
+  ).all(salon_id);
+  portalUsers.forEach((m, i) => {
+    const active = (limits.managers === null || i < limits.managers) ? 1 : 0;
+    db.prepare("UPDATE managers SET active = ? WHERE id = ?").run(active, m.id);
+  });
+
+  console.log(`[enforceStaffLimits] ${salon_id} → plan=${salon.plan} stylists=${stylists.length}/${limits.stylists ?? "∞"} portalUsers=${portalUsers.length}/${limits.managers ?? "∞"}`);
+}
+
 function requireAuth(req, res, next) {
   if (!req.session?.manager_id || !req.session?.salon_id) {
     return res.redirect("/manager/login");
@@ -475,15 +519,16 @@ router.get("/manager/billing", requireAuth, requireOwner, async (req, res) => {
               la.style.fontWeight = annual ? '700' : '400';
               lm.style.color = annual ? '#6B7280' : '#2B2D35';
               la.style.color = annual ? '#2B2D35' : '#6B7280';
-              document.querySelectorAll('.price-monthly').forEach(function(el) { el.style.display = annual ? 'none' : ''; });
-              document.querySelectorAll('.price-annual').forEach(function(el) { el.style.display = annual ? '' : 'none'; });
-              document.querySelectorAll('.price-annual-note').forEach(function(el) { el.style.display = annual ? '' : 'none'; });
+              document.querySelectorAll('.price-monthly').forEach(function(el) { el.style.display = annual ? 'none' : 'inline'; });
+              document.querySelectorAll('.price-annual').forEach(function(el) { el.style.display = annual ? 'inline' : 'none'; });
+              document.querySelectorAll('.price-annual-note').forEach(function(el) { el.style.display = annual ? 'block' : 'none'; });
               document.querySelectorAll('.plan-checkout-btn').forEach(function(btn) {
                 btn.href = annual ? btn.dataset.annual : btn.dataset.monthly;
               });
             }
             document.addEventListener('DOMContentLoaded', function() {
-              // Hide annual prices initially (they start with class="hidden" but ensure via JS too)
+              // Ensure correct initial state (Tailwind 'hidden' class may be overridden)
+              document.querySelectorAll('.price-monthly').forEach(function(el) { el.style.display = 'inline'; });
               document.querySelectorAll('.price-annual,.price-annual-note').forEach(function(el) { el.style.display = 'none'; });
               var btn = document.getElementById('cycleToggle');
               if (btn) {
@@ -563,10 +608,23 @@ export async function stripeWebhookHandler(req, res) {
         const salon = db.prepare("SELECT slug FROM salons WHERE stripe_customer_id=?").get(obj.customer);
         if (!salon) break;
         const status = { trialing: "trialing", active: "active", past_due: "past_due" }[obj.status] || "suspended";
-        db.prepare(`
-          UPDATE salons SET plan_status=?, stripe_subscription_id=?, updated_at=datetime('now') WHERE slug=?
-        `).run(status, obj.id, salon.slug);
-        console.log(`[Stripe] subscription.updated: ${salon.slug} → ${status}`);
+
+        // Extract new plan from the subscription's price ID (handles upgrades + downgrades)
+        const priceId = obj.items?.data?.[0]?.price?.id;
+        const newPlan = planFromPriceId(priceId);
+
+        if (newPlan) {
+          db.prepare(`
+            UPDATE salons SET plan=?, plan_status=?, stripe_subscription_id=?, updated_at=datetime('now') WHERE slug=?
+          `).run(newPlan, status, obj.id, salon.slug);
+          enforceStaffLimits(salon.slug);
+          console.log(`[Stripe] subscription.updated: ${salon.slug} → plan=${newPlan} status=${status}`);
+        } else {
+          db.prepare(`
+            UPDATE salons SET plan_status=?, stripe_subscription_id=?, updated_at=datetime('now') WHERE slug=?
+          `).run(status, obj.id, salon.slug);
+          console.log(`[Stripe] subscription.updated: ${salon.slug} → ${status} (plan unchanged, priceId=${priceId})`);
+        }
         break;
       }
 

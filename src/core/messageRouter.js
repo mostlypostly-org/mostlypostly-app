@@ -155,29 +155,29 @@ function prettifyBody(body) {
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-// Ensure a "Styled by <Name>" line exists or overwrite the current one
+// Ensure a "Styled By: <Name>" line exists or overwrite the current one
 function enforceCreditName(caption, stylistName) {
   const name = (stylistName || "Unknown Stylist").toString().trim();
   const lines = String(caption || "").split("\n");
-  const idx = lines.findIndex((l) => /^Styled by /.test(l));
+  const idx = lines.findIndex((l) => /^Styled [Bb]y[:]?\s/i.test(l));
   if (idx >= 0) {
-    lines[idx] = `Styled by ${name}`;
+    lines[idx] = `Styled By: ${name}`;
     return lines.join("\n");
   }
   if (lines.length) {
-    lines.splice(1, 0, `Styled by ${name}`);
+    lines.splice(1, 0, `Styled By: ${name}`);
     return lines.join("\n");
   }
-  return `Styled by ${name}`;
+  return `Styled By: ${name}`;
 }
 
-// Insert IG URL *under* the Styled by line (used for Facebook)
+// Insert IG URL *under* the Styled By: line (used for Facebook)
 function insertIGUnderStyledBy(caption, instagramHandle) {
   const rawHandle = (instagramHandle || "").toString().trim().replace(/^@+/, "");
   if (!rawHandle) return caption;
   const igLine = `IG: https://instagram.com/${rawHandle}`;
   const lines = String(caption || "").split("\n");
-  const idx = lines.findIndex((l) => /^Styled by /.test(l));
+  const idx = lines.findIndex((l) => /^Styled [Bb]y[:]?\s/i.test(l));
   if (idx >= 0) {
     if (lines[idx + 1] && lines[idx + 1].trim() === igLine) return caption;
     lines.splice(idx + 1, 0, igLine);
@@ -186,10 +186,10 @@ function insertIGUnderStyledBy(caption, instagramHandle) {
   return `${caption}\n${igLine}`;
 }
 
-// Replace the "Styled by ..." line with a custom value
+// Replace the "Styled By: ..." line with a custom value
 function replaceStyledByLine(caption, newLine) {
   const lines = String(caption || "").split("\n");
-  const idx = lines.findIndex((l) => /^Styled by /.test(l));
+  const idx = lines.findIndex((l) => /^Styled [Bb]y[:]?\s/i.test(l));
   if (idx >= 0) {
     lines[idx] = newLine;
     return lines.join("\n");
@@ -236,9 +236,9 @@ function buildInstagramCaption(baseCaption, stylistName, igHandle) {
   const handle = (igHandle || "").replace(/^@+/, "");
   let c;
   if (handle) {
-    c = replaceStyledByLine(baseCaption, `Styled by @${handle}`); // IG wants @handle
+    c = replaceStyledByLine(baseCaption, `Styled By: @${handle}`); // IG wants @handle
   } else {
-    c = enforceCreditName(baseCaption, stylistName);              // fallback to name
+    c = enforceCreditName(baseCaption, stylistName);               // fallback to name
   }
 
   // Remove IG URL helper line and any raw booking URLs (non-clickable on IG)
