@@ -456,6 +456,7 @@ export async function runSchedulerOnce() {
               imageUrl:               image,
               caption:                post.final_caption,
               instagram_business_id:  salon.instagram_business_id || salon?.salon_info?.instagram_business_id,
+              stylist_id:             post.stylist_id || null,
             });
           }
 

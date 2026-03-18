@@ -33,6 +33,18 @@ if (!HOST_BASE) {
 const PUBLIC_DIR =
   process.env.PUBLIC_DIR || path.resolve(process.cwd(), "public");
 
+/**
+ * Build the collaborators array for IG media creation.
+ * Returns an array with the handle (without @) if the stylist is opted in,
+ * or undefined if not.
+ */
+export function buildCollaborators(stylist) {
+  if (!stylist?.ig_collab || !stylist?.instagram_handle) return undefined;
+  const handle = stylist.instagram_handle.replace(/^@/, "").trim();
+  if (!handle) return undefined;
+  return [handle];
+}
+
 async function saveToPublic(jpgBuffer, filenameBase = Date.now().toString()) {
   await fs.mkdir(PUBLIC_DIR, { recursive: true });
   const fileName = `${filenameBase}.jpg`;
@@ -62,13 +74,18 @@ async function ensurePublicImage(imageUrl, nameHint, salonId) {
   return imageUrl;
 }
 
-async function createIgMedia({ userId, imageUrl, caption, token, graphVer }) {
+async function createIgMedia({ userId, imageUrl, caption, token, graphVer, collaborators }) {
   const url = `https://graph.facebook.com/${graphVer}/${userId}/media`;
   const params = new URLSearchParams({
     image_url: imageUrl,
     caption: caption || "",
     access_token: token,
   });
+  if (collaborators?.length) {
+    for (const handle of collaborators) {
+      params.append("collaborators", handle);
+    }
+  }
   const resp = await fetch(url, { method: "POST", body: params });
   const data = await resp.json();
   if (!resp.ok || !data?.id) {
@@ -160,6 +177,9 @@ export async function publishToInstagramCarousel({ salon_id, caption, imageUrls 
   }
 
   console.log(`📷 [Instagram Carousel] ${imageUrls.length} images for salon_id=${salon_id}`);
+  // Note: collaborator tagging is not supported on carousel posts (IG API limitation).
+  // Opted-in stylists will still be @mentioned in the caption but won't receive a
+  // collab invite. Single-image posts via publishToInstagram() do support collaborators.
 
   // 1. Rehost and create a carousel item container for each image
   const itemIds = [];
@@ -267,11 +287,12 @@ export async function publishStoryToInstagram({ salon_id, imageUrl, linkUrl }) {
  * Routes to carousel automatically when imageUrls has 2+ entries.
  */
 export async function publishToInstagram(input) {
-  const { salon_id, caption, imageUrl, imageUrls } = input;
+  const { salon_id, caption, imageUrl, imageUrls, stylist_id } = input;
 
   // Route to carousel if multiple images provided
   const allUrls = imageUrls?.length ? imageUrls : (imageUrl ? [imageUrl] : []);
   if (allUrls.length > 1) {
+    // Carousel posts: collaborator tagging not supported (handled by publishToInstagramCarousel)
     return publishToInstagramCarousel({ salon_id, caption, imageUrls: allUrls });
   }
 
@@ -280,6 +301,19 @@ export async function publishToInstagram(input) {
   }
 
   console.log(`📷 [Instagram] Start publish for salon_id=${salon_id}`);
+
+  // ── Collaborator lookup ──────────────────────────────────────────────
+  let collaborators;
+  if (stylist_id) {
+    try {
+      const stylistRow = db.prepare(
+        `SELECT instagram_handle, ig_collab FROM stylists WHERE id = ?`
+      ).get(stylist_id);
+      collaborators = buildCollaborators(stylistRow);
+    } catch (err) {
+      console.warn("[Instagram] Collaborator lookup failed, continuing without:", err.message);
+    }
+  }
 
   // -------------------------------------------------------
   // Caption normalization (UNCHANGED)
@@ -314,17 +348,39 @@ export async function publishToInstagram(input) {
   );
 
   try {
-    const creationId = await retryIg(
-      () =>
-        createIgMedia({
-          userId,
-          imageUrl: publicImageUrl,
-          caption: igCaption,
-          token,
-          graphVer,
-        }),
-      "media create"
-    );
+    let creationId;
+    try {
+      creationId = await retryIg(
+        () =>
+          createIgMedia({
+            userId,
+            imageUrl: publicImageUrl,
+            caption: igCaption,
+            token,
+            graphVer,
+            collaborators,
+          }),
+        "media create"
+      );
+    } catch (createErr) {
+      // If error mentions collaborators, retry without them (non-blocking)
+      if (collaborators && /collaborator/i.test(createErr.message)) {
+        console.warn("[Instagram] Collaborator tag rejected, retrying without:", createErr.message);
+        creationId = await retryIg(
+          () =>
+            createIgMedia({
+              userId,
+              imageUrl: publicImageUrl,
+              caption: igCaption,
+              token,
+              graphVer,
+            }),
+          "media create (no collab)"
+        );
+      } else {
+        throw createErr;
+      }
+    }
 
     await waitForContainer(creationId, token, graphVer);
 
