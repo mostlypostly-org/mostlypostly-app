@@ -70,6 +70,7 @@ import analyticsSchedulerRoute from "./src/routes/analyticsScheduler.js";
 import telegramRoute from "./src/routes/telegram.js";
 import twilioRoute from "./src/routes/twilio.js";
 import facebookAuthRoutes from "./src/routes/facebookAuth.js";
+import googleAuthRoutes from "./src/routes/googleAuth.js";
 import stylistPortal from "./src/routes/stylistPortal.js";
 
 import managerAuthRoutes from "./src/routes/managerAuth.js";
@@ -548,6 +549,7 @@ app.use("/posts", postsRoute);
 app.use("/analytics", analyticsRoute);
 app.use("/analytics/scheduler", analyticsSchedulerRoute);
 app.use("/auth/facebook", facebookAuthRoutes);
+app.use("/auth/google", googleAuthRoutes);
 
 // =====================================================
 // AUTO-INJECT SALON QUERY PARAM IF MISSING
