@@ -114,9 +114,14 @@ router.get("/", requireAuth, (req, res) => {
         <div class="flex-shrink-0 text-right min-w-[130px]">
           <div class="scheduled-time text-xs font-semibold text-mpCharcoal">${timeDisplay}</div>
           <div class="text-[10px] text-mpMuted mt-0.5">Post #${safe(String(p.salon_post_number || "—"))}</div>
-          <a href="/manager/cancel-post?post=${safe(p.id)}"
-             class="text-[10px] text-red-400 hover:text-red-600 mt-1 inline-block"
-             onclick="return confirm('Remove this post from the queue?')">Remove</a>
+          <div class="flex justify-end gap-3 mt-1">
+            <a href="/manager/post-now?post=${safe(p.id)}"
+               class="text-[10px] text-mpAccent hover:text-mpAccentDark font-semibold"
+               onclick="return confirm('Publish this post right now?')">Post Now</a>
+            <a href="/manager/cancel-post?post=${safe(p.id)}"
+               class="text-[10px] text-red-400 hover:text-red-600"
+               onclick="return confirm('Remove this post from the queue?')">Remove</a>
+          </div>
         </div>
       </div>`;
   }).join("");
