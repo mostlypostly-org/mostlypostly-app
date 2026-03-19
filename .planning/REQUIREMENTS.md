@@ -9,15 +9,15 @@
 
 - [ ] **VSYNC-01**: System can authenticate to Aveda brand portal using stored credentials via Playwright automation
 - [ ] **VSYNC-02**: System scrapes social-tagged asset cards from the past 30 days on the Aveda portal
-- [ ] **VSYNC-03**: System deduplicates scraped assets against existing vendor_campaigns (by image URL or product name) and skips existing entries
+- [x] **VSYNC-03**: System deduplicates scraped assets against existing vendor_campaigns (by image URL or product name) and skips existing entries
 - [ ] **VSYNC-04**: System downloads new vendor images to public/uploads/vendor/aveda/
-- [ ] **VSYNC-05**: System extracts and normalizes product names from asset cards using GPT-4o-mini
-- [ ] **VSYNC-06**: System fetches product descriptions from aveda.com product pages (with fallback to brand site search)
-- [ ] **VSYNC-07**: System generates FB/IG-ready captions in Aveda brand voice using GPT-4o
-- [ ] **VSYNC-08**: System stores completed campaigns in vendor_campaigns with all required fields
-- [ ] **VSYNC-09**: Platform Console shows a "Sync Now" button per vendor and displays last_synced_at timestamp
-- [ ] **VSYNC-10**: Nightly scheduled sync runs automatically via scheduler.js cron
-- [ ] **VSYNC-11**: Vendor sync factory pattern abstracts scraper config so adding a new vendor requires only a config block and three env vars
+- [x] **VSYNC-05**: System extracts and normalizes product names from asset cards using GPT-4o-mini
+- [x] **VSYNC-06**: System fetches product descriptions from aveda.com product pages (with fallback to brand site search)
+- [x] **VSYNC-07**: System generates FB/IG-ready captions in Aveda brand voice using GPT-4o
+- [x] **VSYNC-08**: System stores completed campaigns in vendor_campaigns with all required fields
+- [x] **VSYNC-09**: Platform Console shows a "Sync Now" button per vendor and displays last_synced_at timestamp
+- [x] **VSYNC-10**: Nightly scheduled sync runs automatically via scheduler.js cron
+- [x] **VSYNC-11**: Vendor sync factory pattern abstracts scraper config so adding a new vendor requires only a config block and three env vars
 
 ### Content Recycler (FEAT-019)
 

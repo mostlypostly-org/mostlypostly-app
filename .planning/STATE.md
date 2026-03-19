@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 01-vendor-sync plan 03 (PDF caption bypass in vendorScheduler)
-last_updated: "2026-03-19T22:15:36.586Z"
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-03-19T22:16:36.875Z"
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -47,6 +47,7 @@ Plan: 1 of 5
 
 *Updated after each plan completion*
 | Phase 01-vendor-sync P03 | 1 | 1 tasks | 1 files |
+| Phase 01-vendor-sync P01 | 2 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,8 @@ Recent decisions affecting current work:
 - Project init: GMB OAuth from FEAT-020 reused for Reputation Manager (no new auth flow)
 - [Phase 01-vendor-sync]: pdf_sync campaigns bypass AI entirely — caption_body used verbatim with [SALON NAME] replacement
 - [Phase 01-vendor-sync]: Both source and caption_body must be truthy for PDF path — guards against malformed rows
+- [Phase 01-vendor-sync]: product_value column added to vendor_brands in migration 045 — was in CLAUDE.md but had no migration
+- [Phase 01-vendor-sync]: UNIQUE index on (vendor_name, campaign_name, release_date) — NULLs distinct in SQLite UNIQUE, acceptable since Wave 1 will always set release_date
 
 ### Pending Todos
 
@@ -82,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T22:15:36.584Z
-Stopped at: Completed 01-vendor-sync plan 03 (PDF caption bypass in vendorScheduler)
+Last session: 2026-03-19T22:16:36.873Z
+Stopped at: Completed 01-01-PLAN.md
 Resume file: None
