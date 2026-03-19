@@ -1,41 +1,45 @@
 {
   "version": "1.0",
-  "timestamp": "2026-03-19T15:50:25.658Z",
+  "timestamp": "2026-03-19T16:59:06.083Z",
   "phase": "quick",
-  "phase_name": "Fix AI Generate button in Platform Console campaign forms",
-  "phase_dir": ".planning/quick/260319-fii-fix-ai-generate-button-in-platform-conso",
+  "phase_name": "aiGen button debug + affiliate URL feature pending",
+  "phase_dir": null,
   "plan": null,
   "task": null,
   "total_tasks": null,
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "Discussion phase", "status": "done", "commit": null},
-    {"id": 2, "name": "Root cause identified", "status": "done", "commit": null},
-    {"id": 3, "name": "CONTEXT.md written", "status": "done", "commit": null}
+    {"id": 1, "name": "Fix aiGenerateDesc inline/top-level form buttons (quick-260319-fii)", "status": "done", "commit": "4560978"},
+    {"id": 2, "name": "Fix aiGenerateDescBrand brand detail page button", "status": "done", "commit": "4560978"},
+    {"id": 3, "name": "Fix aiGen edit campaign page (async + null checks + confirm dialog)", "status": "done", "commit": "78d6aac"},
+    {"id": 4, "name": "Push all fixes to dev + prod", "status": "done", "commit": "78d6aac"}
   ],
   "remaining_tasks": [
-    {"id": 4, "name": "Spawn gsd-planner (quick mode)", "status": "not_started"},
-    {"id": 5, "name": "Spawn gsd-executor", "status": "not_started"},
-    {"id": 6, "name": "Update STATE.md quick tasks table", "status": "not_started"},
-    {"id": 7, "name": "Final commit of artifacts", "status": "not_started"}
+    {"id": 5, "name": "Confirm aiGen fix works (awaiting typeof aiGen console result)", "status": "blocked"},
+    {"id": 6, "name": "Affiliate URL injection in social posts", "status": "not_started"}
   ],
-  "blockers": [],
-  "human_actions_pending": [],
+  "blockers": [
+    {
+      "description": "aiGen button still not working despite fix — user ran typeof aiGen in console but paused before sharing result",
+      "type": "human_action",
+      "workaround": "Ask user for typeof aiGen result on resume"
+    }
+  ],
+  "human_actions_pending": [
+    {
+      "action": "Share typeof aiGen console output ('function' or 'undefined')",
+      "context": "Determines if script block parsed correctly. If 'undefined', the CSRF middleware may be corrupting the script tag. If 'function', the confirm() dialog is likely the issue since campaign description is pre-filled.",
+      "blocking": true
+    }
+  ],
   "decisions": [
     {
-      "decision": "Root cause: inline onclick attributes evaluate document.getElementById().value which throws TypeError silently if element not found, before aiGenerateDesc is ever called",
-      "rationale": "User confirmed: product name IS filled in, button shows zero visual response (no loading state, no alert). The ONLY path that produces this exact behavior is a TypeError in the onclick attribute evaluation before the function is invoked.",
-      "phase": "quick"
-    },
-    {
-      "decision": "Fix: move all getElementById lookups inside the JS function body, pass element IDs as string arguments instead of inline .value expressions",
-      "rationale": "Eliminates the silent TypeError path. If element lookup fails inside the function, proper error feedback (alert) can be shown.",
+      "decision": "aiGen rewritten as async/await with defensive null checks matching aiGenerateDesc pattern",
+      "rationale": "Original had no null guard on querySelector — silent TypeError before any visible feedback. Also added confirm() dialog when description already has content.",
       "phase": "quick"
     }
   ],
-  "uncommitted_files": [
-    ".planning/quick/260319-fii-fix-ai-generate-button-in-platform-conso/260319-fii-CONTEXT.md"
-  ],
-  "next_action": "Run /gsd:quick --discuss on fresh session — discussion phase is COMPLETE (CONTEXT.md exists), planner should read it and go straight to planning. Then execute the fix in src/routes/vendorAdmin.js",
-  "context_notes": "This is quick task 260319-fii. The fix touches vendorAdmin.js in 3 places: (1) inline per-vendor form AI Generate onclick, (2) top-level form AI Generate onclick, (3) brand detail page aiGenerateDescBrand onclick. The aiGenerateDesc function signature changes to accept element IDs instead of inline .value calls. The aiGen function on the edit page was already fixed in commit 077230b and does NOT need changes."
+  "uncommitted_files": [],
+  "next_action": "Ask user: what did typeof aiGen return in the console? Then either fix script parse issue (if undefined) or explain confirm dialog behavior (if function). Then start affiliate URL feature as new /gsd:quick --discuss.",
+  "context_notes": "Edit campaign page response is only 3432 bytes (suspicious — PIN page without session is 1992 bytes). aiGen fix deployed to both main and dev. New feature pending: affiliate URL replaces booking URL in FB captions (with UTM tracking token); IG caption changes 'Book now, link in bio' to 'Shop now, link in bio'. See composeFinalCaption.js and scheduler.js (enqueuePost) for relevant code paths."
 }
