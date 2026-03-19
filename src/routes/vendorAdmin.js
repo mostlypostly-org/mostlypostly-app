@@ -202,6 +202,14 @@ router.post("/set-plan", requireSecret, requirePin, (req, res) => {
 
 // ── GET / — Platform Console ───────────────────────────────────────────────────
 router.get("/", requireSecret, requirePin, (req, res) => {
+  const brands = db.prepare(`
+    SELECT vb.vendor_name, vb.product_value, COUNT(vc.id) AS campaign_count
+    FROM vendor_brands vb
+    LEFT JOIN vendor_campaigns vc ON vc.vendor_name = vb.vendor_name
+    GROUP BY vb.vendor_name
+    ORDER BY vb.vendor_name
+  `).all();
+
   const campaigns = db.prepare(`
     SELECT * FROM vendor_campaigns ORDER BY vendor_name ASC, campaign_name ASC
   `).all();
@@ -545,6 +553,55 @@ router.get("/", requireSecret, requirePin, (req, res) => {
       <div class="stat-card"><div class="stat-val ${pendingCount > 0 ? "text-yellow-500" : "text-gray-400"}">${pendingCount}</div><div class="stat-lbl">Pending Approvals</div></div>
       <div class="stat-card"><div class="stat-val ${openIssueCount > 0 ? "text-red-500" : "text-gray-400"}">${openIssueCount}</div><div class="stat-lbl">Open Issues</div></div>
       <div class="stat-card"><div class="stat-val ${openRequestCount > 0 ? "text-indigo-600" : "text-gray-400"}">${openRequestCount}</div><div class="stat-lbl">Feature Requests</div></div>
+    </div>
+
+    <!-- Vendor Brands -->
+    <div class="border rounded-2xl bg-white p-6">
+      <h2 class="font-bold text-lg mb-4">Vendor Brands</h2>
+      <table class="w-full text-sm border-collapse mb-6">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="text-left p-2 border">Brand</th>
+            <th class="text-left p-2 border">Campaigns</th>
+            <th class="text-left p-2 border">Product Value</th>
+            <th class="text-left p-2 border">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${brands.map(b => `
+            <tr>
+              <td class="p-2 border font-medium">${safe(b.vendor_name)}</td>
+              <td class="p-2 border">${b.campaign_count}</td>
+              <td class="p-2 border">$${b.product_value || 45}</td>
+              <td class="p-2 border">
+                <a href="/internal/vendors/brands/${encodeURIComponent(b.vendor_name)}${qs(req)}"
+                   class="text-blue-600 underline">View Campaigns &rarr;</a>
+              </td>
+            </tr>
+          `).join("")}
+          ${brands.length === 0 ? '<tr><td colspan="4" class="p-2 border text-gray-400">No brands yet</td></tr>' : ''}
+        </tbody>
+      </table>
+
+      <h3 class="text-base font-bold mb-3">Add Brand</h3>
+      <form method="POST" action="/internal/vendors/brands/create${qs(req)}" class="flex flex-wrap gap-3 items-end">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Brand Name</label>
+          <input type="text" name="vendor_name" required placeholder="e.g. Aveda"
+            class="border rounded px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Product Value ($)</label>
+          <input type="number" name="product_value" value="45" min="1"
+            class="border rounded px-3 py-2 text-sm w-24" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Brand Hashtags (comma-separated)</label>
+          <input type="text" name="brand_hashtags" placeholder="#Aveda, #AvedaColor"
+            class="border rounded px-3 py-2 text-sm w-64" />
+        </div>
+        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded text-sm">Add Brand</button>
+      </form>
     </div>
 
     <!-- Platform Issues -->
@@ -1376,6 +1433,253 @@ Do NOT include pricing, calls to action, or hashtags.`;
     console.error("[vendorAdmin] AI description error:", err.message);
     return res.json({ error: err.message });
   }
+});
+
+// ── POST /brands/create — Create a new vendor brand ───────────────────────────
+router.post("/brands/create", requireSecret, requirePin, (req, res) => {
+  const { vendor_name, product_value, brand_hashtags } = req.body;
+  if (!vendor_name?.trim()) return res.redirect(`/internal/vendors${qs(req)}&error=missing_vendor_name`);
+  const tags = (brand_hashtags || "").split(",").map(t => t.trim()).filter(Boolean);
+  db.prepare(`INSERT OR IGNORE INTO vendor_brands (vendor_name, product_value, brand_hashtags) VALUES (?, ?, ?)`)
+    .run(vendor_name.trim(), parseInt(product_value, 10) || 45, JSON.stringify(tags));
+  return res.redirect(`/internal/vendors/brands/${encodeURIComponent(vendor_name.trim())}${qs(req)}`);
+});
+
+// ── GET /brands/:name — Brand detail page ────────────────────────────────────
+router.get("/brands/:name", requireSecret, requirePin, (req, res) => {
+  const { name } = req.params;
+  const brand = db.prepare(`SELECT * FROM vendor_brands WHERE vendor_name = ?`).get(name);
+  if (!brand) return res.status(404).send("Brand not found");
+
+  const campaigns = db.prepare(`
+    SELECT * FROM vendor_campaigns WHERE vendor_name = ? ORDER BY created_at DESC
+  `).all(name);
+
+  const safe = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const today = new Date().toISOString().slice(0, 10);
+
+  const brandHashtags = (() => { try { return JSON.parse(brand.brand_hashtags || "[]"); } catch { return []; } })();
+  const categories = (() => { try { return JSON.parse(brand.categories || "[]"); } catch { return []; } })();
+
+  const catOptions = categories.length
+    ? categories.map(cat => `<option value="${safe(cat)}">${safe(cat)}</option>`).join("")
+    : `<option value="Standard">Standard</option><option value="Promotion">Promotion</option><option value="Color">Color</option><option value="Treatment">Treatment</option><option value="Styling">Styling</option><option value="Care">Care</option>`;
+
+  const campaignRows = campaigns.map(c => {
+    const isExpired = c.expires_at && c.expires_at < today;
+    const statusBadge = isExpired
+      ? `<span class="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600">Expired</span>`
+      : `<span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Active</span>`;
+    return `
+    <tr class="border-b last:border-0 hover:bg-gray-50/50">
+      <td class="px-4 py-3">
+        ${c.photo_url
+          ? `<img src="${safe(c.photo_url)}" class="w-10 h-10 object-cover rounded border" onerror="this.style.display='none'" />`
+          : `<div class="w-10 h-10 rounded border bg-gray-50 flex items-center justify-center text-lg">&#127991;</div>`}
+      </td>
+      <td class="px-4 py-3">
+        <p class="font-semibold text-sm">${safe(c.campaign_name)}</p>
+        <p class="text-xs text-gray-500">${safe(c.product_name || "")}${c.category ? ` &middot; ${safe(c.category)}` : ""}</p>
+      </td>
+      <td class="px-4 py-3">${statusBadge}</td>
+      <td class="px-4 py-3 text-xs text-gray-500">${safe(c.expires_at || "—")}</td>
+      <td class="px-4 py-3 text-xs text-gray-500">${safe(c.frequency_cap || 4)}/mo</td>
+      <td class="px-4 py-3">
+        <div class="flex gap-2">
+          <a href="/internal/vendors/campaign/${safe(c.id)}/edit${qs(req)}"
+             class="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</a>
+          <form method="POST" action="/internal/vendors/delete/${safe(c.id)}${qs(req)}"
+                onsubmit="return confirm('Delete campaign: ${safe(c.campaign_name)}?')" class="inline">
+            <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
+          </form>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+
+  res.send(`<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8" /><title>${safe(name)} — Platform Console</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+
+  <!-- Header -->
+  <div class="border-b bg-white px-8 py-4 flex items-center gap-4">
+    <a href="/internal/vendors${qs(req)}" class="text-sm text-blue-600 hover:underline">&larr; Platform Console</a>
+    <span class="text-gray-300">/</span>
+    <h1 class="text-lg font-bold text-gray-900">${safe(name)}</h1>
+  </div>
+
+  <div class="max-w-5xl mx-auto px-8 py-8 space-y-8">
+
+    <!-- Brand Info -->
+    <div class="border rounded-2xl bg-white p-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-xl font-bold">${safe(brand.vendor_name)}</h2>
+          <p class="text-sm text-gray-500 mt-1">
+            Product Value: <strong>$${brand.product_value || 45}</strong>
+            ${brandHashtags.length ? ` &middot; Hashtags: <strong>${brandHashtags.map(h => safe(h)).join(", ")}</strong>` : ""}
+            ${categories.length ? ` &middot; Categories: <strong>${categories.map(c => safe(c)).join(", ")}</strong>` : ""}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Campaigns Table -->
+    <div class="border rounded-2xl bg-white overflow-hidden">
+      <div class="px-6 py-4 border-b flex items-center justify-between">
+        <h2 class="font-bold">Campaigns
+          <span class="ml-2 text-sm font-normal text-gray-400">${campaigns.length} total</span>
+        </h2>
+      </div>
+      ${campaigns.length === 0
+        ? `<div class="px-6 py-8 text-center text-sm text-gray-400">No campaigns yet — add one below.</div>`
+        : `<div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                <tr>
+                  <th class="px-4 py-2"></th>
+                  <th class="px-4 py-2 text-left">Campaign</th>
+                  <th class="px-4 py-2 text-left">Status</th>
+                  <th class="px-4 py-2 text-left">Expires</th>
+                  <th class="px-4 py-2 text-left">Cap</th>
+                  <th class="px-4 py-2 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody>${campaignRows}</tbody>
+            </table>
+           </div>`}
+    </div>
+
+    <!-- Add Campaign Form -->
+    <div class="border rounded-2xl bg-white p-6">
+      <h2 class="font-bold mb-4">Add Campaign</h2>
+      <form method="POST" action="/internal/vendors/campaign/add${qs(req)}" enctype="multipart/form-data" class="space-y-3">
+        <input type="hidden" name="vendor_name" value="${safe(brand.vendor_name)}" />
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Campaign Name *</label>
+            <input type="text" name="campaign_name" required placeholder="Spring Color 2026"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Category *</label>
+            <select name="category" required class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm">
+              <option value="">-- Select --</option>
+              ${catOptions}
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Product Name *</label>
+            <input type="text" name="product_name" id="brand-form-product-name" required placeholder="Full Spectrum Color"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Product Hashtag (max 1)</label>
+            <input type="text" name="product_hashtag" placeholder="#FullSpectrum" maxlength="60"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
+          </div>
+          <div class="col-span-2">
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-xs text-gray-500">Product Description *</label>
+              <button type="button"
+                      onclick="aiGenerateDescBrand(this, '${safe(brand.vendor_name)}', document.getElementById('brand-form-product-name').value, 'brand-form-desc')"
+                      class="text-xs text-purple-600 hover:text-purple-800 font-medium">
+                &#10024; AI Generate
+              </button>
+            </div>
+            <textarea id="brand-form-desc" name="product_description" rows="3" required
+                      placeholder="1–2 sentence description"
+                      class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"></textarea>
+          </div>
+          <div class="col-span-2">
+            <label class="text-xs text-gray-500 block mb-1">Photo *</label>
+            <div class="flex gap-2 items-center">
+              <input type="text" name="photo_url" placeholder="https://... (or upload a file)"
+                     class="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
+              <input type="file" name="photo_file" accept="image/*"
+                     class="text-xs text-gray-600 file:mr-2 file:rounded file:border-0 file:bg-gray-100 file:px-2 file:py-1 file:text-xs file:font-medium" />
+            </div>
+            <p class="text-[11px] text-gray-400 mt-0.5">Provide a URL or upload an image file. Uploaded file takes priority.</p>
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Tone Direction</label>
+            <input type="text" name="tone_direction" placeholder="professional and educational"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">CTA Instructions</label>
+            <input type="text" name="cta_instructions" placeholder="Ask about our color menu"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Service Pairing Notes</label>
+            <input type="text" name="service_pairing_notes" placeholder="Pairs with balayage"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Expires At (required for Promotion)</label>
+            <input type="date" name="expires_at"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Frequency Cap (posts/month)</label>
+            <input type="number" name="frequency_cap" value="4" min="1" max="30"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <button type="submit"
+                  class="text-sm bg-gray-900 text-white rounded-lg px-5 py-2 font-semibold hover:bg-gray-700">
+            Add Campaign
+          </button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+
+<script>
+async function aiGenerateDescBrand(btn, vendorName, productName, targetId) {
+  if (!vendorName || !productName) {
+    alert('Enter product name first.');
+    return;
+  }
+  var target = document.getElementById(targetId);
+  if (!target) return;
+  if (target.value.trim()) {
+    if (!confirm('Description already has content. Replace it with AI-generated text?')) return;
+  }
+  var origText = btn.textContent;
+  btn.textContent = 'Generating\u2026';
+  btn.disabled = true;
+  try {
+    var secret = new URLSearchParams(window.location.search).get('secret') || '';
+    var resp = await fetch('/internal/vendors/campaign/ai-description?secret=' + encodeURIComponent(secret), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vendor_name: vendorName, product_name: productName })
+    });
+    var data = await resp.json();
+    if (data.description) {
+      target.value = data.description;
+    } else {
+      alert('Could not generate description: ' + (data.error || 'Unknown error'));
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+}
+</script>
+
+</body></html>`);
 });
 
 // ── GET /campaign/:id/edit — Dedicated edit page for a campaign ──────────────
