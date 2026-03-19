@@ -62,7 +62,7 @@ export function buildVendorHashtagBlock({ salonHashtags, brandHashtags, productH
 // OpenAI caption generation for vendor posts
 // =====================================================
 
-export async function generateVendorCaption({ campaign, salon, affiliateUrl }) {
+export async function generateVendorCaption({ campaign, salon }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     log.warn("Missing OPENAI_API_KEY — skipping vendor caption generation");
@@ -71,21 +71,6 @@ export async function generateVendorCaption({ campaign, salon, affiliateUrl }) {
 
   const salonName = salon.name || "the salon";
   const tone      = salon.tone || "friendly and professional";
-
-  // Validate affiliate URL — skip if malformed to prevent prompt injection
-  let safeAffiliateUrl = null;
-  if (affiliateUrl) {
-    try {
-      const parsed = new URL(affiliateUrl);
-      if (parsed.protocol === "https:" || parsed.protocol === "http:") {
-        safeAffiliateUrl = parsed.href;
-      } else {
-        log.warn(`Skipping non-HTTP affiliate URL for campaign ${campaign.id}: ${affiliateUrl}`);
-      }
-    } catch {
-      log.warn(`Invalid affiliate URL for campaign ${campaign.id}: ${affiliateUrl}`);
-    }
-  }
 
   const systemPrompt = `You are a social media expert writing Instagram and Facebook posts for a hair salon.
 Write a single post caption that:
@@ -106,7 +91,6 @@ Description: ${campaign.product_description || ""}
 ${campaign.tone_direction ? `Brand tone direction: ${campaign.tone_direction}` : ""}
 ${campaign.cta_instructions ? `CTA instructions: ${campaign.cta_instructions}` : ""}
 ${campaign.service_pairing_notes ? `Service pairing notes: ${campaign.service_pairing_notes}` : ""}
-${safeAffiliateUrl ? `Include this partner link in the post: ${safeAffiliateUrl}` : ""}
 
 Remember: this is for ${salonName} — write in their voice (${tone}), not the brand's voice.`;
 
@@ -266,7 +250,7 @@ async function processCampaign(campaign, salon, thisMonth, affiliateUrl) {
 
   // Generate AI caption adapted to salon's tone
   log.info(`  Generating caption for salon ${salonId} / campaign "${campaign.campaign_name}"`);
-  const caption = await generateVendorCaption({ campaign, salon, affiliateUrl });
+  const caption = await generateVendorCaption({ campaign, salon });
 
   if (!caption) {
     log.warn(`  Skipping campaign ${campaign.id} — caption generation failed`);
@@ -288,7 +272,6 @@ async function processCampaign(campaign, salon, thisMonth, affiliateUrl) {
     brandHashtags,
     productHashtag: campaign.product_hashtag || null,
   });
-  const finalCaption = caption + (lockedBlock ? `\n\n${lockedBlock}` : "");
 
   // 7. Compute next salon post number
   const { maxnum } = db.prepare(
@@ -301,9 +284,9 @@ async function processCampaign(campaign, salon, thisMonth, affiliateUrl) {
   const now    = new Date().toISOString();
   const status = salon.require_manager_approval ? "manager_pending" : "manager_approved";
 
-  // Replace raw affiliate URL in caption with tracking short URL
-  let trackedCaption = finalCaption;
-  if (affiliateUrl && finalCaption.includes(affiliateUrl)) {
+  // Deterministic affiliate URL injection — system controls placement, not AI
+  let trackedCaption;
+  if (affiliateUrl) {
     const utmContent = `vendor_${slugify(campaign.vendor_name)}`;
     const destination = appendUtm(affiliateUrl, {
       source: 'mostlypostly',
@@ -320,10 +303,14 @@ async function processCampaign(campaign, salon, thisMonth, affiliateUrl) {
         utmContent,
         destination,
       });
-      trackedCaption = finalCaption.replace(affiliateUrl, buildShortUrl(token));
+      const shortUrl = buildShortUrl(token);
+      trackedCaption = caption + "\n\nShop today: " + shortUrl + (lockedBlock ? "\n\n" + lockedBlock : "");
     } catch (err) {
       log.warn(`  UTM token creation failed for campaign ${campaign.id}: ${err.message}`);
+      trackedCaption = caption + (lockedBlock ? "\n\n" + lockedBlock : "");
     }
+  } else {
+    trackedCaption = caption + (lockedBlock ? "\n\n" + lockedBlock : "");
   }
 
   db.prepare(`
