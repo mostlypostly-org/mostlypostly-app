@@ -121,7 +121,8 @@ router.get("/", requireAuth, (req, res) => {
       // Task 3: brand config and vendor settings per vendor
       const brandCfg      = brandConfigMap[vendorName] || {};
       const vendorSetting = vendorSettingsMap[vendorName] || {};
-      const brandCategories = (() => { try { return JSON.parse(brandCfg.categories || "[]"); } catch { return []; } })();
+      // Pull categories from actual campaign data for this brand (not vendor_brands.categories which may be unpopulated)
+      const brandCategories = [...new Set(items.map(c => c.category).filter(Boolean))].sort();
       const activeFilters   = (() => { try { return JSON.parse(vendorSetting.category_filters || "[]"); } catch { return []; } })();
       const canRenew        = brandCfg.allow_client_renewal !== 0;
       const vKey            = safe(vendorName.replace(/\s+/g, "_"));

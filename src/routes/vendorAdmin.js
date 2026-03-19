@@ -1283,7 +1283,7 @@ router.post("/campaign/edit", requireSecret, requirePin, vendorCampaignUpload, (
   } = req.body;
   const frequency_cap = parseInt(req.body.frequency_cap, 10) || 4;
 
-  if (!campaign_id || !campaign_name || !product_name || !product_description) {
+  if (!campaign_id || !campaign_name || !category || !product_name || !product_description) {
     return res.redirect(`/internal/vendors${qs(req)}&error=missing_fields`);
   }
 
