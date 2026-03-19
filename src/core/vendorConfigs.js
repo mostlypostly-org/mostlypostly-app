@@ -7,7 +7,7 @@
  * @property {string} vendorName — matches vendor_brands.vendor_name
  * @property {string} portalUrl — login/resource page URL
  * @property {{ userSelector: string, passSelector: string, submitSelector: string }} loginSelectors
- * @property {string} searchKeywordTemplate — "{MONTH} {YEAR} Salon Social Assets"
+ * @property {string} searchKeywordTemplate — "{MONTH} {YEAR} Salon Social Media Assets"
  * @property {{ cardSelector: string, downloadButtonSelector: string }} pdfDownloadSelectors
  * @property {'auto'|'direct'|'page-click'} imageDownloadStrategy
  * @property {{ userEnv: string, passEnv: string }} credentialEnvVars
@@ -24,7 +24,7 @@ export const VENDOR_CONFIGS = [
       passSelector: 'input[name="password"], input[type="password"], #password',
       submitSelector: 'button[type="submit"], input[type="submit"]',
     },
-    searchKeywordTemplate: '{MONTH} {YEAR} Salon Social Assets',
+    searchKeywordTemplate: '{MONTH} {YEAR} Salon Social Media Assets',
     pdfDownloadSelectors: {
       cardSelector: '.resource-card, .card, [data-resource]',
       downloadButtonSelector: 'a[download], button.download, a.download, [data-action="download"]',
