@@ -86,7 +86,7 @@ router.get("/:token", (req, res) => {
 
   // ── Logo ─────────────────────────────────────────────────────────────────
   const logoHtml = salon.logo_url
-    ? `<div style="background:#fff;border-radius:10px;padding:6px 10px;display:flex;align-items:center;"><img src="${esc(salon.logo_url)}" alt="${esc(salon.name)}" style="height:32px;width:auto;object-fit:contain;" /></div>`
+    ? `<img src="${esc(salon.logo_url)}" alt="${esc(salon.name)}" style="height:44px;width:auto;object-fit:contain;" />`
     : `<span style="font-size:1.25rem;font-weight:800;color:#fff;letter-spacing:-0.02em">${esc(salon.name)}</span>`;
 
   // ── Bonus banner ─────────────────────────────────────────────────────────
@@ -294,8 +294,8 @@ router.get("/:token", (req, res) => {
 
   <!-- ── Header ─────────────────────────────────────────────────────────── -->
   <header class="lb-header" style="
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: #ffffff;
+    border-bottom: 1px solid #E2E8F0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -304,7 +304,7 @@ router.get("/:token", (req, res) => {
   ">
     <div style="display:flex;align-items:center;gap:1rem;">
       ${logoHtml}
-      <div style="width:1px;height:2rem;background:rgba(255,255,255,0.12)"></div>
+      <div style="width:1px;height:2rem;background:#E2E8F0"></div>
       <div>
         <p style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#3B72B9">Team Leaderboard</p>
         <p style="font-size:.9rem;font-weight:700;color:#3B72B9">This Month</p>
