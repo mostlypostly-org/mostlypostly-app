@@ -388,7 +388,7 @@ router.get("/", requireAuth, (req, res) => {
     // Reset
     var resetBtn = e.target.closest('.reset-campaign-btn');
     if (resetBtn) {
-      if (!confirm('Reset this month\'s post count for this campaign?')) return;
+      if (!confirm("Reset this month's post count for this campaign?")) return;
       try {
         var r = await fetch('/manager/vendors/reset-campaign', {
           method: 'POST',
