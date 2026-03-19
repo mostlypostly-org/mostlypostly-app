@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-03-19T22:48:38.837Z"
+stopped_at: Completed quick task 260319-q5j
+last_updated: "2026-03-19T23:18:38.516Z"
 progress:
   total_phases: 4
   completed_phases: 1
@@ -92,9 +92,10 @@ None yet.
 | 260319-dqb | Fix vendor post image not publishing to social platforms | 2026-03-19 | 86319c9 | [260319-dqb-fix-vendor-post-image-not-publishing-to-](./quick/260319-dqb-fix-vendor-post-image-not-publishing-to-/) |
 | 260319-fii | Fix AI Generate button in Platform Console campaign forms | 2026-03-19 | 4560978 | [260319-fii-fix-ai-generate-button-in-platform-conso](./quick/260319-fii-fix-ai-generate-button-in-platform-conso/) |
 | 260319-i8s | Inject affiliate URL into vendor posts (deterministic) | 2026-03-19 | ba90a69 | [260319-i8s-inject-affiliate-url-into-vendor-posts-f](./quick/260319-i8s-inject-affiliate-url-into-vendor-posts-f/) |
+| 260319-q5j | Vendor campaign posting frequency controls (min-gap, auto-expiry, tone_direction removal) | 2026-03-19 | 65a68f7 | [260319-q5j-audit-vendor-campaign-posting-frequency-](./quick/260319-q5j-audit-vendor-campaign-posting-frequency-/) |
 
 ## Session Continuity
 
-Last session: 2026-03-19T22:24:41.441Z
-Stopped at: Completed 01-04-PLAN.md
+Last session: 2026-03-19T23:18:38.513Z
+Stopped at: Completed quick task 260319-q5j
 Resume file: None
