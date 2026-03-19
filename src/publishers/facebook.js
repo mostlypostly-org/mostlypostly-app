@@ -94,12 +94,14 @@ export async function publishToFacebook(
     }
 
     // URL-based upload failed — try binary upload for self-hosted images.
-    // This handles cases where Facebook's CDN cannot reach our server URL.
+    // This handles cases where Facebook's CDN cannot reach our server URL,
+    // or where a relative path was stored instead of an absolute URL.
     const selfBase = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
-    if (selfBase && imageUrl.startsWith(selfBase)) {
+    const resolvedImageUrl = imageUrl.startsWith("/") && selfBase ? `${selfBase}${imageUrl}` : imageUrl;
+    if (selfBase && (resolvedImageUrl.startsWith(selfBase))) {
       console.log("📤 [Facebook] Attempting binary upload for self-hosted image…");
       try {
-        const imgRes = await fetch(imageUrl);
+        const imgRes = await fetch(resolvedImageUrl);
         if (!imgRes.ok) throw new Error(`Image fetch failed: ${imgRes.status}`);
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
         const ext = imageUrl.split(".").pop()?.split("?")[0]?.toLowerCase() || "jpg";

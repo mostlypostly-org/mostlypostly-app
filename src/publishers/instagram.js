@@ -56,6 +56,12 @@ async function saveToPublic(jpgBuffer, filenameBase = Date.now().toString()) {
 async function ensurePublicImage(imageUrl, nameHint, salonId) {
   if (!imageUrl) throw new Error("Missing imageUrl");
 
+  // Resolve relative paths (e.g. /uploads/...) to absolute URLs
+  if (imageUrl.startsWith("/")) {
+    const base = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+    if (base) imageUrl = `${base}${imageUrl}`;
+  }
+
   if (/^https:\/\/api\.twilio\.com\//i.test(imageUrl)) {
     console.log("🔄 [Instagram] Rehosting Twilio image…");
     return await rehostTwilioMedia(imageUrl, salonId || null);

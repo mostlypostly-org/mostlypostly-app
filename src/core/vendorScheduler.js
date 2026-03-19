@@ -14,6 +14,16 @@ import { enqueuePost } from "../scheduler.js";
 import { appendUtm, slugify } from './utm.js';
 import { buildTrackingToken, buildShortUrl } from './trackingUrl.js';
 
+// Ensure a URL stored as a relative path (/uploads/...) becomes absolute.
+function resolveUrl(url) {
+  if (!url) return null;
+  if (url.startsWith("/")) {
+    const base = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+    return base ? `${base}${url}` : url;
+  }
+  return url;
+}
+
 const tag = "[VendorScheduler]";
 const log = {
   info:  (...a) => console.log(tag, ...a),
@@ -331,7 +341,7 @@ async function processCampaign(campaign, salon, thisMonth, affiliateUrl) {
     id:                  postId,
     salon_id:            salonId,
     stylist_name:        `${campaign.vendor_name} (Campaign)`,
-    image_url:           campaign.photo_url || null,
+    image_url:           resolveUrl(campaign.photo_url),
     base_caption:        caption,          // AI text only, no hashtags
     final_caption:       trackedCaption,  // AI text + locked hashtag block + tracked URL
     post_type:           "standard_post",

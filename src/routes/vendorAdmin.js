@@ -354,7 +354,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
               <a href="/internal/vendors/campaign/${safe(c.id)}/edit${qs(req)}"
                  class="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</a>
               <form method="POST" action="/internal/vendors/delete/${safe(c.id)}${qs(req)}"
-                    onsubmit="return confirm('Delete campaign: ${safe(c.campaign_name)}?')" class="inline">
+                    data-confirm="Delete campaign: ${safe(c.campaign_name)}?" class="inline">
                 <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
               </form>
             </div>
@@ -467,7 +467,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
           </div>
           <div class="flex justify-end gap-2">
             <button type="button"
-                    onclick="this.closest('details').removeAttribute('open');"
+                    data-action="close-details"
                     class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
             <button type="submit"
                     class="text-xs bg-gray-900 text-white rounded-lg px-4 py-1.5 font-semibold">
@@ -599,7 +599,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
                   <a href="/internal/vendors/brands/${encodeURIComponent(b.vendor_name)}/edit${qs(req)}"
                      class="text-xs text-gray-500 hover:text-gray-700 font-medium">Edit</a>
                   <form method="POST" action="/internal/vendors/brands/${encodeURIComponent(b.vendor_name)}/delete${qs(req)}"
-                        onsubmit="return confirm('Delete brand ${safe(b.vendor_name)} and all its campaigns? This cannot be undone.')" class="inline">
+                        data-confirm="Delete brand ${safe(b.vendor_name)} and all its campaigns? This cannot be undone." class="inline">
                     <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
                   </form>
                 </div>
@@ -715,7 +715,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
               <td class="px-4 py-3 text-center font-bold text-gray-700">${r.vote_count}</td>
               <td class="px-4 py-3">
                 <form method="POST" action="/internal/vendors/feature-requests/${safe(r.id)}/status${qs(req)}" class="flex gap-1 items-center">
-                  <select name="status" onchange="this.form.submit()" class="text-xs border rounded px-1.5 py-1 bg-white">
+                  <select name="status" data-action="auto-submit" class="text-xs border rounded px-1.5 py-1 bg-white">
                     ${['submitted','under_review','planned','live','declined'].map(s => `<option value="${s}" ${r.status === s ? 'selected' : ''}>${s.replace('_',' ')}</option>`).join('')}
                   </select>
                 </form>
@@ -726,7 +726,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
                 </form>
               </td>
               <td class="px-4 py-3">
-                <form method="POST" action="/internal/vendors/feature-requests/${safe(r.id)}/delete${qs(req)}" onsubmit="return confirm('Delete this feature request?')">
+                <form method="POST" action="/internal/vendors/feature-requests/${safe(r.id)}/delete${qs(req)}" data-confirm="Delete this feature request?">
                   <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
                 </form>
               </td>
@@ -900,7 +900,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
               </td>
               <td class="px-4 py-3">
                 <form method="POST" action="/internal/vendors/delete-salon${qs(req)}"
-                      onsubmit="return confirm('Permanently delete ${safe(s.name)} and all associated data? This cannot be undone.')">
+                      data-confirm="Permanently delete ${safe(s.name)} and all associated data? This cannot be undone.">
                   <input type="hidden" name="salon_slug" value="${safe(s.slug)}" />
                   <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
                 </form>
@@ -1160,6 +1160,24 @@ async function aiGenerateDesc(btn, vendorArg, productNameInputId, targetId) {
 document.addEventListener('click', function(e) {
   var btn = e.target.closest('[data-action="ai-gen-desc"]');
   if (btn) { e.preventDefault(); aiGenerateDesc(btn, btn.dataset.vendor, btn.dataset.prodId, btn.dataset.targetId); }
+});
+
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-action="close-details"]');
+  if (btn) { var d = btn.closest('details'); if (d) d.removeAttribute('open'); }
+});
+
+document.addEventListener('submit', function(e) {
+  var form = e.target.closest('form[data-confirm]');
+  if (form) {
+    var msg = form.dataset.confirm;
+    if (!confirm(msg)) e.preventDefault();
+  }
+});
+
+document.addEventListener('change', function(e) {
+  var sel = e.target.closest('[data-action="auto-submit"]');
+  if (sel) { var f = sel.closest('form'); if (f) f.submit(); }
 });
 </script>
 
@@ -1703,7 +1721,7 @@ router.get("/brands/:name", requireSecret, requirePin, (req, res) => {
           <a href="/internal/vendors/campaign/${safe(c.id)}/edit${qs(req)}"
              class="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</a>
           <form method="POST" action="/internal/vendors/delete/${safe(c.id)}${qs(req)}"
-                onsubmit="return confirm('Delete campaign: ${safe(c.campaign_name)}?')" class="inline">
+                data-confirm="Delete campaign: ${safe(c.campaign_name)}?" class="inline">
             <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
           </form>
         </div>
