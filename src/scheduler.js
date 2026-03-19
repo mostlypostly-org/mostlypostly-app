@@ -615,7 +615,8 @@ export function enqueuePost(post) {
   // Inject UTM tracking short URL for booking link (Facebook captions contain "Book: https://...")
   try {
     const bookingMatch = post.final_caption?.match(/Book:\s+(https?:\/\/\S+)/);
-    if (bookingMatch) {
+    const BASE = (process.env.PUBLIC_BASE_URL || 'app.mostlypostly.com').replace(/^https?:\/\//, '');
+    if (bookingMatch && !bookingMatch[1].includes(BASE + '/t/')) {
       const rawBooking = bookingMatch[1];
       const postMeta = db.prepare(`SELECT post_type, stylist_name FROM posts WHERE id = ?`).get(post.id);
       const utmContent = postMeta?.post_type || 'standard_post';

@@ -1,6 +1,8 @@
 // src/core/composeFinalCaption.js
 // ✅ Unified caption builder with intelligent spacing between sections
 
+import { buildTrackingToken, buildShortUrl } from './trackingUrl.js';
+
 const BRAND_TAG = process.env.MOSTLYPOSTLY_BRAND_TAG || "#MostlyPostly";
 
 /**
@@ -53,7 +55,11 @@ export function composeFinalCaption({
   bookingUrl,
   salon,
   platform = "generic",
-  asHtml = false
+  asHtml = false,
+  salonId = null,
+  postId = null,
+  postType = null,
+  stylistSlug = null,
   }) {
   const parts = [];
 
@@ -146,7 +152,27 @@ export function composeFinalCaption({
   }
 
   // --- 5️⃣ Booking URL (non-IG only) ---
-  if (booking) parts.push(`Book: ${booking}`);
+  // When salonId + postId are available, inject a tracking short URL so clicks
+  // can be attributed in utm_clicks. Falls back to raw URL on any error.
+  if (booking) {
+    let bookingLine = `Book: ${booking}`;
+    if (salonId && postId) {
+      try {
+        const token = buildTrackingToken({
+          salonId,
+          postId,
+          clickType: 'booking',
+          utmContent: postType || 'standard_post',
+          utmTerm: stylistSlug || null,
+          destination: booking,
+        });
+        bookingLine = `Book: ${buildShortUrl(token)}`;
+      } catch {
+        // fallback to raw URL — never block caption generation
+      }
+    }
+    parts.push(bookingLine);
+  }
 
   //
   // -------------------------------------------------------

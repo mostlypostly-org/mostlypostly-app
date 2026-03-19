@@ -426,6 +426,9 @@ router.post("/:id/regenerate", validateToken, async (req, res) => {
       bookingUrl: fullSalon?.booking_url || fullSalon?.booking_link || "",
       salon: fullSalon,
       asHtml: false,
+      salonId: post.salon_id,
+      postId: post.id,
+      postType: post.post_type || 'standard_post',
     });
 
     db.prepare(`
@@ -517,6 +520,9 @@ router.post("/:id/submit", validateToken, async (req, res) => {
       bookingUrl: fullSalon?.booking_url || fullSalon?.booking_link || "",
       salon: fullSalon,
       asHtml: false,
+      salonId: post.salon_id,
+      postId: post.id,
+      postType: post.post_type || 'standard_post',
     });
 
     // Parse submitted service types
