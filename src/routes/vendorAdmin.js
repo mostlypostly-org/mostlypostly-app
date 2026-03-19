@@ -1205,30 +1205,29 @@ document.addEventListener('change', function(e) {
   var catHint     = document.getElementById('top-form-cat-hint');
   if (!vendorInput || !catSelect) return;
   var timer;
-  vendorInput.addEventListener('input', function() {
-    clearTimeout(timer);
-    timer = setTimeout(function() {
-      var vendor = vendorInput.value.trim();
-      if (!vendor) return;
-      var secret = new URLSearchParams(window.location.search).get('secret') || '';
-      fetch('/internal/vendors/brand-categories?secret=' + encodeURIComponent(secret) + '&vendor=' + encodeURIComponent(vendor))
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          var cats = data.categories || [];
-          while (catSelect.options.length) catSelect.remove(0);
-          var placeholder = document.createElement('option');
-          placeholder.value = ''; placeholder.textContent = '-- Select --';
-          catSelect.appendChild(placeholder);
-          cats.forEach(function(c) {
-            var o = document.createElement('option');
-            o.value = c; o.textContent = c;
-            catSelect.appendChild(o);
-          });
-          if (catHint) catHint.style.display = cats.length ? 'none' : '';
-        })
-        .catch(function() {});
-    }, 600);
-  });
+  function loadCats() {
+    var vendor = vendorInput.value.trim();
+    if (!vendor) return;
+    var secret = new URLSearchParams(window.location.search).get('secret') || '';
+    fetch('/internal/vendors/brand-categories?secret=' + encodeURIComponent(secret) + '&vendor=' + encodeURIComponent(vendor))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var cats = data.categories || [];
+        while (catSelect.options.length) catSelect.remove(0);
+        var placeholder = document.createElement('option');
+        placeholder.value = ''; placeholder.textContent = cats.length ? '-- Select --' : '-- No categories configured for this brand --';
+        catSelect.appendChild(placeholder);
+        cats.forEach(function(c) {
+          var o = document.createElement('option');
+          o.value = c; o.textContent = c;
+          catSelect.appendChild(o);
+        });
+        if (catHint) catHint.style.display = 'none';
+      })
+      .catch(function() {});
+  }
+  vendorInput.addEventListener('input', function() { clearTimeout(timer); timer = setTimeout(loadCats, 500); });
+  vendorInput.addEventListener('blur', loadCats);
 })();
 </script>
 
@@ -1572,9 +1571,16 @@ router.post("/campaign/edit", requireSecret, requirePin, vendorCampaignUpload, (
 router.get("/brand-categories", requireSecret, requirePin, (req, res) => {
   const vendor = (req.query.vendor || "").trim();
   if (!vendor) return res.json({ categories: [] });
+  const CAMPAIGN_TYPE_NAMES = new Set(['Standard', 'Promotion', 'Educational', 'Product Launch', 'Seasonal', 'Brand Awareness']);
   const cfg = db.prepare(`SELECT categories FROM vendor_brands WHERE vendor_name = ?`).get(vendor);
-  const cats = (() => { try { return JSON.parse(cfg?.categories || "[]"); } catch { return []; } })();
-  res.json({ categories: cats });
+  const configured = (() => { try { return JSON.parse(cfg?.categories || "[]"); } catch { return []; } })()
+    .filter(c => !CAMPAIGN_TYPE_NAMES.has(c));
+  if (configured.length > 0) return res.json({ categories: configured });
+  // Fall back to distinct categories from existing campaigns for this vendor
+  const dbCats = db.prepare(
+    `SELECT DISTINCT category FROM vendor_campaigns WHERE vendor_name = ? AND category IS NOT NULL AND category != '' ORDER BY category`
+  ).all(vendor).map(r => r.category).filter(c => !CAMPAIGN_TYPE_NAMES.has(c));
+  res.json({ categories: dbCats });
 });
 
 // ── POST /campaign/ai-description — Generate product description via OpenAI ──
