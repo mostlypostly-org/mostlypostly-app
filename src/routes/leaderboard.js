@@ -86,7 +86,7 @@ router.get("/:token", (req, res) => {
 
   // ── Logo ─────────────────────────────────────────────────────────────────
   const logoHtml = salon.logo_url
-    ? `<img src="${esc(salon.logo_url)}" alt="${esc(salon.name)}" style="height:44px;width:auto;object-fit:contain;" />`
+    ? `<div style="background:#fff;border-radius:10px;padding:6px 10px;display:flex;align-items:center;"><img src="${esc(salon.logo_url)}" alt="${esc(salon.name)}" style="height:32px;width:auto;object-fit:contain;" /></div>`
     : `<span style="font-size:1.25rem;font-weight:800;color:#fff;letter-spacing:-0.02em">${esc(salon.name)}</span>`;
 
   // ── Bonus banner ─────────────────────────────────────────────────────────
@@ -306,15 +306,15 @@ router.get("/:token", (req, res) => {
       ${logoHtml}
       <div style="width:1px;height:2rem;background:rgba(255,255,255,0.12)"></div>
       <div>
-        <p style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,0.4)">Team Leaderboard</p>
-        <p style="font-size:.9rem;font-weight:700;color:rgba(255,255,255,0.85)">This Month</p>
+        <p style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#3B72B9">Team Leaderboard</p>
+        <p style="font-size:.9rem;font-weight:700;color:#3B72B9">This Month</p>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:1.25rem;">
       ${bonusBanner}
       <div style="text-align:right;">
-        <p style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,0.3)">Powered by</p>
-        <p style="font-size:.8rem;font-weight:800;color:rgba(255,255,255,0.6)">MostlyPostly</p>
+        <p style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:#3B72B9">Powered by</p>
+        <p style="font-size:.8rem;font-weight:800;color:#3B72B9">MostlyPostly</p>
       </div>
     </div>
   </header>
