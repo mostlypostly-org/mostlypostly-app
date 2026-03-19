@@ -258,12 +258,20 @@ async function processCampaign(campaign, salon, thisMonth, affiliateUrl) {
     return false;
   }
 
-  // Generate AI caption adapted to salon's tone
-  log.info(`  Generating caption for salon ${salonId} / campaign "${campaign.campaign_name}"`);
-  const caption = await generateVendorCaption({ campaign, salon });
+  // Caption handling — PDF-sourced campaigns use verbatim caption, manual campaigns use AI
+  let caption;
+  if (campaign.source === 'pdf_sync' && campaign.caption_body) {
+    // PDF captions are brand-provided and ready to post — replace [SALON NAME] with actual salon name
+    caption = campaign.caption_body.replace(/\[SALON NAME\]/gi, salon.name);
+    log.info(`  Using PDF caption for salon ${salonId} / campaign "${campaign.campaign_name}" (source: pdf_sync)`);
+  } else {
+    // Manual/CSV campaigns — generate AI caption adapted to salon's tone
+    log.info(`  Generating AI caption for salon ${salonId} / campaign "${campaign.campaign_name}"`);
+    caption = await generateVendorCaption({ campaign, salon });
+  }
 
   if (!caption) {
-    log.warn(`  Skipping campaign ${campaign.id} — caption generation failed`);
+    log.warn(`  Skipping campaign ${campaign.id} — no caption available`);
     return false;
   }
 
