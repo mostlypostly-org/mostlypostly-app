@@ -9,6 +9,8 @@ import { publishToInstagram, publishToInstagramCarousel, publishStoryToInstagram
 import { publishWhatsNewToGmb, publishOfferToGmb } from "./publishers/googleBusiness.js";
 import { logEvent } from "./core/analyticsDb.js";
 import { runCelebrationCheck } from "./core/celebrationScheduler.js";
+import { appendUtm, slugify } from './core/utm.js';
+import { buildTrackingToken, buildShortUrl } from './core/trackingUrl.js';
 
 const log = createLogger("scheduler");
 
@@ -609,6 +611,40 @@ export function enqueuePost(post) {
   }
 
   const scheduled = toSqliteTimestamp(scheduledUtc);
+
+  // Inject UTM tracking short URL for booking link (Facebook captions contain "Book: https://...")
+  try {
+    const bookingMatch = post.final_caption?.match(/Book:\s+(https?:\/\/\S+)/);
+    if (bookingMatch) {
+      const rawBooking = bookingMatch[1];
+      const postMeta = db.prepare(`SELECT post_type, stylist_name FROM posts WHERE id = ?`).get(post.id);
+      const utmContent = postMeta?.post_type || 'standard_post';
+      const utmTerm = slugify(postMeta?.stylist_name || '');
+      const destination = appendUtm(rawBooking, {
+        source: 'mostlypostly',
+        medium: 'social',
+        campaign: post.salon_id,
+        content: utmContent,
+        term: utmTerm || undefined,
+      });
+      const token = buildTrackingToken({
+        salonId: post.salon_id,
+        postId: post.id,
+        clickType: 'booking',
+        utmContent,
+        utmTerm: utmTerm || null,
+        destination,
+      });
+      const shortUrl = buildShortUrl(token);
+      const updatedCaption = post.final_caption.replace(bookingMatch[0], `Book: ${shortUrl}`);
+      db.prepare(`UPDATE posts SET final_caption = ?, updated_at = ? WHERE id = ?`)
+        .run(updatedCaption, new Date().toISOString(), post.id);
+      post = { ...post, final_caption: updatedCaption };
+    }
+  } catch (err) {
+    // UTM injection failure never blocks scheduling
+    console.warn('[Scheduler] UTM injection failed for post', post.id, err.message);
+  }
 
   db.prepare(
     `UPDATE posts SET status='manager_approved', scheduled_for=? WHERE id=?`
