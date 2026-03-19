@@ -353,9 +353,9 @@ document.querySelectorAll('.add-to-queue-btn').forEach(function(btn) {
       const data = await res.json();
       if (data.success) {
         btn.textContent = 'Added \u2713';
-        const wrapper = btn.closest('[data-campaign-wrapper]') || btn.parentElement.closest('[data-campaign-wrapper]');
-        if (wrapper) {
-          const pill = wrapper.querySelector('.count-pill');
+        const vendorAccordion = btn.closest('details.vendor-accordion');
+        if (vendorAccordion) {
+          const pill = vendorAccordion.querySelector('.count-pill');
           if (pill) pill.textContent = data.count + '/' + data.cap + ' this month';
         }
         if (data.count >= data.cap) {
