@@ -130,14 +130,21 @@ router.get("/", requireAuth, (req, res) => {
       const brandCfg      = brandConfigMap[vendorName] || {};
       const vendorSetting = vendorSettingsMap[vendorName] || {};
       // Canonical category set merged with any DB-specific categories for this vendor
-      const CANONICAL_CATEGORIES = ['Standard', 'Promotion', 'Color', 'Treatment', 'Styling', 'Care'];
+      // Product categories: brand-configured list takes priority.
+      // Fall back to any categories found on existing campaigns (backward compat).
+      // Exclude campaign type values (Standard, Promotion, etc.) — those are not product categories.
+      const CAMPAIGN_TYPE_NAMES = new Set(['Standard', 'Promotion', 'Educational', 'Product Launch', 'Seasonal', 'Brand Awareness']);
+      const brandConfigCats = (() => { try { return JSON.parse(brandCfg.categories || "[]"); } catch { return []; } })()
+        .filter(c => !CAMPAIGN_TYPE_NAMES.has(c));
       const dbCategoryRows = db.prepare(`
         SELECT DISTINCT category FROM vendor_campaigns
         WHERE vendor_name = ? AND category IS NOT NULL AND category != ''
         ORDER BY category
       `).all(vendorName);
-      const dbCategories = dbCategoryRows.map(r => r.category);
-      const brandCategories = [...new Set([...CANONICAL_CATEGORIES, ...dbCategories])];
+      const dbCategories = dbCategoryRows.map(r => r.category).filter(c => !CAMPAIGN_TYPE_NAMES.has(c));
+      const brandCategories = brandConfigCats.length > 0
+        ? brandConfigCats
+        : [...new Set(dbCategories)];
       const activeFilters   = (() => { try { return JSON.parse(vendorSetting.category_filters || "[]"); } catch { return []; } })();
       const canRenew        = brandCfg.allow_client_renewal !== 0;
       const vKey            = safe(vendorName.replace(/\s+/g, "_"));

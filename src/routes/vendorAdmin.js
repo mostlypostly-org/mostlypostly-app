@@ -323,9 +323,12 @@ router.get("/", requireSecret, requirePin, (req, res) => {
     const allowRenewal = cfg.allow_client_renewal !== 0;
     const vendorKey = safe(vendor.replace(/\s+/g, "_"));
 
-    const CANONICAL_CATS = ['Standard', 'Promotion', 'Color', 'Treatment', 'Styling', 'Care'];
-    const mergedCats = [...new Set([...CANONICAL_CATS, ...categories])];
-    const catOptions = mergedCats.map(cat => `<option value="${safe(cat)}">${safe(cat)}</option>`).join("");
+    const CAMPAIGN_TYPES = ['Standard', 'Promotion', 'Educational', 'Product Launch', 'Seasonal', 'Brand Awareness'];
+    const DEFAULT_PRODUCT_CATS = ['Color', 'Treatment', 'Styling', 'Care'];
+    // Product categories: brand-configured takes priority; fall back to defaults
+    const productCats = categories.length > 0 ? categories : DEFAULT_PRODUCT_CATS;
+    const catOptions = productCats.map(cat => `<option value="${safe(cat)}">${safe(cat)}</option>`).join("");
+    const typeOptions = CAMPAIGN_TYPES.map(t => `<option value="${safe(t)}">${safe(t)}</option>`).join("");
 
     const campaignRows = items.map(c => {
       const isExpired = c.expires_at && c.expires_at < today;
@@ -346,7 +349,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
           <div class="flex items-start justify-between gap-2">
             <div>
               <p class="font-semibold text-sm">${safe(c.campaign_name)}</p>
-              <p class="text-xs text-gray-500">${safe(c.product_name || "")}${c.category ? ` &middot; ${safe(c.category)}` : ""}</p>
+              <p class="text-xs text-gray-500">${safe(c.product_name || "")}${c.campaign_type ? ` &middot; <span class="font-medium">${safe(c.campaign_type)}</span>` : ""}${c.category ? ` &middot; ${safe(c.category)}` : ""}</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               ${statusBadge}
@@ -399,6 +402,13 @@ router.get("/", requireSecret, requirePin, (req, res) => {
               <label class="text-xs text-gray-500 block mb-1">Campaign Name *</label>
               <input type="text" name="campaign_name" required placeholder="Spring Color 2026"
                      class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">Campaign Type *</label>
+              <select name="campaign_type" required class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white">
+                <option value="">-- Select --</option>
+                ${typeOptions}
+              </select>
             </div>
             <div>
               <label class="text-xs text-gray-500 block mb-1">Category *</label>
@@ -959,15 +969,23 @@ router.get("/", requireSecret, requirePin, (req, res) => {
                      class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
             </div>
             <div>
-              <label class="text-xs text-gray-500 block mb-1">Category *</label>
-              <select name="category" required class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white">
+              <label class="text-xs text-gray-500 block mb-1">Campaign Type *</label>
+              <select name="campaign_type" id="top-form-campaign-type" required class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white">
                 <option value="">-- Select --</option>
                 <option value="Standard">Standard</option>
                 <option value="Promotion">Promotion</option>
-                <option value="Color">Color</option>
-                <option value="Treatment">Treatment</option>
-                <option value="Styling">Styling</option>
-                <option value="Care">Care</option>
+                <option value="Educational">Educational</option>
+                <option value="Product Launch">Product Launch</option>
+                <option value="Seasonal">Seasonal</option>
+                <option value="Brand Awareness">Brand Awareness</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">Category *
+                <span id="top-form-cat-hint" class="text-gray-400 font-normal ml-1">(enter vendor name first)</span>
+              </label>
+              <select name="category" id="top-form-category" required class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white">
+                <option value="">-- Select --</option>
               </select>
             </div>
             <div>
@@ -981,7 +999,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
                      class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
             </div>
             <div>
-              <label class="text-xs text-gray-500 block mb-1">Expires At (required for Promotion)</label>
+              <label class="text-xs text-gray-500 block mb-1">Expires At (required for Promotion type)</label>
               <input type="date" name="expires_at"
                      class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
             </div>
@@ -1179,6 +1197,39 @@ document.addEventListener('change', function(e) {
   var sel = e.target.closest('[data-action="auto-submit"]');
   if (sel) { var f = sel.closest('form'); if (f) f.submit(); }
 });
+
+// Top-level Add Campaign: load brand categories when vendor name changes
+(function() {
+  var vendorInput = document.getElementById('top-form-vendor-name');
+  var catSelect   = document.getElementById('top-form-category');
+  var catHint     = document.getElementById('top-form-cat-hint');
+  if (!vendorInput || !catSelect) return;
+  var timer;
+  vendorInput.addEventListener('input', function() {
+    clearTimeout(timer);
+    timer = setTimeout(function() {
+      var vendor = vendorInput.value.trim();
+      if (!vendor) return;
+      var secret = new URLSearchParams(window.location.search).get('secret') || '';
+      fetch('/internal/vendors/brand-categories?secret=' + encodeURIComponent(secret) + '&vendor=' + encodeURIComponent(vendor))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var cats = data.categories || [];
+          while (catSelect.options.length) catSelect.remove(0);
+          var placeholder = document.createElement('option');
+          placeholder.value = ''; placeholder.textContent = '-- Select --';
+          catSelect.appendChild(placeholder);
+          cats.forEach(function(c) {
+            var o = document.createElement('option');
+            o.value = c; o.textContent = c;
+            catSelect.appendChild(o);
+          });
+          if (catHint) catHint.style.display = cats.length ? 'none' : '';
+        })
+        .catch(function() {});
+    }, 600);
+  });
+})();
 </script>
 
 </body></html>`;
@@ -1434,16 +1485,16 @@ router.post("/brand-config", requireSecret, requirePin, (req, res) => {
 // ── POST /campaign/add — Manually add a campaign ─────────────────────────────
 router.post("/campaign/add", requireSecret, requirePin, vendorCampaignUpload, (req, res) => {
   const {
-    vendor_name, campaign_name, category, product_name,
+    vendor_name, campaign_name, campaign_type, category, product_name,
     product_description, photo_url, tone_direction,
     cta_instructions, service_pairing_notes, expires_at,
   } = req.body;
   const frequency_cap = parseInt(req.body.frequency_cap, 10) || 4;
 
-  if (!vendor_name || !campaign_name || !category || !product_name || !product_description) {
+  if (!vendor_name || !campaign_name || !campaign_type || !category || !product_name || !product_description) {
     return res.redirect(`/internal/vendors${qs(req)}&error=missing_fields`);
   }
-  if (category === "Promotion" && !expires_at) {
+  if (campaign_type === "Promotion" && !expires_at) {
     return res.redirect(`/internal/vendors${qs(req)}&error=promotion_needs_expiry`);
   }
 
@@ -1461,12 +1512,12 @@ router.post("/campaign/add", requireSecret, requirePin, vendorCampaignUpload, (r
 
   db.prepare(`
     INSERT INTO vendor_campaigns
-      (id, vendor_name, campaign_name, category, product_name, product_description,
+      (id, vendor_name, campaign_name, campaign_type, category, product_name, product_description,
        photo_url, product_hashtag, tone_direction, cta_instructions,
        service_pairing_notes, expires_at, frequency_cap, active)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
   `).run(
-    crypto.randomUUID(), vendor_name, campaign_name, category, product_name,
+    crypto.randomUUID(), vendor_name, campaign_name, campaign_type, category, product_name,
     product_description || null, finalPhotoUrl, product_hashtag,
     tone_direction || null, cta_instructions || null,
     service_pairing_notes || null, expires_at || null, frequency_cap,
@@ -1478,7 +1529,7 @@ router.post("/campaign/add", requireSecret, requirePin, vendorCampaignUpload, (r
 // ── POST /campaign/edit — Update an existing campaign ────────────────────────
 router.post("/campaign/edit", requireSecret, requirePin, vendorCampaignUpload, (req, res) => {
   const {
-    campaign_id, campaign_name, category, product_name,
+    campaign_id, campaign_name, campaign_type, category, product_name,
     product_description, photo_url, tone_direction,
     cta_instructions, service_pairing_notes, expires_at,
   } = req.body;
@@ -1504,17 +1555,26 @@ router.post("/campaign/edit", requireSecret, requirePin, vendorCampaignUpload, (
 
   db.prepare(`
     UPDATE vendor_campaigns SET
-      campaign_name = ?, category = ?, product_name = ?, product_description = ?,
+      campaign_name = ?, campaign_type = ?, category = ?, product_name = ?, product_description = ?,
       photo_url = ?, product_hashtag = ?, tone_direction = ?, cta_instructions = ?,
       service_pairing_notes = ?, expires_at = ?, frequency_cap = ?
     WHERE id = ?
   `).run(
-    campaign_name, category || null, product_name, product_description || null,
+    campaign_name, campaign_type || "Standard", category || null, product_name, product_description || null,
     finalPhotoUrl, product_hashtag, tone_direction || null, cta_instructions || null,
     service_pairing_notes || null, expires_at || null, frequency_cap, campaign_id,
   );
 
   res.redirect(`/internal/vendors${qs(req)}&saved=1`);
+});
+
+// ── GET /brand-categories — Return brand's product categories as JSON ─────────
+router.get("/brand-categories", requireSecret, requirePin, (req, res) => {
+  const vendor = (req.query.vendor || "").trim();
+  if (!vendor) return res.json({ categories: [] });
+  const cfg = db.prepare(`SELECT categories FROM vendor_brands WHERE vendor_name = ?`).get(vendor);
+  const cats = (() => { try { return JSON.parse(cfg?.categories || "[]"); } catch { return []; } })();
+  res.json({ categories: cats });
 });
 
 // ── POST /campaign/ai-description — Generate product description via OpenAI ──
@@ -1979,8 +2039,17 @@ router.get("/campaign/:id/edit", requireSecret, requirePin, (req, res) => {
         <input type="text" name="campaign_name" required value="${s(campaign.campaign_name)}" />
       </div>
       <div>
-        <label>Category</label>
-        <input type="text" name="category" value="${s(campaign.category || "")}" />
+        <label>Campaign Type *</label>
+        <select name="campaign_type" required style="width:100%;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:.875rem;background:#fff;color:#111827;">
+          ${['Standard','Promotion','Educational','Product Launch','Seasonal','Brand Awareness'].map(t =>
+            `<option value="${s(t)}"${campaign.campaign_type === t ? ' selected' : ''}>${s(t)}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div>
+        <label>Category *</label>
+        <input type="text" name="category" required value="${s(campaign.category || "")}" placeholder="Color, Treatment, etc." />
+        <p style="font-size:.7rem;color:#9ca3af;margin-top:3px;">Must match a category configured on the brand.</p>
       </div>
       <div>
         <label>Product Name *</label>
