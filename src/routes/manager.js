@@ -61,9 +61,14 @@ function imageStrip(p, thumbClass = "w-32 h-32") {
   const displayUrls = urls.map(toProxyUrl);
 
   if (displayUrls.length === 1) {
-    return `<div class="relative ${thumbClass} flex-shrink-0">
-      <img src="${esc(displayUrls[0])}" class="w-full h-full rounded-lg object-cover border border-mpBorder" ${BROKEN_IMG_PLACEHOLDER} />
+    return `<div class="img-zoomable relative ${thumbClass} flex-shrink-0 cursor-zoom-in group" data-img="${esc(displayUrls[0])}">
+      <img src="${esc(displayUrls[0])}" class="w-full h-full rounded-lg object-cover border border-mpBorder pointer-events-none" ${BROKEN_IMG_PLACEHOLDER} />
       ${placeholderDiv("w-full h-full absolute inset-0")}
+      <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg pointer-events-none">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white drop-shadow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0zM11 8v6M8 11h6"/>
+        </svg>
+      </div>
     </div>`;
   }
 
@@ -73,9 +78,14 @@ function imageStrip(p, thumbClass = "w-32 h-32") {
     <div class="flex flex-col gap-1">
       <div class="flex gap-1">
         ${displayUrls.map(u => `
-          <div class="relative ${stripThumb} flex-shrink-0">
-            <img src="${esc(u)}" class="w-full h-full rounded-lg object-cover border border-mpBorder" ${BROKEN_IMG_PLACEHOLDER} />
+          <div class="img-zoomable relative ${stripThumb} flex-shrink-0 cursor-zoom-in group" data-img="${esc(u)}">
+            <img src="${esc(u)}" class="w-full h-full rounded-lg object-cover border border-mpBorder pointer-events-none" ${BROKEN_IMG_PLACEHOLDER} />
             ${placeholderDiv("w-full h-full absolute inset-0")}
+            <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-white drop-shadow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0zM11 8v6M8 11h6"/>
+              </svg>
+            </div>
           </div>`).join("")}
       </div>
       <span class="text-xs text-mpMuted text-center">${urls.length} photos</span>
@@ -465,8 +475,31 @@ router.get("/", requireAuth, async (req, res) => {
       <h2 class="text-xl font-bold text-mpCharcoal mt-10 mb-3">Recent Activity</h2>
       ${recentCards}
 
+  <!-- Image lightbox -->
+  <div id="img-lightbox"
+       style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out">
+    <img id="img-lightbox-img" src="" alt=""
+         style="max-width:90vw;max-height:90vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.6)" />
+  </div>
+
   <script>
   document.addEventListener('click', function(e) {
+    // Image zoom
+    var zoomable = e.target.closest('.img-zoomable');
+    if (zoomable) {
+      var src = zoomable.getAttribute('data-img');
+      if (src) {
+        document.getElementById('img-lightbox-img').src = src;
+        document.getElementById('img-lightbox').style.display = 'flex';
+      }
+      return;
+    }
+    if (e.target.closest('#img-lightbox')) {
+      document.getElementById('img-lightbox').style.display = 'none';
+      return;
+    }
+
+    // Show more / show less
     var btn = e.target.closest('.show-more-btn');
     if (!btn) return;
     var card = btn.closest('.recent-card');
