@@ -421,7 +421,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs text-gray-500">Product Description *</label>
                 <button type="button"
-                        onclick="aiGenerateDesc(this, '${safe(vendor)}', '${inlineProdId}', '${inlineFormId}')"
+                        data-action="ai-gen-desc" data-vendor="${safe(vendor)}" data-prod-id="${inlineProdId}" data-target-id="${inlineFormId}"
                         class="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1">
                   &#10024; AI Generate
                 </button>
@@ -989,7 +989,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs text-gray-500">Product Description *</label>
                 <button type="button"
-                        onclick="aiGenerateDesc(this, 'top-form-vendor-name', 'top-form-product-name', 'top-form-desc')"
+                        data-action="ai-gen-desc" data-vendor="top-form-vendor-name" data-prod-id="top-form-product-name" data-target-id="top-form-desc"
                         class="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1">
                   ✨ AI Generate
                 </button>
@@ -1156,6 +1156,11 @@ async function aiGenerateDesc(btn, vendorArg, productNameInputId, targetId) {
     btn.disabled = false;
   }
 }
+
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-action="ai-gen-desc"]');
+  if (btn) { e.preventDefault(); aiGenerateDesc(btn, btn.dataset.vendor, btn.dataset.prodId, btn.dataset.targetId); }
+});
 </script>
 
 </body></html>`;
@@ -1796,7 +1801,7 @@ router.get("/brands/:name", requireSecret, requirePin, (req, res) => {
             <div class="flex items-center justify-between mb-1">
               <label class="text-xs text-gray-500">Product Description *</label>
               <button type="button"
-                      onclick="aiGenerateDescBrand(this, '${safe(brand.vendor_name)}', 'brand-form-product-name', 'brand-form-desc')"
+                      data-action="ai-gen-desc-brand" data-vendor="${safe(brand.vendor_name)}" data-prod-id="brand-form-product-name" data-target-id="brand-form-desc"
                       class="text-xs text-purple-600 hover:text-purple-800 font-medium">
                 &#10024; AI Generate
               </button>
@@ -1902,6 +1907,11 @@ async function aiGenerateDescBrand(btn, vendorArg, productNameInputId, targetId)
     btn.disabled = false;
   }
 }
+
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-action="ai-gen-desc-brand"]');
+  if (btn) { e.preventDefault(); aiGenerateDescBrand(btn, btn.dataset.vendor, btn.dataset.prodId, btn.dataset.targetId); }
+});
 </script>
 
 </body></html>`);
@@ -1966,7 +1976,6 @@ router.get("/campaign/:id/edit", requireSecret, requirePin, (req, res) => {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
           <label style="margin-bottom:0;">Product Description *</label>
           <button type="button" id="ai-btn"
-                  onclick="aiGen(this)"
                   style="font-size:.75rem;color:#7c3aed;font-weight:600;background:none;border:none;cursor:pointer;padding:0;">
             ✨ AI Generate
           </button>
@@ -2045,6 +2054,8 @@ async function aiGen(btn) {
     btn.disabled = false;
   }
 }
+
+document.getElementById('ai-btn').addEventListener('click', function() { aiGen(this); });
 </script>
 </body></html>`);
 });
