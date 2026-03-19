@@ -72,7 +72,7 @@ export function buildVendorHashtagBlock({ salonHashtags, brandHashtags, productH
 // OpenAI caption generation for vendor posts
 // =====================================================
 
-export async function generateVendorCaption({ campaign, salon }) {
+export async function generateVendorCaption({ campaign, salon, brandCaption }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     log.warn("Missing OPENAI_API_KEY — skipping vendor caption generation");
@@ -101,6 +101,7 @@ Description: ${campaign.product_description || ""}
 ${campaign.tone_direction ? `Brand tone direction: ${campaign.tone_direction}` : ""}
 ${campaign.cta_instructions ? `CTA instructions: ${campaign.cta_instructions}` : ""}
 ${campaign.service_pairing_notes ? `Service pairing notes: ${campaign.service_pairing_notes}` : ""}
+${brandCaption ? `\nBrand-provided caption (use as messaging reference — key product claims, language, and tone — but rewrite entirely in the salon's voice):\n${brandCaption}` : ""}
 
 Remember: this is for ${salonName} — write in their voice (${tone}), not the brand's voice.`;
 
@@ -258,12 +259,12 @@ async function processCampaign(campaign, salon, thisMonth, affiliateUrl) {
     return false;
   }
 
-  // Caption handling — PDF-sourced campaigns use verbatim caption, manual campaigns use AI
+  // Caption handling — PDF captions used as brand brief for AI; manual campaigns generate from scratch
   let caption;
   if (campaign.source === 'pdf_sync' && campaign.caption_body) {
-    // PDF captions are brand-provided and ready to post — replace [SALON NAME] with actual salon name
-    caption = campaign.caption_body.replace(/\[SALON NAME\]/gi, salon.name);
-    log.info(`  Using PDF caption for salon ${salonId} / campaign "${campaign.campaign_name}" (source: pdf_sync)`);
+    // PDF caption is the brand's messaging brief — pass it to AI to rewrite in salon's tone
+    log.info(`  Generating AI caption with PDF brand brief for salon ${salonId} / campaign "${campaign.campaign_name}"`);
+    caption = await generateVendorCaption({ campaign, salon, brandCaption: campaign.caption_body });
   } else {
     // Manual/CSV campaigns — generate AI caption adapted to salon's tone
     log.info(`  Generating AI caption for salon ${salonId} / campaign "${campaign.campaign_name}"`);

@@ -7,13 +7,13 @@
 
 ### Vendor Sync (FEAT-031)
 
-- [x] **VSYNC-01**: System can authenticate to Aveda brand portal using stored credentials via Playwright automation
-- [x] **VSYNC-02**: System scrapes social-tagged asset cards from the past 30 days on the Aveda portal
-- [x] **VSYNC-03**: System deduplicates scraped assets against existing vendor_campaigns (by image URL or product name) and skips existing entries
+- [x] **VSYNC-01**: System can authenticate to Aveda brand portal using stored credentials via Puppeteer automation
+- [x] **VSYNC-02**: System downloads the current release PDF from the Aveda portal (monthly release cadence; 30-day rolling window deferred until API access available)
+- [x] **VSYNC-03**: System deduplicates scraped assets against existing vendor_campaigns (by vendor_name + campaign_name + release_date) and skips existing entries
 - [x] **VSYNC-04**: System downloads new vendor images to public/uploads/vendor/aveda/
-- [x] **VSYNC-05**: System extracts and normalizes product names from asset cards using GPT-4o-mini
-- [x] **VSYNC-06**: System fetches product descriptions from aveda.com product pages (with fallback to brand site search)
-- [x] **VSYNC-07**: System generates FB/IG-ready captions in Aveda brand voice using GPT-4o
+- [x] **VSYNC-05**: System stores brand-provided captions from PDF verbatim as caption_body; product name sourced from PDF content
+- [x] **VSYNC-06**: Product description sourced from PDF caption_body — no separate product page fetch required
+- [x] **VSYNC-07**: System generates salon-toned FB/IG captions at post time via GPT-4o-mini, using PDF caption as brand messaging brief
 - [x] **VSYNC-08**: System stores completed campaigns in vendor_campaigns with all required fields
 - [x] **VSYNC-09**: Platform Console shows a "Sync Now" button per vendor and displays last_synced_at timestamp
 - [x] **VSYNC-10**: Nightly scheduled sync runs automatically via scheduler.js cron
