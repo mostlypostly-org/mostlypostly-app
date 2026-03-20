@@ -51,6 +51,7 @@ export function composeFinalCaption({
   hashtags = [],
   cta,
   instagramHandle,
+  tiktokHandle,
   stylistName,
   bookingUrl,
   salon,
@@ -88,10 +89,18 @@ export function composeFinalCaption({
 
 
   // --- 2️⃣ "Styled By:" credit ---
-  // FB: full name; IG: @handle; fallback: name or generic
+  // TikTok: @tiktok_handle if set, else name; IG: @ig_handle if set, else name; FB: full name
   let credit = creditName ? `Styled By: ${creditName}` : "Styled By: Team Member";
 
-  if (platform === "instagram") {
+  const ttHandle = ((tiktokHandle || "") + "").replace(/^@+/, "").trim();
+
+  if (platform === "tiktok") {
+    if (ttHandle) {
+      credit = `Styled By: @${ttHandle}`;
+    } else if (creditName) {
+      credit = `Styled By: ${creditName}`;
+    }
+  } else if (platform === "instagram") {
     // IG → @handle if available, else full name
     if (handle) {
       credit = `Styled By: @${handle}`;
