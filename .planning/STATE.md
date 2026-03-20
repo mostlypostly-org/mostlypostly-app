@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 02-04-PLAN.md — Auto-Recycle Notice Banner and Undo
-last_updated: "2026-03-20T02:11:06.209Z"
+stopped_at: Completed 02-03-PLAN.md — Admin Recycle Toggles and Database Recycle/Block Actions
+last_updated: "2026-03-20T02:16:55.242Z"
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 10
-  completed_plans: 7
+  completed_plans: 9
 ---
 
 # Project State
@@ -55,6 +55,7 @@ Plan: 4 of 5
 | Phase quick P260319-t0p | 4 | 2 tasks | 4 files |
 | Phase 02-content-engine P02 | 181 | 2 tasks | 3 files |
 | Phase 02-content-engine P04 | 4 | 2 tasks | 2 files |
+| Phase 02-content-engine P03 | 8 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,8 @@ Recent decisions affecting current work:
 - [Phase 02-content-engine]: Deficit scoring (target.min - current_ratio) replaces static priority sort — dynamic cadence enforcement
 - [Phase 02-content-engine Plan 04]: Recycle banner uses datetime('now', '-7 days') rolling window — not calendar week boundary
 - [Phase 02-content-engine Plan 04]: Undo form passes salon as query param matching resolveSalonId(req) pattern in dashboard.js
+- [Phase 02-content-engine]: Caption refresh toggle omitted from DOM entirely for Starter/trial (not greyed)
+- [Phase 02-content-engine]: Manual recycle calls shared cloneAndEnqueue same path as auto-recycle for consistent RECYC-05 behavior
 
 ### Pending Todos
 
@@ -110,6 +113,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-20T02:14:10Z
-Stopped at: Completed 02-04-PLAN.md — Auto-Recycle Notice Banner and Undo
+Last session: 2026-03-20T02:16:55.240Z
+Stopped at: Completed 02-03-PLAN.md — Admin Recycle Toggles and Database Recycle/Block Actions
 Resume file: None
