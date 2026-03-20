@@ -22,15 +22,15 @@ Creating new post types beyond `reel`, new publishing channels beyond IG/FB/TikT
 - APPROVE, EDIT, REDO all work identically to photo posts — no special cases in messageRouter.js draft handling
 
 ### Video File Storage & Public URL
-- Download Twilio video with auth → save to `data/uploads/videos/` — no S3
+- Download Twilio video with auth -> save to `data/uploads/videos/` — no S3
 - Rename to UUID + `.mp4` extension on download — avoids collisions, no Twilio filenames in public URLs
-- Serve via `express.static('data/uploads/videos')` mounted at `/uploads/videos/` — zero overhead, publicly accessible
+- **NOTE (superseded):** The original decision to add `express.static('data/uploads/videos')` mounted at `/uploads/videos/` is superseded by code inspection. The existing `app.use("/uploads", express.static(UPLOADS_DIR, ...))` mount in server.js (line 285) already serves all files under UPLOADS_DIR, including the `videos/` subdirectory. No new static mount is needed — only the cache header regex needs updating to include `mp4|mov` extensions. Plans 03-01 through 03-04 implement this correctly.
 - Public video URL constructed using `PUBLIC_BASE_URL` env var (same pattern as buildPromotionImage.js / buildAvailabilityImage.js)
 - Store video URL in existing `image_url` column on posts table — no schema change, all existing queries work unchanged
 
 ### Instagram Reels API
-- Three-step: create container (type=REELS) → poll status → publish
-- Poll inside the scheduler tick: 3s intervals × 40 attempts = 2 min max timeout
+- Three-step: create container (type=REELS) -> poll status -> publish
+- Poll inside the scheduler tick: 3s intervals x 40 attempts = 2 min max timeout
 - After 2 min without `FINISHED` status: mark post as failed, surface via existing error flow (postErrorTranslator.js + manager SMS)
 - IG and FB publish independently — one failure does not block the other (same as photo posts today)
 
@@ -50,7 +50,6 @@ Creating new post types beyond `reel`, new publishing channels beyond IG/FB/TikT
 
 ### Claude's Discretion
 - Exact `data/uploads/videos/` directory creation and file path construction
-- How `data/` is declared as Express static root (may need to create route)
 - Twilio video download implementation (fetch with Basic auth vs using twilio-node SDK)
 - IG container creation request body shape and API version
 - FB Reels API endpoint exact path (research needed — Graph API v22.0)
@@ -112,6 +111,7 @@ Creating new post types beyond `reel`, new publishing channels beyond IG/FB/TikT
 - `post_type` values are normalized via `canonicalType()` in gamification.js — `reel` will normalize correctly
 - All post rows use `image_url` for the primary media URL — video URL stored there, no new column needed
 - `PUBLIC_BASE_URL` env var already set in Render for both staging and production
+- Existing `/uploads` static mount in server.js already serves all files under UPLOADS_DIR — no new mount needed for videos
 
 ### Integration Points
 - `src/routes/twilio.js` — add video content-type detection branch before the photo flow
@@ -120,7 +120,7 @@ Creating new post types beyond `reel`, new publishing channels beyond IG/FB/TikT
 - `src/publishers/facebook.js` — add `publishFacebookReel(salon, videoUrl, caption)` function
 - `src/core/gamification.js` — add `reel: 20` to `DEFAULT_POINTS`
 - `src/routes/integrations.js` — add TikTok "coming soon" card
-- `data/uploads/videos/` — new directory, served via Express static at `/uploads/videos/`
+- `data/uploads/videos/` — new directory, served via existing Express static mount at `/uploads`
 
 </code_context>
 

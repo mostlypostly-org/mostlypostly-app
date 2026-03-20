@@ -1,9 +1,9 @@
 ---
 phase: 3
 slug: reels-video
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-20
 ---
 
@@ -17,9 +17,9 @@ created: 2026-03-20
 
 | Property | Value |
 |----------|-------|
-| **Framework** | none — manual + CLI verification (no test runner installed) |
+| **Framework** | none — inline grep/node-e verification (no test runner installed) |
 | **Config file** | none |
-| **Quick run command** | `node --input-type=module < /dev/stdin` (inline smoke checks) |
+| **Quick run command** | `grep` + `node -e "import(...).then(...)"` inline checks |
 | **Full suite command** | Manual end-to-end via staging |
 | **Estimated runtime** | ~5 minutes manual |
 
@@ -36,29 +36,26 @@ created: 2026-03-20
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 3-01-01 | 01 | 1 | REEL-01 | grep | `grep -r "video/mp4\|video/quicktime\|video/mov" src/routes/twilio.js` | ❌ W0 | ⬜ pending |
-| 3-01-02 | 01 | 1 | REEL-02 | grep | `grep -r "service_description\|video_reel" src/core/messageRouter.js` | ❌ W0 | ⬜ pending |
-| 3-01-03 | 01 | 1 | REEL-03 | file | `test -f src/publishers/instagram.js && grep "REELS" src/publishers/instagram.js` | ❌ W0 | ⬜ pending |
-| 3-01-04 | 01 | 1 | REEL-04 | file | `test -f src/publishers/facebook.js && grep "video_reels" src/publishers/facebook.js` | ❌ W0 | ⬜ pending |
-| 3-02-01 | 02 | 2 | REEL-05 | grep | `grep -r "reel\|video_reel" src/core/composeFinalCaption.js` | ❌ W0 | ⬜ pending |
-| 3-02-02 | 02 | 2 | REEL-06 | grep | `grep "reel.*20\|20.*reel" src/core/gamification.js` | ❌ W0 | ⬜ pending |
-| 3-02-03 | 02 | 2 | REEL-07 | grep | `grep -r "reel" src/routes/analytics.js` | ❌ W0 | ⬜ pending |
-| 3-02-04 | 02 | 2 | REEL-08 | file | `test -f src/publishers/tiktok.js` | ❌ W0 | ⬜ pending |
-| 3-02-05 | 02 | 2 | REEL-09 | grep | `grep "post_type.*reel\|reel.*post_type" src/routes/manager.js` | ❌ W0 | ⬜ pending |
-| 3-02-06 | 02 | 2 | REEL-10 | grep | `grep "reel\|video" src/core/postErrorTranslator.js` | ❌ W0 | ⬜ pending |
+| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | Status |
+|---------|------|------|-------------|-----------|-------------------|--------|
+| 3-01-01 | 01 | 1 | REEL-01, REEL-02 | node-e | `node -e "import('./src/core/videoDownload.js').then(m => { console.log('VIDEO_DIR:', m.VIDEO_DIR); console.log('downloadTwilioVideo:', typeof m.downloadTwilioVideo); process.exit(m.VIDEO_DIR && typeof m.downloadTwilioVideo === 'function' ? 0 : 1); })"` | ⬜ pending |
+| 3-01-02 | 01 | 1 | REEL-01, REEL-02 | grep | `grep -n "isVideo" src/routes/twilio.js \| head -5 && grep -n "mp4" server.js \| head -3` | ⬜ pending |
+| 3-02-01 | 02 | 1 | REEL-08, REEL-09 | node-e | `node -e "import('./src/core/gamification.js').then(m => { const ok = m.DEFAULT_POINTS.reel === 20; console.log('reel=20:', ok); process.exit(ok ? 0 : 1); })" && node -e "import('./src/core/postErrorTranslator.js').then(m => { const ok = m.translatePostError('FB Reel init failed').includes('Facebook Reel'); console.log('FB Reel error:', ok); process.exit(ok ? 0 : 1); })" && node -e "import('./src/publishers/tiktok.js').then(m => m.publishReel()).catch(e => { const ok = e.message === 'TikTok publishing not yet available'; console.log('tiktok stub:', ok); process.exit(ok ? 0 : 1); })"` | ⬜ pending |
+| 3-02-02 | 02 | 1 | REEL-10 | grep | `grep -c "TikTok" src/routes/integrations.js` | ⬜ pending |
+| 3-03-01 | 03 | 2 | REEL-03, REEL-04, REEL-05 | grep | `grep -c "pendingVideoDescriptions" src/core/messageRouter.js && grep -c "generateReelCaption" src/core/messageRouter.js && grep -c "composeFinalCaption" src/core/messageRouter.js && grep -A 80 "async function generateReelCaption" src/core/messageRouter.js \| grep -c "_stylistId" \| xargs -I{} sh -c 'if [ "{}" = "0" ]; then echo "OK"; else echo "FAIL"; exit 1; fi'` | ⬜ pending |
+| 3-03-02 | 03 | 2 | REEL-05 | grep | `grep "Reel.*text a video" src/core/messageRouter.js && grep -c "isVideo" src/routes/twilio.js \| xargs -I{} sh -c 'if [ "{}" -ge "3" ]; then echo "isVideo ACK suppression: yes"; else echo "FAIL: isVideo refs < 3"; exit 1; fi'` | ⬜ pending |
+| 3-04-01 | 04 | 3 | REEL-06, REEL-07 | node-e | `node -e "import('./src/publishers/instagram.js').then(m => { console.log('publishReelToInstagram:', typeof m.publishReelToInstagram); process.exit(typeof m.publishReelToInstagram === 'function' ? 0 : 1); })" && node -e "import('./src/publishers/facebook.js').then(m => { console.log('publishFacebookReel:', typeof m.publishFacebookReel); process.exit(typeof m.publishFacebookReel === 'function' ? 0 : 1); })"` | ⬜ pending |
+| 3-04-02 | 04 | 3 | REEL-06, REEL-07 | grep | `grep -c "publishReelToInstagram\|publishFacebookReel" src/scheduler.js && grep "postType.*reel" src/scheduler.js \| head -3 && grep -q "postType" src/core/composeFinalCaption.js && echo "OK: composeFinalCaption accepts postType" \|\| echo "CHECK"` | ⬜ pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: ⬜ pending -- ✅ green -- ❌ red -- ⚠️ flaky*
 
 ---
 
 ## Wave 0 Requirements
 
-- No test framework to install — project uses grep/file-existence checks
-- All verification commands above can be run immediately after file creation
+No Wave 0 test scaffold files are needed. This project has no test framework installed (no vitest, jest, or mocha). All automated verification uses inline `grep` and `node -e` commands that run against the production source files directly. These commands satisfy the Nyquist requirement for automated feedback after every task.
 
-*Existing infrastructure covers all phase requirements via grep-verifiable checks.*
+*Wave 0 is complete by definition — inline commands are the project standard.*
 
 ---
 
@@ -66,21 +63,21 @@ created: 2026-03-20
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Stylist texts video → receives service description prompt | REEL-01, REEL-02 | Requires live Twilio + stylist phone | Text a .mov video to the salon Twilio number; verify SMS reply asks "What service is this for?" |
-| IG Reel publishes after manager approval | REEL-03 | Requires live IG Business Account + Graph API | Approve a reel post from the dashboard; verify it appears on the IG profile as a Reel |
-| FB Reel publishes after manager approval | REEL-04 | Requires live FB Page + Graph API | Approve a reel post; verify it appears on the FB Page under Reels tab |
-| IG container poll completes within 120s | REEL-03 | Requires live API timing | Monitor logs during IG Reel publish; confirm no timeout error |
+| Stylist texts video -> receives service description prompt | REEL-01, REEL-02 | Requires live Twilio + stylist phone | Text a .mov video to the salon Twilio number; verify SMS reply asks "What service is this?" |
+| IG Reel publishes after manager approval | REEL-06 | Requires live IG Business Account + Graph API | Approve a reel post from the dashboard; verify it appears on the IG profile as a Reel |
+| FB Reel publishes after manager approval | REEL-07 | Requires live FB Page + Graph API | Approve a reel post; verify it appears on the FB Page under Reels tab |
+| IG container poll completes within 120s | REEL-06 | Requires live API timing | Monitor logs during IG Reel publish; confirm no timeout error |
 | Reel scores 20 pts on leaderboard | REEL-09 | Requires full publish flow | Publish a reel; verify team leaderboard shows 20 pts for that stylist |
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 120s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (N/A — no test files needed, inline commands are the standard)
+- [x] No watch-mode flags
+- [x] Feedback latency < 120s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved
