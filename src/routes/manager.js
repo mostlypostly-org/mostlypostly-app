@@ -2,7 +2,7 @@
 import express from "express";
 import crypto from "crypto";
 import path from "path";
-import { renameSync } from "fs";
+import { renameSync, readFileSync } from "fs";
 import multer from "multer";
 import { db } from "../../db.js";
 import pageShell from "../ui/pageShell.js";
@@ -1135,15 +1135,20 @@ router.post("/coordinator/upload", requireAuth, coordinatorUpload.single("photo"
     const newPath = path.join(process.cwd(), "public/uploads/", newFilename);
     renameSync(req.file.path, newPath);
 
-    const BASE_URL = process.env.BASE_URL || "https://app.mostlypostly.com";
-    const imageUrl = `${BASE_URL}/uploads/${newFilename}`;
+    const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || process.env.BASE_URL || "https://app.mostlypostly.com";
+    const imageUrl = `${PUBLIC_BASE_URL}/uploads/${newFilename}`;
+
+    // Read file as base64 data URI for OpenAI (avoids needing public URL access at caption time)
+    const mimeType = req.file.mimetype || "image/jpeg";
+    const fileBuffer = readFileSync(newPath);
+    const imageDataUri = `data:${mimeType};base64,${fileBuffer.toString("base64")}`;
 
     // Generate AI caption
     const { generateCaption } = await import("../openai.js");
     const salonRow = db.prepare("SELECT * FROM salons WHERE slug = ?").get(salon_id);
     const fullSalon = getSalonPolicy(salon_id) || salonRow;
     const aiJson = await generateCaption({
-      imageDataUrl: imageUrl,
+      imageDataUrl: imageDataUri,
       notes: caption_note || "",
       salon: fullSalon,
       stylist: {
