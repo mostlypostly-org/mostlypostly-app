@@ -71,5 +71,9 @@ Salons never run out of quality content — the platform generates, recycles, an
 | Smart recycler triggers at queue depth < 3 AND 48hr since last publish | Avoids over-recycling during active periods | — Pending |
 | Featured Review posts use sharp (existing pattern) | Consistent with celebration/promo image generation | — Pending |
 
+## Current State
+
+Phase 05 (Guest Care & Support Staff) complete — coordinator role can submit posts on behalf of stylists via SMS or portal upload, with attribution badges, leaderboard scoring, and welcome SMS.
+
 ---
-*Last updated: 2026-03-19 after initialization*
+*Last updated: 2026-03-20 — Phase 05 complete*
