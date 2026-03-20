@@ -4,8 +4,8 @@ import { DateTime } from "luxon";
 import { db } from "../db.js";
 import { createLogger } from "./utils/logHelper.js";
 import { rehostTwilioMedia } from "./utils/rehostTwilioMedia.js";
-import { publishToFacebook, publishToFacebookMulti } from "./publishers/facebook.js";
-import { publishToInstagram, publishToInstagramCarousel, publishStoryToInstagram } from "./publishers/instagram.js";
+import { publishToFacebook, publishToFacebookMulti, publishFacebookReel } from "./publishers/facebook.js";
+import { publishToInstagram, publishToInstagramCarousel, publishStoryToInstagram, publishReelToInstagram } from "./publishers/instagram.js";
 import { publishWhatsNewToGmb, publishOfferToGmb } from "./publishers/googleBusiness.js";
 import { logEvent } from "./core/analyticsDb.js";
 import { runCelebrationCheck } from "./core/celebrationScheduler.js";
@@ -499,7 +499,35 @@ export async function runSchedulerOnce() {
           let fbResp = null;
           let igResp = null;
 
-          if (storyOnly) {
+          if (postType === "reel") {
+            // -- Reel publish (REEL-06, REEL-07) --------------------------
+            // FB and IG publish independently — one failure does not block the other
+            const videoUrl = allImages[0] || post.image_url;
+            console.log(`[Scheduler] Publishing reel ${post.id} to FB + IG`);
+
+            try {
+              fbResp = await publishFacebookReel(
+                salon,       // pass full salon object — publishFacebookReel extracts page_id, token, graph_version
+                fbCaption,
+                videoUrl
+              );
+            } catch (fbErr) {
+              console.error(`[Scheduler] FB Reel failed for ${post.id}:`, fbErr.message);
+              // fbResp stays null — IG still proceeds
+            }
+
+            try {
+              igResp = await publishReelToInstagram({
+                salon_id: salon.slug,
+                videoUrl,
+                caption: igCaption,
+              });
+            } catch (igErr) {
+              console.error(`[Scheduler] IG Reel failed for ${post.id}:`, igErr.message);
+              // If both failed, throw so the outer catch handles retry
+              if (!fbResp) throw igErr;
+            }
+          } else if (storyOnly) {
             // Availability + Promotions → Stories only
             const image        = allImages[0] || post.image_url;
             const storyLinkUrl = salon.booking_url || salon.booking_link || null;
@@ -551,7 +579,8 @@ export async function runSchedulerOnce() {
             && salon.gmb_enabled
             && salon.google_location_id
             && salon.google_refresh_token
-            && postType !== "availability";
+            && postType !== "availability"
+            && postType !== "reel";   // GMB does not support video Reels
 
           if (gmbEligible) {
             try {
