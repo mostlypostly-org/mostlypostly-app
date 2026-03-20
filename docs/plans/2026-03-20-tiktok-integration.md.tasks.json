@@ -1,0 +1,17 @@
+{
+  "planPath": "docs/plans/2026-03-20-tiktok-integration.md",
+  "tasks": [
+    {"id": 7,  "subject": "Task 1: Migration 050 — TikTok DB columns", "status": "pending"},
+    {"id": 8,  "subject": "Task 2: Token refresh helper", "status": "pending", "blockedBy": [7]},
+    {"id": 9,  "subject": "Task 3: Publisher — replace stub", "status": "pending", "blockedBy": [8]},
+    {"id": 10, "subject": "Task 4: OAuth route", "status": "pending", "blockedBy": [7]},
+    {"id": 11, "subject": "Task 5: Mount router in server.js", "status": "pending", "blockedBy": [10]},
+    {"id": 12, "subject": "Task 6: Wire TikTok into scheduler", "status": "pending", "blockedBy": [9]},
+    {"id": 13, "subject": "Task 7: Update integrations UI", "status": "pending", "blockedBy": [10]},
+    {"id": 14, "subject": "Task 8: Unlock scheduler config TikTok input", "status": "pending"},
+    {"id": 15, "subject": "Task 9: Add TikTok error mappings", "status": "pending"},
+    {"id": 16, "subject": "Task 10: Manual end-to-end test", "status": "pending", "blockedBy": [11, 12, 13, 14, 15]},
+    {"id": 17, "subject": "Task 11: Update CLAUDE.md and FEATURES.md", "status": "pending", "blockedBy": [16]}
+  ],
+  "lastUpdated": "2026-03-20T00:00:00Z"
+}
