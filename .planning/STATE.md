@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-03-20T19:07:27.651Z"
+stopped_at: Completed 06-03-PLAN.md
+last_updated: "2026-03-20T19:07:42.657Z"
 progress:
   total_phases: 6
   completed_phases: 5
@@ -65,6 +65,7 @@ Plan: 3 of 3
 | Phase 05 P02 | 413 | 3 tasks | 3 files |
 | Phase 06-per-salon-platform-content-routing P01 | 2 | 2 tasks | 3 files |
 | Phase 06-per-salon-platform-content-routing P02 | 2 | 2 tasks | 1 files |
+| Phase 06 P03 | 5 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,9 @@ Recent decisions affecting current work:
 - [Phase 06-per-salon-platform-content-routing]: isEnabledFor() returns true for unknown post types — new types will not be accidentally suppressed before routing rules are set
 - [Phase 06-per-salon-platform-content-routing]: buildRoutingRows() defined as closure in GET handler — needs access to isGmbPlanAllowed, fbConnected, tiktokConnected without extra params
 - [Phase 06-per-salon-platform-content-routing]: TikTok column greyed for availability, promotions, celebration_story — skipped by scheduler anyway; greying prevents manager confusion
+- [Phase 06-per-salon-platform-content-routing]: isEnabledFor() guards wrap individual publish calls in scheduler so FB and IG can be disabled independently per post type
+- [Phase 06-per-salon-platform-content-routing]: GMB and TikTok routing added as && condition on existing eligible check — no restructuring needed
+- [Phase 06-per-salon-platform-content-routing]: Platform Console reset-routing uses requireSecret + requirePin middleware pattern from existing routes
 
 ### Pending Todos
 
@@ -147,6 +151,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-20T19:07:22.347Z
-Stopped at: Completed 06-02-PLAN.md
+Last session: 2026-03-20T19:07:42.655Z
+Stopped at: Completed 06-03-PLAN.md
 Resume file: None
