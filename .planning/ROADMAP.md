@@ -107,3 +107,15 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 3. Reels & Video | 2/4 | In Progress|  |
 | 4. Reputation Manager | 0/TBD | Not started | - |
 | 5. Guest Care | 3/3 | Complete   | 2026-03-20 |
+
+### Phase 6: Per-Salon Platform Content Routing
+
+**Goal:** Salon managers control which content types publish to which platforms — per-salon routing rules stored as JSON, enforced by the scheduler, managed via the Integrations page toggle grid
+**Requirements**: TBD
+**Depends on:** Phase 5
+**Plans:** 3 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Migration 051 (platform_routing column) + platformRouting.js helper module
+- [ ] 06-02-PLAN.md — Content Routing card on Integrations page (toggle grid + save handler)
+- [ ] 06-03-PLAN.md — Scheduler routing guards + Platform Console global defaults viewer
