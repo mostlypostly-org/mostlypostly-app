@@ -15,10 +15,11 @@ import { sendViaTwilio } from "./twilio.js";
 import { PLAN_LIMITS } from "./billing.js";
 import { translatePostError } from "../core/postErrorTranslator.js";
 import { savePost } from "../core/storage.js";
+import { UPLOADS_DIR, toUploadUrl } from "../core/uploadPath.js";
 
 // Multer config for coordinator photo uploads
 const coordinatorUpload = multer({
-  dest: path.join(process.cwd(), "public/uploads/"),
+  dest: UPLOADS_DIR,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith("image/")) cb(null, true);
@@ -1156,16 +1157,15 @@ router.post("/coordinator/upload", requireAuth, coordinatorUpload.single("photo"
     ).get(stylist_id, salon_id);
     if (!stylistRow) return res.redirect("/manager/coordinator/upload?error=stylist");
 
-    // Rename uploaded file with proper extension
+    // Rename uploaded file to include original extension (multer strips it)
     const ext = path.extname(req.file.originalname || "") || ".jpg";
     const newFilename = `${crypto.randomUUID()}${ext}`;
-    const newPath = path.join(process.cwd(), "public/uploads/", newFilename);
+    const newPath = path.join(UPLOADS_DIR, newFilename);
     renameSync(req.file.path, newPath);
 
-    const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
-    const imageUrl = `${PUBLIC_BASE_URL}/uploads/${newFilename}`;
+    const imageUrl = toUploadUrl(newFilename);
 
-    // Read file as base64 data URI for OpenAI (avoids needing public URL access at caption time)
+    // Read file as base64 data URI for OpenAI (no network round-trip needed)
     const mimeType = req.file.mimetype || "image/jpeg";
     const fileBuffer = readFileSync(newPath);
     const imageDataUri = `data:${mimeType};base64,${fileBuffer.toString("base64")}`;
