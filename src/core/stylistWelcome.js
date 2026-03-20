@@ -45,6 +45,23 @@ export async function sendWelcomeSms(stylist, salonName) {
 }
 
 /**
+ * Send a welcome SMS to a newly added coordinator.
+ * @param {object} coordinator - DB row with at least { name, phone }
+ * @param {string} salonName
+ */
+export async function sendCoordinatorWelcomeSms(coordinator, salonName) {
+  const { name, phone } = coordinator;
+  if (!phone) return;
+
+  await sendViaTwilio(
+    phone,
+    `You've been added as a coordinator at ${salonName}. ` +
+    `To post for a stylist, text a photo and include their name ` +
+    `(e.g. "Taylor did this color"). Reply HELP for guidance.`
+  );
+}
+
+/**
  * Send the post-consent quick-start message (called from messageRouter after AGREE).
  */
 export async function sendQuickStart(phone, name) {

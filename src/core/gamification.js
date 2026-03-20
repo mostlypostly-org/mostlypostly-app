@@ -182,6 +182,52 @@ export function getLeaderboard(salonId, period = "month") {
   return stylists;
 }
 
+// ─── Coordinator Leaderboard ─────────────────────────────────────────────────
+
+/**
+ * Returns coordinator leaderboard rows ranked by points descending.
+ * Points = SUM of (getPointValue(postType) * 0.5) per post submitted by coordinator.
+ * Coordinators are identified by posts.submitted_by JOIN managers.id.
+ */
+export function getCoordinatorLeaderboard(salonId, period = "month") {
+  const pf = periodFilter(period);
+
+  const posts = db.prepare(`
+    SELECT m.name AS coordinator_name, m.id AS coordinator_id, p.post_type, COUNT(*) AS cnt
+    FROM posts p
+    JOIN managers m ON m.id = p.submitted_by
+    WHERE p.salon_id = ?
+      AND p.status = 'published'
+      AND p.submitted_by IS NOT NULL
+      ${pf}
+    GROUP BY p.submitted_by, p.post_type
+    ORDER BY m.name
+  `).all(salonId);
+
+  const map = new Map();
+  for (const row of posts) {
+    const name = row.coordinator_name;
+    if (!map.has(name)) {
+      map.set(name, { coordinator_name: name, coordinator_id: row.coordinator_id, points: 0, post_count: 0 });
+    }
+    const entry = map.get(name);
+    const pts = Math.round(getPointValue(salonId, row.post_type) * 0.5) * row.cnt;
+    entry.points += pts;
+    entry.post_count += row.cnt;
+  }
+
+  const coordinators = [...map.values()];
+  coordinators.sort((a, b) => b.points - a.points || b.post_count - a.post_count);
+
+  let rank = 1;
+  for (let i = 0; i < coordinators.length; i++) {
+    if (i > 0 && coordinators[i].points < coordinators[i - 1].points) rank = i + 1;
+    coordinators[i].rank = rank;
+  }
+
+  return coordinators;
+}
+
 // ─── Streak ───────────────────────────────────────────────────────────────────
 
 /**
