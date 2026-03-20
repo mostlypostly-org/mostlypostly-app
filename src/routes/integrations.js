@@ -166,12 +166,11 @@ router.get("/", requireAuth, (req, res) => {
       const name  = `routing_${postType}_${platform}`;
       const inner = `
         <label class="relative inline-flex items-center cursor-pointer${disabled ? ' opacity-40 pointer-events-none cursor-not-allowed' : ''}">
-          <input type="hidden" name="${name}" value="0">
           <input type="checkbox" name="${name}" value="1"${enabled ? ' checked' : ''}
             class="sr-only peer" onchange="this.form.submit()">
-          <div class="w-11 h-6 rounded-full transition-colors peer-checked:bg-mpAccent bg-gray-200 relative">
-            <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5 block"></span>
-          </div>
+          <div class="w-11 h-6 rounded-full transition-colors peer-checked:bg-mpAccent bg-gray-200 relative
+            after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:rounded-full after:bg-white after:shadow after:transition-all
+            peer-checked:after:translate-x-5"></div>
         </label>`;
       if (disabled) {
         return `<td class="text-center py-2 px-3"><span class="inline-flex justify-center opacity-40 cursor-not-allowed pointer-events-none">${inner}</span></td>`;
@@ -638,7 +637,7 @@ router.post("/routing-update", requireAuth, (req, res) => {
     for (const plat of PLATFORMS) {
       const key = `routing_${pt}_${plat}`;
       // "1" = checked checkbox value = enabled; "0" = hidden fallback = disabled
-      routing[pt][plat] = req.body[key] === "1";
+      routing[pt][plat] = [].concat(req.body[key] ?? []).includes("1");
     }
   }
 
