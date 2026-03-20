@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-03-20T15:33:00.463Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-03-20T15:40:30.226Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 05 (guest-care-and-support-staff) — EXECUTING
-Plan: 1 of 3
+Plan: 3 of 3 (complete)
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Plan: 1 of 3
 | Phase 03-reels-video P03 | 8 | 2 tasks | 1 files |
 | Phase 03-reels-video P04 | 3 | 2 tasks | 3 files |
 | Phase 05-guest-care-and-support-staff P01 | 2 | 2 tasks | 4 files |
+| Phase 05-guest-care-and-support-staff P03 | 8 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,8 @@ Recent decisions affecting current work:
 - [Phase 03-reels-video]: waitForContainer extended with optional timeout params (backward-compatible); reel branch in scheduler catches FB/IG independently; GMB excluded for reel posts
 - [Phase 05-guest-care-and-support-staff]: Separate SELECT role query for coordinator detection — avoids altering existing manager JOIN shape
 - [Phase 05-guest-care-and-support-staff]: submitted_by defaults NULL — backward compatible with all existing post saves
+- [Phase 05-guest-care-and-support-staff]: getCoordinatorLeaderboard uses 50% point values (Math.round(getPointValue * 0.5)) — coordinators facilitate rather than originate content
+- [Phase 05-guest-care-and-support-staff]: submitted_by lookup is per-row synchronous DB call in dashboard.js map() — acceptable since better-sqlite3 is sync and result set is capped at 1000 rows
 
 ### Pending Todos
 
@@ -133,6 +136,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-20T15:33:00.462Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-03-20T15:40:30.224Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None

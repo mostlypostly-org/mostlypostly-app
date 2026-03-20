@@ -88,7 +88,7 @@ Plans:
   3. Performance page has Stylists/Coordinators tab toggle; coordinator leaderboard shows 50% of base point values
   4. "Submitted by [Coordinator] on behalf of [Stylist]" badge visible in manager approval queue and Database view
   5. Welcome SMS with posting instructions sent when coordinator is added via Team page
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 05-01-PLAN.md — Migration 049 (submitted_by column) + savePost wiring + salonLookup coordinator detection
@@ -106,4 +106,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Content Engine | 4/5 | In Progress|  |
 | 3. Reels & Video | 2/4 | In Progress|  |
 | 4. Reputation Manager | 0/TBD | Not started | - |
-| 5. Guest Care | 1/3 | In Progress|  |
+| 5. Guest Care | 2/3 | In Progress|  |

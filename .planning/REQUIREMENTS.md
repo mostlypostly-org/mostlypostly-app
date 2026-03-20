@@ -78,10 +78,10 @@
 - [ ] **COORD-04**: Coordinator texting a photo with stylist name triggers GPT-4o-mini name extraction and portal confirmation link
 - [ ] **COORD-05**: Coordinator texting a photo without stylist name receives single "Who is this for?" SMS; reply with name continues flow
 - [ ] **COORD-06**: Coordinator portal approval card shows stylist dropdown (pre-filled with GPT match) and flood warning (3+ posts in 7 days)
-- [ ] **COORD-07**: `getCoordinatorLeaderboard()` in gamification.js returns coordinators ranked by 50% of base point values
-- [ ] **COORD-08**: Performance page has Stylists/Coordinators tab toggle; Coordinators tab shows rank, name, posts, points
-- [ ] **COORD-09**: `sendCoordinatorWelcomeSms()` sends posting instructions on coordinator creation; phone required for coordinators
-- [ ] **COORD-10**: "Submitted by [Coordinator] on behalf of [Stylist]" badge visible in manager approval queue and Database view
+- [x] **COORD-07**: `getCoordinatorLeaderboard()` in gamification.js returns coordinators ranked by 50% of base point values
+- [x] **COORD-08**: Performance page has Stylists/Coordinators tab toggle; Coordinators tab shows rank, name, posts, points
+- [x] **COORD-09**: `sendCoordinatorWelcomeSms()` sends posting instructions on coordinator creation; phone required for coordinators
+- [x] **COORD-10**: "Submitted by [Coordinator] on behalf of [Stylist]" badge visible in manager approval queue and Database view
 
 ## v2 Requirements
 
