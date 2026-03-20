@@ -162,7 +162,7 @@ router.get("/", (req, res) => {
   const { fromUtc, toUtc } = rangeToUtc(range, tz, start, end);
 
   let sql = `
-    SELECT id, stylist_name, salon_id, status, post_type, created_at, scheduled_for, salon_post_number, final_caption, image_url, image_urls
+    SELECT id, stylist_name, salon_id, status, post_type, created_at, scheduled_for, salon_post_number, final_caption, image_url, image_urls, recycled_from_id
     FROM posts
     WHERE salon_id = ?
       AND datetime(created_at) BETWEEN datetime(?) AND datetime(?)
@@ -221,9 +221,22 @@ router.get("/", (req, res) => {
         <td class="px-3 py-2 text-xs uppercase tracking-wide text-mpAccent">${p.status}</td>
         <td class="px-3 py-2 text-xs">
           <span class="inline-block rounded px-2 py-0.5 text-xs font-medium capitalize ${ptColor}">${ptLabel}</span>
+          ${p.recycled_from_id ? '<span class="inline-block rounded px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 ml-1">Recycled</span>' : ''}
         </td>
         <td class="px-3 py-2 text-xs text-mpMuted">${formatLocalTime(p.created_at, salon_id)}</td>
         <td class="px-3 py-2 text-xs text-mpMuted">${formatLocalTime(p.scheduled_for, salon_id)}</td>
+        <td class="px-3 py-2 text-xs">
+          ${p.recycled_from_id ? `
+            <form method="POST" action="/dashboard/undo-recycle?salon=${encodeURIComponent(salon_id)}" class="inline">
+              <input type="hidden" name="post_id" value="${p.id}">
+              <button type="submit"
+                onclick="return confirm('Delete this recycled post? The original published post will not be affected.')"
+                class="px-2 py-1 text-[10px] font-bold rounded bg-mpBg text-mpMuted border border-mpBorder hover:border-red-300 hover:text-red-500 transition-colors">
+                Undo
+              </button>
+            </form>
+          ` : ''}
+        </td>
       </tr>`;
       }
     )
@@ -363,6 +376,7 @@ router.get("/", (req, res) => {
               <th class="px-3 py-2 text-left">Type</th>
               <th class="px-3 py-2 text-left">Created</th>
               <th class="px-3 py-2 text-left">Scheduled</th>
+              <th class="px-3 py-2 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -384,6 +398,36 @@ router.get("/", (req, res) => {
       salon_id,
     })
   );
+});
+
+// ─────────────────────────────────────────────────────────────
+// Undo Recycle — deletes a recycled copy, leaves original untouched
+// ─────────────────────────────────────────────────────────────
+
+router.post("/undo-recycle", (req, res) => {
+  const salon_id = req.query.salon || req.session?.salon_id || req.manager?.salon_id;
+  if (!salon_id) return res.status(400).send("Missing salon context");
+
+  const { post_id } = req.body;
+  if (!post_id) return res.status(400).send("Missing post_id");
+
+  try {
+    // Verify post belongs to this salon AND is a recycled copy
+    const post = db.prepare(
+      `SELECT id, recycled_from_id FROM posts WHERE id = ? AND salon_id = ?`
+    ).get(post_id, salon_id);
+
+    if (!post) return res.status(404).send("Post not found");
+    if (!post.recycled_from_id) return res.status(400).send("This post is not a recycled copy");
+
+    // Delete the recycled copy — original published post is untouched
+    db.prepare(`DELETE FROM posts WHERE id = ? AND salon_id = ?`).run(post_id, salon_id);
+
+    return res.redirect(`/dashboard?salon=${encodeURIComponent(salon_id)}&status=all&notice=${encodeURIComponent('Recycled post removed')}`);
+  } catch (err) {
+    console.error('[Dashboard] undo-recycle error:', err);
+    return res.status(500).send("Failed to undo recycle");
+  }
 });
 
 export default router;
