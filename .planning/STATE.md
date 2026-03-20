@@ -95,6 +95,7 @@ None yet.
 | 260319-fii | Fix AI Generate button in Platform Console campaign forms | 2026-03-19 | 4560978 | [260319-fii-fix-ai-generate-button-in-platform-conso](./quick/260319-fii-fix-ai-generate-button-in-platform-conso/) |
 | 260319-i8s | Inject affiliate URL into vendor posts (deterministic) | 2026-03-19 | ba90a69 | [260319-i8s-inject-affiliate-url-into-vendor-posts-f](./quick/260319-i8s-inject-affiliate-url-into-vendor-posts-f/) |
 | 260319-q5j | Vendor campaign posting frequency controls (min-gap, auto-expiry, tone_direction removal) | 2026-03-19 | 65a68f7 | [260319-q5j-audit-vendor-campaign-posting-frequency-](./quick/260319-q5j-audit-vendor-campaign-posting-frequency-/) |
+| 260319-t0p | KB article workflow — template, Post Queue demo article, Definition of Done enforcement | 2026-03-20 | f505962 | [260319-t0p-ensure-kb-article-is-created-for-every-n](./quick/260319-t0p-ensure-kb-article-is-created-for-every-n/) |
 
 ## Session Continuity
 
