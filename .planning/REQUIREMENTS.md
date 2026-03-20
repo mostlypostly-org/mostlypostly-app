@@ -46,9 +46,9 @@
 
 - [x] **REEL-01**: messageRouter.js detects video/* content type from Twilio MMS and branches to video flow
 - [x] **REEL-02**: System downloads Twilio video file (auth required) and saves to data/uploads/videos/
-- [ ] **REEL-03**: System sends SMS prompt to stylist asking for service description to inform caption
-- [ ] **REEL-04**: System generates Reel caption from stylist's SMS answer + salon tone via GPT-4o
-- [ ] **REEL-05**: Post is created in DB with post_type=reel and enters standard approval queue
+- [x] **REEL-03**: System sends SMS prompt to stylist asking for service description to inform caption
+- [x] **REEL-04**: System generates Reel caption from stylist's SMS answer + salon tone via GPT-4o
+- [x] **REEL-05**: Post is created in DB with post_type=reel and enters standard approval queue
 - [ ] **REEL-06**: Instagram Reels publisher handles container creation, status polling, and publish (three-step API)
 - [ ] **REEL-07**: Facebook Reels publisher handles upload + publish independently from Instagram
 - [x] **REEL-08**: Reel post failures integrate with existing FEAT-033 error flow
