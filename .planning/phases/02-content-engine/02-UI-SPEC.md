@@ -43,8 +43,10 @@ Declared values (must be multiples of 4):
 | xl | 32px | Layout gaps between major blocks |
 | 2xl | 48px | Major section breaks |
 | 3xl | 64px | Page-level spacing |
+| banner-v | 12px | Vertical padding on info/notice banners (`py-3`) |
+| banner-h | 20px | Horizontal padding on info/notice banners (`px-5`) |
 
-Exceptions: Touch targets for row-level action buttons use minimum height of `py-1` (8px vertical) + `px-2` (8px horizontal) = 36px minimum tap area — acceptable for desktop-primary admin UI. The recycle banner uses `px-5 py-3` (20px / 12px) consistent with `failedBanner` pattern in manager.js.
+Exceptions: Touch targets for row-level action buttons use minimum height of `py-1` (8px vertical) + `px-2` (8px horizontal) = 36px minimum tap area — acceptable for desktop-primary admin UI.
 
 Source: Codebase scan of admin.js, manager.js, dashboard.js established patterns
 
