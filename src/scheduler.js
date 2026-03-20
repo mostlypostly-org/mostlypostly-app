@@ -13,6 +13,7 @@ import { runVendorSync } from './core/vendorSync.js';
 import { appendUtm, slugify } from './core/utm.js';
 import { buildTrackingToken, buildShortUrl } from './core/trackingUrl.js';
 import { checkAndAutoRecycle } from './core/contentRecycler.js';
+import { pickNextPost } from './core/pickNextPost.js';
 
 const log = createLogger("scheduler");
 
@@ -382,16 +383,20 @@ export async function runSchedulerOnce() {
 
       if (!due.length) continue;
 
-      // --- Sort by content priority ---
-      const priorityOrder = salon.priorityOrder || DEFAULT_PRIORITY;
-      due.sort((a, b) =>
-        getPriorityIndex(a.post_type, priorityOrder) -
-        getPriorityIndex(b.post_type, priorityOrder)
-      );
-
       console.log(`⚡ [Scheduler] ${due.length} due for ${salonId}`);
 
       const tz             = salon.timezone || "America/Indiana/Indianapolis";
+
+      // --- Select next post by cadence-aware distribution ---
+      const nextPost = pickNextPost(due, salonId, tz);
+      if (nextPost) {
+        // Move selected post to front of due array
+        const idx = due.findIndex(p => p.id === nextPost.id);
+        if (idx > 0) {
+          due.splice(idx, 1);
+          due.unshift(nextPost);
+        }
+      }
       const windowStart    = salon.posting_start_time || "09:00";
       const windowEnd      = salon.posting_end_time   || "19:00";
       const postingSchedule = salon.posting_schedule || null;
