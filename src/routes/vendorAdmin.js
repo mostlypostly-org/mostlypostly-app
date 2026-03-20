@@ -354,10 +354,10 @@ router.get("/", requireSecret, requirePin, (req, res) => {
               ${statusBadge}
               ${renewBtn}
               <a href="/internal/vendors/campaign/${safe(c.id)}/edit${qs(req)}"
-                 class="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</a>
+                 class="text-xs text-blue-500 hover:text-blue-700 font-medium leading-none py-1">Edit</a>
               <form method="POST" action="/internal/vendors/delete/${safe(c.id)}${qs(req)}"
-                    data-confirm="Delete campaign: ${safe(c.campaign_name)}?" class="inline">
-                <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
+                    data-confirm="Delete campaign: ${safe(c.campaign_name)}?" style="display:contents;">
+                <button type="submit" class="text-xs text-red-400 hover:text-red-600 leading-none py-1">Delete</button>
               </form>
             </div>
           </div>
@@ -599,12 +599,12 @@ router.get("/", requireSecret, requirePin, (req, res) => {
               <td class="p-2 border">
                 <div class="flex items-center gap-3">
                   <a href="/internal/vendors/brands/${encodeURIComponent(b.vendor_name)}${qs(req)}"
-                     class="text-blue-600 underline text-xs">View &rarr;</a>
+                     class="text-blue-600 underline text-xs leading-none py-1">View &rarr;</a>
                   <a href="/internal/vendors/brands/${encodeURIComponent(b.vendor_name)}/edit${qs(req)}"
-                     class="text-xs text-gray-500 hover:text-gray-700 font-medium">Edit</a>
+                     class="text-xs text-gray-500 hover:text-gray-700 font-medium leading-none py-1">Edit</a>
                   <form method="POST" action="/internal/vendors/brands/${encodeURIComponent(b.vendor_name)}/delete${qs(req)}"
-                        data-confirm="Delete brand ${safe(b.vendor_name)} and all its campaigns? This cannot be undone." class="inline">
-                    <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
+                        data-confirm="Delete brand ${safe(b.vendor_name)} and all its campaigns? This cannot be undone." style="display:contents;">
+                    <button type="submit" class="text-xs text-red-400 hover:text-red-600 leading-none py-1">Delete</button>
                   </form>
                 </div>
               </td>
@@ -1790,12 +1790,12 @@ router.get("/brands/:name", requireSecret, requirePin, (req, res) => {
       <td class="px-4 py-3 text-xs text-gray-500">${safe(c.expires_at || "—")}</td>
       <td class="px-4 py-3 text-xs text-gray-500">${safe(c.frequency_cap || 4)}/mo</td>
       <td class="px-4 py-3">
-        <div class="flex gap-2">
+        <div class="flex items-center gap-2">
           <a href="/internal/vendors/campaign/${safe(c.id)}/edit${qs(req)}"
-             class="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</a>
+             class="text-xs text-blue-500 hover:text-blue-700 font-medium leading-none py-1">Edit</a>
           <form method="POST" action="/internal/vendors/delete/${safe(c.id)}${qs(req)}"
-                data-confirm="Delete campaign: ${safe(c.campaign_name)}?" class="inline">
-            <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
+                data-confirm="Delete campaign: ${safe(c.campaign_name)}?" style="display:contents;">
+            <button type="submit" class="text-xs text-red-400 hover:text-red-600 leading-none py-1">Delete</button>
           </form>
         </div>
       </td>
@@ -2046,7 +2046,10 @@ function syncVendor(btn, name) {
   var origText = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Syncing...';
-  fetch('/internal/vendors/sync/' + encodeURIComponent(name) + '?secret=' + new URLSearchParams(window.location.search).get('secret'), { method: 'POST' })
+  fetch('/internal/vendors/sync/' + encodeURIComponent(name) + '?secret=' + new URLSearchParams(window.location.search).get('secret'), {
+    method: 'POST',
+    headers: { 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '' }
+  })
     .then(function(r) { return r.json(); })
     .then(function(d) { btn.textContent = d.status === 'started' ? 'Started — refresh in 2min' : 'Error'; })
     .catch(function() { btn.textContent = 'Error'; btn.disabled = false; });

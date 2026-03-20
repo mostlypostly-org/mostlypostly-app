@@ -306,15 +306,15 @@ router.get("/:token", (req, res) => {
       ${logoHtml}
       <div style="width:1px;height:2rem;background:#E2E8F0"></div>
       <div>
-        <p style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#3B72B9">Team Leaderboard</p>
-        <p style="font-size:.9rem;font-weight:700;color:#3B72B9">This Month</p>
+        <p style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#1a2744">Team Leaderboard</p>
+        <p style="font-size:.9rem;font-weight:700;color:#1a2744">This Month</p>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:1.25rem;">
       ${bonusBanner}
       <div style="text-align:right;">
-        <p style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:#3B72B9">Powered by</p>
-        <p style="font-size:.8rem;font-weight:800;color:#3B72B9">MostlyPostly</p>
+        <p style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:#1a2744">Powered by</p>
+        <p style="font-size:.8rem;font-weight:800;color:#1a2744">MostlyPostly</p>
       </div>
     </div>
   </header>

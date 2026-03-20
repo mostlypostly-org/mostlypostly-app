@@ -140,6 +140,7 @@ export function getLeaderboard(salonId, period = "month") {
       AND status = 'published'
       AND stylist_name IS NOT NULL
       AND stylist_name != ''
+      AND stylist_name NOT LIKE '% (Campaign)'
       ${pf}
     GROUP BY stylist_name, post_type
     ORDER BY stylist_name
