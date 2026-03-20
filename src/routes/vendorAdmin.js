@@ -342,7 +342,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
       return `
       <div class="border rounded-xl bg-white p-4 flex gap-4 items-start">
         ${c.photo_url
-          ? `<img src="${safe(c.photo_url)}" class="w-14 h-14 object-cover rounded-lg border flex-shrink-0" onerror="this.style.display='none'" />`
+          ? `<img src="${safe(c.photo_url)}" class="w-14 h-14 object-cover rounded-lg border flex-shrink-0" data-img-fallback />`
           : `<div class="w-14 h-14 rounded-lg border bg-gray-50 flex-shrink-0 flex items-center justify-center text-xl">&#127991;</div>`}
         <div class="flex-1 min-w-0">
           <div class="flex items-start justify-between gap-2">
@@ -1779,7 +1779,7 @@ router.get("/brands/:name", requireSecret, requirePin, (req, res) => {
     <tr class="border-b last:border-0 hover:bg-gray-50/50">
       <td class="px-4 py-3">
         ${c.photo_url
-          ? `<img src="${safe(c.photo_url)}" class="w-10 h-10 object-cover rounded border" onerror="this.style.display='none'" />`
+          ? `<img src="${safe(c.photo_url)}" class="w-10 h-10 object-cover rounded border" data-img-fallback />`
           : `<div class="w-10 h-10 rounded border bg-gray-50 flex items-center justify-center text-lg">&#127991;</div>`}
       </td>
       <td class="px-4 py-3">
@@ -1847,11 +1847,19 @@ router.get("/brands/:name", requireSecret, requirePin, (req, res) => {
           </div>
           <div>
             <span class="text-gray-500 text-xs block mb-0.5">Status</span>
-            <span class="font-medium ${brand.last_sync_error ? 'text-red-600' : 'text-green-600'}">${brand.last_sync_error ? 'Error' : (brand.last_sync_at ? 'OK' : 'Not synced')}</span>
+            ${brand.last_sync_error
+              ? (brand.last_sync_error.includes('Missing credentials') || brand.last_sync_error.includes('env var'))
+                ? `<span class="font-medium text-gray-500">Not configured</span>`
+                : `<span class="font-medium text-red-600">Error</span>`
+              : `<span class="font-medium ${brand.last_sync_at ? 'text-green-600' : 'text-gray-500'}">${brand.last_sync_at ? 'OK' : 'Not synced'}</span>`}
           </div>
         </div>
-        ${brand.last_sync_error ? `<div class="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 mb-3">${safe(brand.last_sync_error)}</div>` : ''}
-        <button type="button" onclick="syncVendor('${safe(brand.vendor_name)}')"
+        ${brand.last_sync_error
+          ? (brand.last_sync_error.includes('Missing credentials') || brand.last_sync_error.includes('env var'))
+            ? `<div class="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">Automated sync not configured — set credentials env vars to enable.</div>`
+            : `<div class="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 mb-3">${safe(brand.last_sync_error)}</div>`
+          : ''}
+        <button type="button" data-action="sync-vendor" data-vendor="${safe(brand.vendor_name)}"
                 class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition font-medium">
           Sync Now
         </button>
@@ -2023,8 +2031,18 @@ document.addEventListener('click', function(e) {
   if (btn) { e.preventDefault(); aiGenerateDescBrand(btn, btn.dataset.vendor, btn.dataset.prodId, btn.dataset.targetId); }
 });
 
-function syncVendor(name) {
-  var btn = event.target;
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-action="sync-vendor"]');
+  if (btn) syncVendor(btn, btn.dataset.vendor);
+});
+
+document.addEventListener('error', function(e) {
+  if (e.target.tagName === 'IMG' && e.target.hasAttribute('data-img-fallback')) {
+    e.target.style.display = 'none';
+  }
+}, true);
+
+function syncVendor(btn, name) {
   var origText = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Syncing...';
