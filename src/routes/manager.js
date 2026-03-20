@@ -1,28 +1,28 @@
-// src/routes/manager.js — Restored MostlyPostly “Old Blue UI” Manager Dashboard
-import express from “express”;
-import crypto from “crypto”;
-import path from “path”;
-import { renameSync } from “fs”;
-import multer from “multer”;
-import { db } from “../../db.js”;
-import pageShell from “../ui/pageShell.js”;
-import { DateTime } from “luxon”;
-import { getSalonName } from “../core/salonLookup.js”;
-import { handleManagerApproval } from “../core/messageRouter.js”;
-import { buildPromotionImage } from “../core/buildPromotionImage.js”;
-import { getSalonPolicy } from “../scheduler.js”;
-import { sendViaTwilio } from “./twilio.js”;
-import { PLAN_LIMITS } from “./billing.js”;
-import { translatePostError } from “../core/postErrorTranslator.js”;
-import { savePost } from “../core/storage.js”;
+// src/routes/manager.js — Restored MostlyPostly "Old Blue UI" Manager Dashboard
+import express from "express";
+import crypto from "crypto";
+import path from "path";
+import { renameSync } from "fs";
+import multer from "multer";
+import { db } from "../../db.js";
+import pageShell from "../ui/pageShell.js";
+import { DateTime } from "luxon";
+import { getSalonName } from "../core/salonLookup.js";
+import { handleManagerApproval } from "../core/messageRouter.js";
+import { buildPromotionImage } from "../core/buildPromotionImage.js";
+import { getSalonPolicy } from "../scheduler.js";
+import { sendViaTwilio } from "./twilio.js";
+import { PLAN_LIMITS } from "./billing.js";
+import { translatePostError } from "../core/postErrorTranslator.js";
+import { savePost } from "../core/storage.js";
 
 // Multer config for coordinator photo uploads
 const coordinatorUpload = multer({
-  dest: path.join(process.cwd(), “public/uploads/”),
+  dest: path.join(process.cwd(), "public/uploads/"),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith(“image/”)) cb(null, true);
-    else cb(new Error(“Only images are allowed”));
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Only images are allowed"));
   },
 });
 
@@ -490,10 +490,16 @@ router.get("/", requireAuth, async (req, res) => {
         <h1 class="text-2xl font-extrabold text-mpCharcoal">
           Manager Dashboard
         </h1>
-        <a href="/manager/promotion/new"
-           class="px-4 py-2 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-semibold rounded-lg text-sm">
-          + Create Promotion
-        </a>
+        <div class="flex items-center gap-2">
+          <a href="/manager/coordinator/upload"
+             class="inline-flex items-center gap-1.5 rounded-full border border-mpAccent px-4 py-1.5 text-xs font-semibold text-mpAccent hover:bg-mpAccent hover:text-white transition-colors">
+            Upload a Post
+          </a>
+          <a href="/manager/promotion/new"
+             class="px-4 py-2 bg-mpCharcoal hover:bg-mpCharcoalDark text-white font-semibold rounded-lg text-sm">
+            + Create Promotion
+          </a>
+        </div>
       </div>
       <p class="text-sm text-mpMuted mb-8">
         Logged in as ${mgrName} (${managerPhone})
@@ -1028,6 +1034,133 @@ router.post("/promotion/create", requireAuth, async (req, res) => {
         <a href="/manager/promotion/new" class="block mt-4 text-center text-blue-400 underline text-sm">Try again</a>
       </div>`;
     return res.send(pageShell({ title: "Error", current: "manager", salon_id, body }));
+  }
+});
+
+/* -------------------------------------------------------------
+   COORDINATOR UPLOAD — GET form
+------------------------------------------------------------- */
+router.get("/coordinator/upload", requireAuth, (req, res) => {
+  const salon_id = req.manager.salon_id;
+
+  const stylists = db.prepare(
+    "SELECT id, name FROM stylists WHERE salon_id = ? AND (active IS NULL OR active = 1) ORDER BY name"
+  ).all(salon_id);
+
+  const errorMsg = req.query.error === "missing"
+    ? "Please select a stylist and upload a photo."
+    : req.query.error === "stylist"
+    ? "Stylist not found. Please try again."
+    : req.query.error === "failed"
+    ? "Something went wrong. Please try again."
+    : "";
+
+  const body = `
+    <section class="mb-8">
+      <div class="flex items-center gap-3 mb-1">
+        <a href="/manager" class="text-mpMuted hover:text-mpCharcoal text-sm">← Dashboard</a>
+      </div>
+      <h1 class="text-2xl font-extrabold text-mpCharcoal mt-4">Upload a Post</h1>
+      <p class="mt-1 text-sm text-mpMuted">Upload a photo on behalf of a stylist.</p>
+    </section>
+
+    ${errorMsg ? `<div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">${esc(errorMsg)}</div>` : ""}
+
+    <section class="rounded-2xl border border-mpBorder bg-white px-6 py-6 max-w-lg">
+      <form method="POST" action="/manager/coordinator/upload" enctype="multipart/form-data" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-mpCharcoal mb-1.5">Stylist</label>
+          <select name="stylist_id" required
+            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-mpCharcoal focus:border-mpAccent focus:ring-1 focus:ring-mpAccent">
+            <option value="">Select a stylist...</option>
+            ${stylists.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join("")}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-mpCharcoal mb-1.5">Photo</label>
+          <input type="file" name="photo" accept="image/*" required
+            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-mpCharcoal file:mr-3 file:rounded-full file:border-0 file:bg-mpAccent file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white hover:file:bg-[#2E5E9E]" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-mpCharcoal mb-1.5">Caption note <span class="font-normal text-mpMuted">(optional)</span></label>
+          <textarea name="caption_note" rows="2" placeholder="Any context for the AI caption (e.g. 'balayage on a new client')"
+            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-mpCharcoal placeholder:text-mpMuted focus:border-mpAccent focus:ring-1 focus:ring-mpAccent"></textarea>
+        </div>
+        <button type="submit"
+          class="inline-flex items-center justify-center rounded-full bg-mpAccent px-6 py-2 text-sm font-semibold text-white shadow-md hover:bg-[#2E5E9E]">
+          Upload &amp; Generate Caption
+        </button>
+      </form>
+    </section>
+  `;
+
+  return res.send(pageShell({ title: "Upload a Post", current: "manager", salon_id, body }));
+});
+
+/* -------------------------------------------------------------
+   COORDINATOR UPLOAD — POST handler
+------------------------------------------------------------- */
+router.post("/coordinator/upload", requireAuth, coordinatorUpload.single("photo"), async (req, res) => {
+  const salon_id = req.manager.salon_id;
+  const manager_id = req.manager.id;
+
+  try {
+    const { stylist_id, caption_note } = req.body;
+    if (!stylist_id || !req.file) {
+      return res.redirect("/manager/coordinator/upload?error=missing");
+    }
+
+    const stylistRow = db.prepare(
+      "SELECT id, name, phone, instagram_handle FROM stylists WHERE id = ? AND salon_id = ?"
+    ).get(stylist_id, salon_id);
+    if (!stylistRow) return res.redirect("/manager/coordinator/upload?error=stylist");
+
+    // Rename uploaded file with proper extension
+    const ext = path.extname(req.file.originalname || "") || ".jpg";
+    const newFilename = `${crypto.randomUUID()}${ext}`;
+    const newPath = path.join(process.cwd(), "public/uploads/", newFilename);
+    renameSync(req.file.path, newPath);
+
+    const BASE_URL = process.env.BASE_URL || "https://app.mostlypostly.com";
+    const imageUrl = `${BASE_URL}/uploads/${newFilename}`;
+
+    // Generate AI caption
+    const { generateCaption } = await import("../openai.js");
+    const salonRow = db.prepare("SELECT * FROM salons WHERE slug = ?").get(salon_id);
+    const fullSalon = getSalonPolicy(salon_id) || salonRow;
+    const aiJson = await generateCaption({
+      imageDataUrl: imageUrl,
+      notes: caption_note || "",
+      salon: fullSalon,
+      stylist: {
+        stylist_name: stylistRow.name,
+        name: stylistRow.name,
+        instagram_handle: stylistRow.instagram_handle || null,
+      },
+      postType: "standard_post",
+      city: salonRow?.city || "",
+    });
+
+    const caption = aiJson?.caption || "";
+
+    // Save the post attributed to the selected stylist, tracked to the coordinator
+    const stylistPayload = {
+      stylist_id: stylistRow.id,
+      manager_id,
+      stylist_name: stylistRow.name,
+      stylist_phone: stylistRow.phone || "",
+      instagram_handle: stylistRow.instagram_handle || null,
+      image_url: imageUrl,
+      post_type: "standard_post",
+      submitted_by: manager_id,
+    };
+
+    savePost(null, stylistPayload, caption, [], "manager_pending", null, { salon_id });
+
+    return res.redirect(`/manager?notice=${encodeURIComponent(`Post uploaded for ${stylistRow.name} — pending approval`)}`);
+  } catch (err) {
+    console.error("[Coordinator Upload] Error:", err);
+    return res.redirect("/manager/coordinator/upload?error=failed");
   }
 });
 
