@@ -29,6 +29,7 @@ import {
   findLatestDraft,
 } from "../core/storage.js";
 import { composeFinalCaption } from "./composeFinalCaption.js";
+import { downloadTwilioVideo } from "./videoDownload.js";
 import { classifyPostType } from "./classifyPostType.js";
 import { buildBeforeAfterCollage } from "./buildBeforeAfterCollage.js";
 import { buildAvailabilityImage } from "./buildAvailabilityImage.js";
@@ -278,6 +279,11 @@ const consentSessions = new Map(); // chatId -> { status: 'pending' | 'granted',
 // Shape: Map<chatId, { salonId, stylistId, stylistName, stylistPhone, at: timestamp }>
 const noAvailabilityRecent = new Map();
 const NO_AVAIL_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+// In-memory pending video descriptions (REEL-03)
+// Map<chatId, { videoPublicUrl, salonId, stylistId, stylistName, expiresAt }>
+const pendingVideoDescriptions = new Map();
+const VIDEO_DESC_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 function hasConsent(stylist) {
   return !!(stylist?.compliance_opt_in) || !!(stylist?.consent?.sms_opt_in);
@@ -629,6 +635,119 @@ function restoreDraftFromDb(row) {
 }
 
 // --------------------------------------
+// Reel caption generation (REEL-03, REEL-04)
+// Module-level function — uses module-level imports only.
+// Receives all needed data as parameters; does NOT reference _stylistId (local to handleIncomingMessage).
+async function generateReelCaption({
+  chatId, videoPublicUrl, serviceDescription,
+  drafts, generateCaption, moderateAIOutput, sendMessage,
+  stylist, salon,
+}) {
+  const salonInfo = salon?.salon_info || salon || {};
+  const salonSlug = salonInfo.slug || salon?.salon_id || salon?.id || '';
+
+  // Hydrate salon with DB-backed config for tone/hashtags/rules (getSalonPolicy is a static top-level import)
+  const fullSalon = getSalonPolicy(salonSlug) || salonInfo;
+
+  // Generate caption via GPT-4o with postType='reel'
+  let aiJson;
+  try {
+    aiJson = await generateCaption({
+      imageDataUrl: videoPublicUrl,
+      notes: serviceDescription || '',
+      salon: fullSalon,
+      stylist,
+      postType: 'reel',
+      city: stylist?.city || '',
+    });
+  } catch (err) {
+    console.error('[Router] Reel caption generation failed:', err.message);
+    await sendMessage.sendText(chatId, "Sorry, couldn't generate a caption for your video. Please try again.");
+    return;
+  }
+
+  // Moderate
+  if (moderateAIOutput && typeof moderateAIOutput === 'function') {
+    try {
+      const modResult = await moderateAIOutput({ caption: aiJson?.caption || '' }, serviceDescription || '');
+      if (modResult?.safe === false) {
+        await sendMessage.sendText(chatId, "This caption was flagged. Please try again with a different description.");
+        return;
+      }
+    } catch {}
+  }
+
+  // Build composed caption with Book: line via composeFinalCaption
+  // (same pattern as processNewImageFlow for photo posts — ensures UTM tracking works)
+  const stylistName = getStylistName(stylist);
+  const stylistHandle = getStylistHandle(stylist);
+  const bookingUrl = fullSalon?.booking_url || salonInfo?.booking_url || '';
+  const postId = crypto.randomUUID();
+
+  const caption = composeFinalCaption({
+    caption: aiJson?.caption || '',
+    hashtags: aiJson?.hashtags || [],
+    cta: aiJson?.cta || '',
+    instagramHandle: null,
+    stylistName,
+    bookingUrl,
+    salon: fullSalon,
+    asHtml: false,
+    salonId: salonSlug,
+    postId,
+    postType: 'reel',
+  });
+
+  // Derive stylistId from parameter — do NOT reference _stylistId (local to handleIncomingMessage)
+  const stylistId = stylist?.id || stylist?.stylist_id || null;
+
+  // Save draft to DB as post_type='reel'
+  try {
+    savePost(
+      chatId,
+      {
+        ...stylist,
+        id: postId,
+        image_url: videoPublicUrl,
+        image_urls: [videoPublicUrl],
+        final_caption: caption,
+        post_type: 'reel',
+        stylist_name: stylistName,
+        salon_id: salonSlug,
+      },
+      aiJson?.caption || '',
+      aiJson?.hashtags || [],
+      'draft',
+      null,
+      salon
+    );
+  } catch (err) {
+    console.warn('[Router] Could not persist reel draft to DB:', err.message);
+  }
+
+  // Store in-memory draft (same shape as photo drafts)
+  const draft = {
+    _db_id: postId,
+    salon,
+    stylist,
+    image_url: videoPublicUrl,
+    image_urls: [videoPublicUrl],
+    caption: aiJson?.caption || '',
+    hashtags: aiJson?.hashtags || [],
+    final_caption: caption,
+    base_caption: caption,
+    postType: 'reel',
+    post_type: 'reel',
+  };
+  drafts.set(chatId, draft);
+
+  // Send preview — "Here's your Reel caption:" (locked decision from CONTEXT.md)
+  const previewCaption = buildFacebookCaption(caption, stylistName, stylistHandle);
+  const preview = `Here's your Reel caption:\n\n${previewCaption}\n\nReply APPROVE to submit, EDIT <your changes> to modify, or REDO for a new caption.`;
+  await sendMessage.sendText(chatId, preview);
+}
+
+// --------------------------------------
 // MAIN HANDLER
 export async function handleIncomingMessage({
   source,
@@ -636,6 +755,7 @@ export async function handleIncomingMessage({
   text,
   imageUrl,    // single URL (Telegram / legacy callers)
   imageUrls,   // array from Twilio MMS
+  isVideo,     // NEW — true when Twilio MMS content type is video/* (REEL-03)
   drafts,
   generateCaption,
   moderateAIOutput,
@@ -772,6 +892,35 @@ export async function handleIncomingMessage({
     return;
   }
 
+  // -- VIDEO DESCRIPTION REPLY (REEL-03, REEL-04) --
+  // If this chatId has a pending video waiting for a service description,
+  // treat the current text as the description and generate a reel caption.
+  const pendingVideo = pendingVideoDescriptions.get(chatId);
+  if (pendingVideo && !isVideo && !primaryImageUrl) {
+    if (Date.now() < pendingVideo.expiresAt) {
+      pendingVideoDescriptions.delete(chatId);
+      const serviceDescription = cleanText || '';
+      console.log(`[Router] Video description received from ${chatId}: "${serviceDescription.slice(0, 80)}"`);
+      await generateReelCaption({
+        chatId,
+        videoPublicUrl: pendingVideo.videoPublicUrl,
+        serviceDescription,
+        drafts,
+        generateCaption,
+        moderateAIOutput,
+        sendMessage,
+        stylist,
+        salon,
+      });
+      endTimer(start);
+      return;
+    } else {
+      // Expired — clean up, fall through to normal handling
+      pendingVideoDescriptions.delete(chatId);
+      console.log(`[Router] Video description expired for ${chatId}, falling through`);
+    }
+  }
+
   // CANCEL
   if (command === "CANCEL") {
     const cancelDraft = drafts.get(chatId);
@@ -872,6 +1021,7 @@ export async function handleIncomingMessage({
     await sendMessage.sendText(chatId,
       `Here's what you can do with MostlyPostly:\n\n` +
       `📸 *Standard post* — text 1–3 photos and we'll write a caption\n` +
+      `🎬 *Reel* — text a video and we'll create a Reel caption\n` +
       `🔄 *Before & after* — text 2 photos with "before and after" or "transformation"\n` +
       `📅 *Post my availability* — pulls your open slots from your booking software\n` +
       `🏆 *Leaderboard* — see where you rank on the team\n\n` +
@@ -1404,6 +1554,77 @@ Log in to review: ${managerLink}
       stylist,
       salon
     });
+
+    endTimer(start);
+    return;
+  }
+
+  // -- VIDEO MMS (REEL-01 → REEL-03) --
+  if (isVideo && primaryImageUrl) {
+    console.log(`[Router] Video MMS detected from ${chatId}`);
+
+    // Guard: salon and stylist must be resolved (same guard as processNewImageFlow)
+    if (!salon || !stylist?.salon_info) {
+      console.error(`[Router] Video MMS from ${chatId} but salon or stylist not found — cannot process`);
+      await sendMessage.sendText(chatId,
+        "Sorry, we couldn't identify your salon account. Please contact your manager for help."
+      );
+      endTimer(start);
+      return;
+    }
+
+    // Download video from Twilio (requires auth) and save locally
+    let videoResult;
+    try {
+      videoResult = await downloadTwilioVideo(primaryImageUrl);
+      console.log(`[Router] Video saved: ${videoResult.publicUrl}`);
+    } catch (err) {
+      console.error('[Router] Video download failed:', err.message);
+      await sendMessage.sendText(chatId,
+        "Sorry, we couldn't download your video. Please try sending it again."
+      );
+      endTimer(start);
+      return;
+    }
+
+    // Store pending video context and send description prompt
+    const stylistId = stylist?.id || stylist?.stylist_id;
+    pendingVideoDescriptions.set(chatId, {
+      videoPublicUrl: videoResult.publicUrl,
+      salonId: salon?.salon_id || salon?.id || salon?.salon_info?.slug,
+      stylistId,
+      stylistName: getStylistName(stylist),
+      expiresAt: Date.now() + VIDEO_DESC_TTL_MS,
+    });
+
+    // Send the description prompt (locked decision from CONTEXT.md)
+    await sendMessage.sendText(chatId,
+      "Got your video! What service is this? Give me a quick description and I'll write your caption."
+    );
+
+    // Set a timeout to auto-generate a generic caption if no reply within 30 minutes
+    setTimeout(async () => {
+      const stillPending = pendingVideoDescriptions.get(chatId);
+      if (stillPending && stillPending.videoPublicUrl === videoResult.publicUrl) {
+        pendingVideoDescriptions.delete(chatId);
+        console.log(`[Router] Video description timeout for ${chatId} — generating generic caption`);
+        try {
+          await generateReelCaption({
+            chatId,
+            videoPublicUrl: videoResult.publicUrl,
+            serviceDescription: '', // empty = generic caption from salon tone
+            drafts,
+            generateCaption,
+            moderateAIOutput,
+            sendMessage,
+            stylist,
+            salon,
+          });
+        } catch (err) {
+          console.error('[Router] Auto-caption after video timeout failed:', err.message);
+        }
+      }
+    }, VIDEO_DESC_TTL_MS);
 
     endTimer(start);
     return;
