@@ -16,6 +16,7 @@ import { buildTrackingToken, buildShortUrl } from './core/trackingUrl.js';
 import { checkAndAutoRecycle } from './core/contentRecycler.js';
 import { pickNextPost } from './core/pickNextPost.js';
 import { isEnabledFor } from './core/platformRouting.js';
+import { composeFinalCaption } from './core/composeFinalCaption.js';
 
 const log = createLogger("scheduler");
 
@@ -650,11 +651,19 @@ export async function runSchedulerOnce() {
 
           if (tiktokEligible && tiktokPostedToday < tiktokDailyCap) {
             try {
-              // TikTok doesn't render clickable links — strip the "Book:" line
-              const tiktokCaption = fbCaption
-                .replace(/\n\nBook: https?:\/\/\S+/gi, '')
-                .replace(/\n{3,}/g, '\n\n')
-                .trim();
+              // Build a dedicated TikTok caption: @tiktok_handle credit, no booking URL
+              const tiktokStylist = post.stylist_id
+                ? db.prepare('SELECT tiktok_handle, name FROM stylists WHERE id = ?').get(post.stylist_id)
+                : null;
+              const tiktokCaption = composeFinalCaption({
+                caption:      post.base_caption || post.final_caption || "",
+                hashtags:     (() => { try { return JSON.parse(post.hashtags || "[]"); } catch { return []; } })(),
+                stylistName:  post.stylist_name || "",
+                tiktokHandle: tiktokStylist?.tiktok_handle || "",
+                salon,
+                platform:     "tiktok",
+                noBookingCta: true,
+              }).trim();
 
               let tiktokPublishId;
               const isVideo = postType === "reel"
