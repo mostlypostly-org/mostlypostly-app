@@ -1,336 +1,162 @@
+# MostlyPostly
 
+AI-driven social media automation for hair salons. Stylists text a photo → AI generates a branded caption → manager approves → post publishes to Facebook, Instagram, and Google Business Profile on a smart schedule. No app download required.
 
-````markdown
-# 💇‍♀️ MostlyPostly
-
-> **AI-powered social posting assistant for salons**  
-> Created and maintained by **Troy Hardister**
+**Creator**: Troy Hardister — Carmel, Indiana
 
 ---
 
-## 🧮 Tenant Health Check (Automation)
+## Stack
 
-To ensure every record carries a valid salon_id:
-
-```bash
-node scripts/check-tenant-health.js
-
----
-
-## 🧩 v1.1 — Multi-Tenant Upgrade (November 2025)
-
-**Overview:**  
-MostlyPostly now supports multiple salons in a single deployment.  
-All posts, media, analytics, and logs include a `salon_id` for complete tenant isolation.
-
-### 🔑 Key Changes
-- Added `salon_id` column to all database tables  
-- Added tenant-aware middleware (`tenantFromLink`)  
-- Per-salon tokens, booking URLs, posting windows, and logs  
-- Updated Twilio → Scheduler → Publisher flow to carry `salon_id`  
-- New health scripts:
-  - `scripts/verify-salon-id.js`
-  - `scripts/check-tenant-health.js`
-- Added `/manager/login` and `/manager/logout` routes  
-- Daily integrity checks ensure all new rows include `salon_id`  
-
-**Migration Note:**  
-Legacy posts before v1.1 were backfilled with `salon_id='rejuvesalonspa'`.  
-All new data now enforces tenant context automatically.
+| Layer | Technology |
+|---|---|
+| Runtime | Node.js, Express.js, ES Modules |
+| Database | SQLite via `better-sqlite3` (synchronous) |
+| SMS/MMS | Twilio |
+| AI | OpenAI GPT-4o Vision (captions), GPT-4o-mini (coordinator flows) |
+| Publishing | Facebook Graph API v22.0, Instagram Graph API, Google Business Profile API v4 |
+| Payments | Stripe (subscriptions + webhooks) |
+| Email | Resend |
+| Image gen | sharp + Pexels API (no DALL-E) |
+| Hosting | Render.com — auto-deploys from `main` (production) and `dev` (staging) |
+| Frontend | Server-rendered HTML + Tailwind CSS CDN |
 
 ---
 
-## 🏗️ Architecture Diagram
-
-```text
-   📱 Stylist (SMS / Telegram)
-          │
-          ▼
-   Twilio Webhook (Express)
-          │
-          ▼
-   🧠 OpenAI (gpt-4o-mini)
-          │
-          ▼
-   JSON { service_type, caption, hashtags[], cta }
-          │
-          ▼
-   Preview via SMS  →  Stylist replies APPROVE / EDIT / OPTIONS
-          │
-          ▼
-   Scheduler → Queued Post (SQLite)
-          │
-          ▼
-   Publisher → Facebook + Instagram
-          │
-          ▼
-   📊 Analytics + Moderation Logs
-````
-
----
-
-## ⚙️ Tech Stack
-
-| Component      | Technology                                         |
-| -------------- | -------------------------------------------------- |
-| **Backend**    | Node.js (Express)                                  |
-| **Database**   | SQLite (via better-sqlite3)                        |
-| **AI Model**   | OpenAI `gpt-4o-mini` (vision + JSON mode)          |
-| **Messaging**  | Twilio SMS/MMS + Telegram Bot                      |
-| **Publishing** | Meta Graph API (Facebook + Instagram)              |
-| **Scheduler**  | Custom `scheduler.js` with randomized post windows |
-| **Hosting**    | Render (staging) → AWS (production target)         |
-| **Logging**    | JSON logs (`/data/logs`) + Analytics DB            |
-
----
-
-## 🗂️ Repository Structure
-
-```
-mostlypostly-clean/
-├── server.js
-├── db.js
-├── schema.sql
-├── package.json
-├── salons/
-│   ├── rejuvesalonspa.json
-│   └── (future salons)
-├── data/
-│   ├── posts.json
-│   ├── schedulerPolicy.json
-│   └── logs/
-├── src/
-│   ├── core/
-│   │   ├── storage.js
-│   │   ├── analyticsDb.js
-│   │   ├── initSchemaHealth.js
-│   │   └── joinWizard.js
-│   ├── publishers/
-│   │   ├── facebook.js
-│   │   ├── instagram.js
-│   │   └── telegram.js
-│   ├── routes/
-│   │   ├── twilio.js
-│   │   ├── dashboard.js
-│   │   ├── posts.js
-│   │   ├── analytics.js
-│   │   ├── manager.js
-│   │   └── (other routes)
-│   ├── utils/
-│   │   ├── moderation.js
-│   │   ├── rehostTwilioMedia.js
-│   │   ├── logHelper.js
-│   │   └── hashtags.js
-│   └── scheduler.js
-└── scripts/
-    ├── patch-posts-table-to-v1.js
-    ├── migrate-posts-json-to-sqlite.js
-    ├── verify-posts-in-db.js
-    ├── verify-schema-health.js
-    └── (test tools)
-```
-
----
-
-## 🧩 Environment Setup
-
-### 1️⃣ Prerequisites
-
-* Node.js v22+
-* npm or pnpm
-* Render account (for staging deployment)
-* Meta Business Manager (for FB/IG API tokens)
-* Twilio account (with SMS/MMS enabled number)
-
-### 2️⃣ .env Template
-
-Create a `.env` file in the project root:
-
-```bash
-OPENAI_API_KEY=sk-xxxx
-TWILIO_ACCOUNT_SID=ACxxxx
-TWILIO_AUTH_TOKEN=xxxx
-TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
-
-META_PAGE_ID=xxxxxxxx
-META_PAGE_TOKEN=EAAGxxxxxxxx
-META_IG_BUSINESS_ID=xxxxxxxx
-
-NODE_ENV=development
-PORT=3000
-```
-
-> 🧠 **Note:** Tokens are **per-salon**. Store them securely in the `salons/` configs for multi-tenant builds.
-
----
-
-## 🚀 Run & Deploy
-
-### 🧪 Local Development
+## Quick Start (Local)
 
 ```bash
 npm install
 node server.js
 ```
 
-Visit:
-👉 [http://localhost:3000](http://localhost:3000)
-
-You should see:
-
-```
-✅ MostlyPostly schema initialized
-🚀 MostlyPostly ready on http://localhost:3000
-```
-
-### ☁️ Render Deployment (Staging)
-
-* Connect your GitHub repo to Render
-* Add the above `.env` variables
-* Configure:
-
-  * **Start command:** `node server.js`
-  * **Build command:** `npm install`
-* Enable **persistent disk** for `/data` and `/uploads`
-
-### 🌩️ AWS Production Notes (Future)
-
-When migrating to AWS:
-
-* Move media to **S3**
-* Use **RDS (Postgres)** or keep SQLite with EFS
-* Move static files to **CloudFront / S3**
-* Keep `/data/logs` accessible for monitoring
+Requires a `.env` file — see environment variables below.
 
 ---
 
-## 🧱 Multi-Tenant Architecture
+## Environment Variables
 
-Each salon runs as an isolated tenant.
-All major tables include a `salon_id` column for separation.
+```env
+# Twilio
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
 
-### Schema Isolation
+# Telegram (optional secondary channel)
+TELEGRAM_BOT_TOKEN=
 
-```sql
-CREATE TABLE posts (
-  id TEXT PRIMARY KEY,
-  salon_id TEXT NOT NULL,
-  stylist_id TEXT,
-  caption TEXT,
-  image_url TEXT,
-  status TEXT,
-  scheduled_for TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
+# OpenAI
+OPENAI_API_KEY=
+
+# Facebook / Meta
+FACEBOOK_APP_ID=
+FACEBOOK_APP_SECRET=
+
+# Google Business Profile
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=
+
+# Google Places (address autocomplete at signup)
+GOOGLE_PLACES_API_KEY=
+
+# Stripe
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PRICE_STARTER_MONTHLY=
+STRIPE_PRICE_STARTER_ANNUAL=
+STRIPE_PRICE_GROWTH_MONTHLY=
+STRIPE_PRICE_GROWTH_ANNUAL=
+STRIPE_PRICE_PRO_MONTHLY=
+STRIPE_PRICE_PRO_ANNUAL=
+
+# Image backgrounds
+PEXELS_API_KEY=
+
+# App
+BASE_URL=https://app.mostlypostly.com
+PUBLIC_BASE_URL=https://app.mostlypostly.com
+APP_ENV=local
+SESSION_SECRET=
+
+# Email
+RESEND_API_KEY=
+EMAIL_FROM=hello@mostlypostly.com
+
+# Internal admin tool
+INTERNAL_SECRET=
+INTERNAL_PIN=
+
+# RCS (optional)
+RCS_ENABLED=
+
+# Promo code (sent on signup if set)
+FOUNDER_PROMO_CODE=
 ```
 
-Every major query filters by `salon_id`:
-
-```js
-db.prepare("SELECT * FROM posts WHERE salon_id = ?").all(salon_id);
-```
-
-### Config Isolation
-
-Each salon has its own config JSON:
-
-```json
-{
-  "salon_id": "rejuvesalonspa",
-  "manager_name": "Troy Hardister",
-  "booking_url": "https://rejuvesalonspa.com/book",
-  "timezone": "America/Indiana/Indianapolis",
-  "default_hashtags": ["#RejuveSalonSpa", "#MostlyPostly"]
-}
-```
+`APP_ENV=local` enables JSON salon file fallback in `./salons/` for dev without a populated DB.
 
 ---
 
-## ⏰ Scheduler Flow
-
-1. On approval → post inserted into `posts` with status `queued`.
-2. Scheduler runs every 5 minutes:
-
-   ```bash
-   node src/scheduler.js
-   ```
-3. It checks each salon’s posting window and publishes due posts.
-4. Published events log to `analytics_events` with timestamp + salon_id.
-
----
-
-## 📊 Analytics & Moderation
-
-Analytics events are tracked automatically in SQLite:
-
-| Event Type        | Description                           |
-| ----------------- | ------------------------------------- |
-| `post_created`    | Post JSON generated                   |
-| `post_approved`   | Manager approval logged               |
-| `post_published`  | Scheduler completed publish           |
-| `post_flagged_ai` | Unsafe or low-quality caption flagged |
-| `scheduler_run`   | Scheduler cycle completed             |
-
-Moderation logs (AI or manual) are stored under `/data/logs/{salon_id}/moderation.log`.
-
----
-
-## 🧠 Development Standards
-
-🚫 **Do not remove or replace**:
-
-* `db.js`, `storage.js`, `scheduler.js`
-* Publisher files (facebook.js, instagram.js)
-* Twilio/Telegram routes
-* Analytics + moderation logging helpers
-
-✅ **Safe changes include**:
-
-* New routes (`src/routes/*`)
-* New analytics event types
-* Schema extensions via `ALTER TABLE`
-* Additional helper or dashboard code
-
-### Schema Verification
-
-Run after schema or migration changes:
-
-```bash
-node scripts/verify-schema-health.js
-```
-
-Expected output:
+## Repository Layout
 
 ```
-✅ MostlyPostly schema verified
+mostlypostly-app/
+├── server.js               # Express app entry point
+├── db.js                   # better-sqlite3 singleton + migration runner
+├── src/
+│   ├── routes/             # Express route handlers (one domain per file)
+│   ├── core/               # Business logic (messageRouter, storage, AI, scheduler...)
+│   ├── publishers/         # Facebook, Instagram, Google Business publishers
+│   ├── ui/pageShell.js     # Shared HTML shell (sidebar nav, mobile menu)
+│   └── scheduler.js        # Post scheduling engine
+├── migrations/             # SQLite schema migrations (001–049+)
+├── public/
+│   ├── admin.js            # Client-side admin panel JS
+│   └── logo/               # Logo assets
+└── .render.yaml            # Render.com deployment config
 ```
 
 ---
 
-## 🧭 Roadmap
+## Branching & Deployment
 
-| Version | Focus                                    | Status         |
-| ------- | ---------------------------------------- | -------------- |
-| v1.0    | Stable single-salon MVP                  | ✅ Complete    |
-| v1.1    | Multi-tenant scaling + tenant protection | ✅ Complete    |
-| v1.2    | Media cache & deduplication              | ⏳ Next        |
-| v1.3    | Analytics dashboard (web)                | Planned        |
-| v1.4    | Token management (FB system user)        | Planned        |
-| v1.5    | AWS deployment readiness                 | Future         |
+- `main` → production (`https://app.mostlypostly.com`) — Render auto-deploys
+- `dev` → staging (`https://mostlypostly-staging.onrender.com`) — Render auto-deploys
+- Work on `dev`, test on staging, merge to `main` to ship
+- After merging to `main`: `git checkout dev && git merge main && git push origin dev && git checkout main`
 
 ---
 
-## 👤 Author
+## Post Flow (End to End)
 
-**Troy Hardister**
-Creator & Product Owner — *MostlyPostly*
-📍 Carmel, Indiana
-💬 [LinkedIn](https://linkedin.com) | [Website (coming soon)](#)
+```
+Stylist texts photo (SMS or Telegram)
+  → messageRouter.js: AI caption via GPT-4o Vision
+  → Stylist approves/edits/redoes via SMS
+  → If manager approval required: saved as manager_pending, manager link sent
+  → Manager approves in dashboard
+  → enqueuePost() → scheduler picks up at next window
+  → Published to Facebook + Instagram + Google Business Profile
+  → Analytics synced from Graph API
+```
+
+**Coordinator flow**: A coordinator with the `coordinator` role can text on behalf of any stylist. GPT-4o-mini extracts the stylist name from the message. Coordinator can also upload via `/manager/coordinator/upload`.
 
 ---
 
-## 🧾 License
+## Plans
 
-© 2025 MostlyPostly. All rights reserved.
-Use permitted for internal development and pilot testing only.
+| Plan | Monthly | Posts/mo | Stylists | Locations |
+|---|---|---|---|---|
+| Starter | $49 | 60 | 4 | 1 |
+| Growth | $149 | 150 | 12 | 2 |
+| Pro | $249 | 400 | Unlimited | 5 |
 
+Vendor Brand Integrations (Pro only). 7-day free trial on all plans.
+
+---
+
+## License
+
+© 2026 MostlyPostly. All rights reserved.
