@@ -155,11 +155,59 @@ router.get("/:id", validateToken, async (req, res) => {
   try { hashtags = JSON.parse(post.hashtags || "[]"); } catch { }
   const hashtagLine = hashtags.length ? hashtags.map(h => `#${h.replace(/^#/, "")}`).join(" ") : "";
 
+  // Coordinator flow: show stylist dropdown and flood warning when submitted_by is set
+  const isCoordinatorFlow = !!post.submitted_by;
+  let stylistDropdownHtml = "";
+  let floodWarningHtml = "";
+
+  if (isCoordinatorFlow) {
+    const stylists = db.prepare(
+      "SELECT id, name FROM stylists WHERE salon_id = ? AND (active IS NULL OR active = 1) ORDER BY name"
+    ).all(post.salon_id);
+
+    const options = stylists.map(s => {
+      const selected = s.name === post.stylist_name ? "selected" : "";
+      return `<option value="${esc(s.name)}" data-id="${esc(s.id)}" ${selected}>${esc(s.name)}</option>`;
+    }).join("\n");
+
+    stylistDropdownHtml = `
+      <div class="mb-4">
+        <label class="block text-xs font-semibold text-mpCharcoal mb-1.5">Attribute this post to:</label>
+        <select name="attributed_stylist"
+          form="submit-form"
+          class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-mpCharcoal focus:border-mpAccent focus:ring-1 focus:ring-mpAccent">
+          ${options}
+        </select>
+      </div>
+    `;
+
+    // Flood check: how many posts has this coordinator submitted for this stylist in the last 7 days?
+    const floodCount = db.prepare(`
+      SELECT COUNT(*) AS cnt FROM posts
+      WHERE salon_id = ?
+        AND submitted_by = ?
+        AND stylist_name = ?
+        AND created_at >= datetime('now', '-7 days')
+    `).get(post.salon_id, post.submitted_by, post.stylist_name);
+
+    if (floodCount && floodCount.cnt >= 3) {
+      floodWarningHtml = `
+        <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+          You've posted <strong>${floodCount.cnt}</strong> times for ${esc(post.stylist_name)} in the last 7 days
+          — consider capturing content for other team members too.
+        </div>
+      `;
+    }
+  }
+
   res.send(shell("Review Your Caption", `
     <h1 class="text-xl font-bold mb-1 text-mpCharcoal">Your Post Preview</h1>
     <p class="text-sm text-mpMuted mb-5">${post.post_type === "availability"
       ? "Review your availability post below. Update the details if needed, then submit."
       : "Review your caption below. Add notes and regenerate before submitting."}</p>
+
+    ${floodWarningHtml}
+    ${stylistDropdownHtml}
 
     ${renderImages(displayUrls)}
 
@@ -223,7 +271,7 @@ router.get("/:id", validateToken, async (req, res) => {
     </form>`}
 
     <!-- Submit -->
-    <form method="POST" action="/stylist/${esc(post.id)}/submit?token=${esc(token)}">
+    <form id="submit-form" method="POST" action="/stylist/${esc(post.id)}/submit?token=${esc(token)}">
 
       <!-- Service type chips -->
       <div class="mb-4">
@@ -528,6 +576,12 @@ router.post("/:id/submit", validateToken, async (req, res) => {
     // Parse submitted service types
     const serviceTypeCombined = (req.body.service_type_combined || "").trim();
     const serviceType = serviceTypeCombined || null;
+
+    // Coordinator: allow changing the attributed stylist before submit
+    if (req.body.attributed_stylist && post.submitted_by) {
+      db.prepare("UPDATE posts SET stylist_name = ?, updated_at = datetime('now') WHERE id = ?")
+        .run(req.body.attributed_stylist, post.id);
+    }
 
     db.prepare(`
       UPDATE posts
