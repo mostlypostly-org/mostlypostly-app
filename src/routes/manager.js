@@ -55,11 +55,10 @@ async function ensurePublicImageUrls(p) {
 }
 
 // Placeholder shown when an image URL is broken/expired
-const BROKEN_IMG_PLACEHOLDER = `
-  onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
-`;
+// Uses CSS class + event delegation (no inline onerror — blocked by CSP script-src-attr 'none')
+const BROKEN_IMG_PLACEHOLDER = `class-broken-img`; // sentinel — appended to img class string
 function placeholderDiv(cls) {
-  return `<div class="${cls} rounded-lg bg-mpBg border border-mpBorder flex-col items-center justify-center gap-1 text-mpMuted" style="display:none">
+  return `<div class="${cls} broken-placeholder rounded-lg bg-mpBg border border-mpBorder flex-col items-center justify-center gap-1 text-mpMuted" style="display:none">
     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4-4 4 4 4-6 4 6M4 4h16v16H4z"/></svg>
     <span class="text-[9px] uppercase tracking-wide">Expired</span>
   </div>`;
@@ -76,7 +75,7 @@ function imageStrip(p, thumbClass = "w-32 h-32") {
 
   if (displayUrls.length === 1) {
     return `<div class="img-zoomable relative ${thumbClass} flex-shrink-0 cursor-zoom-in group" data-img="${esc(displayUrls[0])}">
-      <img src="${esc(displayUrls[0])}" class="w-full h-full rounded-lg object-cover border border-mpBorder pointer-events-none" ${BROKEN_IMG_PLACEHOLDER} />
+      <img src="${esc(displayUrls[0])}" class="w-full h-full rounded-lg object-cover border border-mpBorder pointer-events-none" />
       ${placeholderDiv("w-full h-full absolute inset-0")}
       <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg pointer-events-none">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white drop-shadow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -339,7 +338,7 @@ router.get("/", requireAuth, async (req, res) => {
                   </div>
                   ${p.status === "manager_approved" || p.status === "failed" ? `
                     <a href="/manager/cancel-post?post=${p.id}"
-                       onclick="return confirm('Cancel this post and remove it from the queue?')"
+                       data-confirm="Cancel this post and remove it from the queue?"
                        class="text-[11px] text-red-400 hover:text-red-300 shrink-0">
                       Cancel
                     </a>` : ""}
@@ -407,7 +406,7 @@ router.get("/", requireAuth, async (req, res) => {
           <div class="flex flex-col gap-1.5 shrink-0">
             ${isPending ? `<a href="/manager/approve?post=${p.id}" class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-xs text-white text-center">Approve</a>` : ""}
             <a href="/manager/cancel-post?post=${esc(p.id)}"
-               onclick="return confirm('Cancel this promotion?')"
+               data-confirm="Cancel this promotion?"
                class="px-3 py-1 bg-mpBg hover:bg-red-50 border border-mpBorder rounded text-xs text-red-400 hover:text-red-600 text-center">
               Cancel
             </a>
@@ -438,7 +437,7 @@ router.get("/", requireAuth, async (req, res) => {
         })();
         return `
         <div class="flex items-start gap-3 py-3 border-t border-red-100">
-          ${thumb ? `<img src="${esc(thumb)}" class="w-14 h-14 rounded-lg object-cover shrink-0 bg-red-100" onerror="this.style.display='none'">` : `<div class="w-14 h-14 rounded-lg bg-red-100 shrink-0"></div>`}
+          ${thumb ? `<img src="${esc(thumb)}" class="w-14 h-14 rounded-lg object-cover shrink-0 bg-red-100 img-hide-on-error">` : `<div class="w-14 h-14 rounded-lg bg-red-100 shrink-0"></div>`}
           <div class="flex-1 min-w-0">
             <p class="text-xs font-semibold text-red-700 mb-0.5">${esc(p.stylist_name || "Unknown")}</p>
             <p class="text-xs text-red-600 mb-2">${esc(friendlyErr)}</p>
@@ -450,7 +449,7 @@ router.get("/", requireAuth, async (req, res) => {
                 </button>
               </form>
               <a href="/manager/cancel-post?post=${esc(p.id)}"
-                 onclick="return confirm('Remove this failed post?')"
+                 data-confirm="Remove this failed post?"
                  class="px-3 py-1 border border-red-200 text-red-500 hover:bg-red-100 text-xs font-semibold rounded">
                 Dismiss
               </a>
@@ -478,7 +477,7 @@ router.get("/", requireAuth, async (req, res) => {
         ${recycledThisWeek} post${recycledThisWeek > 1 ? 's were' : ' was'} auto-recycled this week.
         <a href="/dashboard?salon=${encodeURIComponent(salon_id)}&status=published" class="underline font-medium">View in Database</a>
       </p>
-      <button onclick="document.getElementById('recycle-notice').remove()"
+      <button data-dismiss-id="recycle-notice"
               class="text-blue-400 hover:text-blue-600 text-lg leading-none shrink-0">&times;</button>
     </div>`;
 
@@ -590,6 +589,34 @@ router.get("/", requireAuth, async (req, res) => {
     preview.style.display = showing ? ''     : 'none';
     btn.textContent       = showing ? 'Show more' : 'Show less';
   });
+
+  // Confirm dialogs — replaces inline onclick="return confirm(...)"
+  document.addEventListener('click', function(e) {
+    var link = e.target.closest('[data-confirm]');
+    if (!link) return;
+    if (!confirm(link.dataset.confirm)) e.preventDefault();
+  });
+
+  // Dismiss banners — replaces inline onclick="document.getElementById(...).remove()"
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-dismiss-id]');
+    if (!btn) return;
+    var el = document.getElementById(btn.dataset.dismissId);
+    if (el) el.remove();
+  });
+
+  // Hide broken images — replaces inline onerror="this.style.display='none'..."
+  document.addEventListener('error', function(e) {
+    if (e.target.tagName !== 'IMG') return;
+    if (e.target.classList.contains('img-hide-on-error')) {
+      e.target.style.display = 'none';
+    }
+    // BROKEN_IMG_PLACEHOLDER pattern: hide img, show sibling placeholder
+    if (e.target.nextElementSibling && e.target.nextElementSibling.classList.contains('broken-placeholder')) {
+      e.target.style.display = 'none';
+      e.target.nextElementSibling.style.display = 'flex';
+    }
+  }, true); // useCapture required — error events don't bubble
   </script>
   `;
 
@@ -1135,7 +1162,7 @@ router.post("/coordinator/upload", requireAuth, coordinatorUpload.single("photo"
     const newPath = path.join(process.cwd(), "public/uploads/", newFilename);
     renameSync(req.file.path, newPath);
 
-    const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || process.env.BASE_URL || "https://app.mostlypostly.com";
+    const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
     const imageUrl = `${PUBLIC_BASE_URL}/uploads/${newFilename}`;
 
     // Read file as base64 data URI for OpenAI (avoids needing public URL access at caption time)
