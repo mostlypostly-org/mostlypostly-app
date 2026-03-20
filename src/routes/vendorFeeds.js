@@ -181,10 +181,7 @@ router.get("/", requireAuth, (req, res) => {
                   ${atCap ? "disabled" : ""}>
                   ${atCap ? "Monthly cap reached" : "Add to Queue"}
                 </button>
-                ${canRenew ? `
-                <button class="reset-campaign-btn px-4 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50"
-                  data-campaign-id="${safe(c.id)}">Reset</button>` : ""}
-              </div>
+                </div>
             </div>
           </div>`;
       }).join("");
@@ -403,20 +400,6 @@ router.get("/", requireAuth, (req, res) => {
       return;
     }
 
-    // Reset
-    var resetBtn = e.target.closest('.reset-campaign-btn');
-    if (resetBtn) {
-      if (!confirm("Reset this month's post count for this campaign?")) return;
-      try {
-        var r = await fetch('/manager/vendors/reset-campaign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-          body: JSON.stringify({ campaign_id: resetBtn.dataset.campaignId })
-        });
-        var d = await r.json();
-        if (d.success) location.reload();
-      } catch (err) {}
-    }
   });
 })();
 </script>
@@ -601,15 +584,5 @@ router.post("/add-to-queue", requireAuth, async (req, res) => {
   return res.json({ success: true, count: monthCount + 1, cap });
 });
 
-// ── POST /reset-campaign ──────────────────────────────────────────────────────
-router.post("/reset-campaign", requireAuth, (req, res) => {
-  const salonId = req.manager.salon_id;
-  const { campaign_id } = req.body;
-  if (!campaign_id) return res.json({ success: false, error: "Missing campaign_id" });
-  const thisMonth = new Date().toISOString().slice(0, 7);
-  db.prepare(`DELETE FROM vendor_post_log WHERE salon_id = ? AND campaign_id = ? AND posted_month = ?`)
-    .run(salonId, campaign_id, thisMonth);
-  return res.json({ success: true });
-});
 
 export default router;
