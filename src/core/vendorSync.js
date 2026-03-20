@@ -167,6 +167,7 @@ async function downloadPortalPdf(config) {
 
   const browser = await getBrowser();
   const page = await browser.newPage();
+  let cdpTimeout; // hoisted so finally block can always clearTimeout
 
   try {
     // Set up CDP download interception before navigation
@@ -180,7 +181,6 @@ async function downloadPortalPdf(config) {
     // Listen for download completion via CDP event
     // Falls back to file-system polling if CDP events don't fire (--single-process constraint)
     let cdpResolved = false;
-    let cdpTimeout;
     const cdpDownloadPromise = new Promise((resolve, reject) => {
       cdpTimeout = setTimeout(() => {
         if (!cdpResolved) reject(new Error('[VendorSync] PDF download timed out (CDP)'));
