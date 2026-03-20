@@ -180,31 +180,42 @@ async function downloadPortalPdf(config) {
     // Listen for download completion via CDP event
     // Falls back to file-system polling if CDP events don't fire (--single-process constraint)
     let cdpResolved = false;
+    let cdpTimeout;
     const cdpDownloadPromise = new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      cdpTimeout = setTimeout(() => {
         if (!cdpResolved) reject(new Error('[VendorSync] PDF download timed out (CDP)'));
       }, 120000);
 
       cdpSession.on('Browser.downloadProgress', (ev) => {
         if (ev.state === 'completed') {
           cdpResolved = true;
-          clearTimeout(timeout);
+          clearTimeout(cdpTimeout);
           resolve();
         } else if (ev.state === 'canceled') {
-          clearTimeout(timeout);
+          clearTimeout(cdpTimeout);
           reject(new Error('[VendorSync] PDF download canceled'));
         }
       });
     });
+    // Prevent unhandled rejection if we exit early (login failure, etc.)
+    cdpDownloadPromise.catch(() => {});
 
     // Navigate to portal login page
     console.log(`[VendorSync] Navigating to portal: ${config.portalUrl}`);
     await page.goto(config.portalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // Fill login form
-    await page.type(config.loginSelectors.userSelector, user);
-    await page.type(config.loginSelectors.passSelector, pass);
-    await page.click(config.loginSelectors.submitSelector);
+    // Fill login form — try each selector individually to get a clear error
+    const userInput = await page.waitForSelector(config.loginSelectors.userSelector, { timeout: 10000 }).catch(() => null);
+    if (!userInput) throw new Error(`[VendorSync] Login email field not found — portal selectors may need updating`);
+    await userInput.type(user);
+
+    const passInput = await page.waitForSelector(config.loginSelectors.passSelector, { timeout: 5000 }).catch(() => null);
+    if (!passInput) throw new Error(`[VendorSync] Login password field not found`);
+    await passInput.type(pass);
+
+    const submitBtn = await page.waitForSelector(config.loginSelectors.submitSelector, { timeout: 5000 }).catch(() => null);
+    if (!submitBtn) throw new Error(`[VendorSync] Login submit button not found`);
+    await submitBtn.click();
     await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 });
 
     console.log(`[VendorSync] Logged in — searching for: ${searchKeyword}`);
@@ -266,6 +277,7 @@ async function downloadPortalPdf(config) {
 
     return path.join(downloadDir, files[0]);
   } finally {
+    clearTimeout(cdpTimeout);
     await page.close();
   }
 }
