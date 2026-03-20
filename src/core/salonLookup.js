@@ -272,6 +272,9 @@ export function lookupStylist(identifier) {
     if (mgr) {
       row = mgr;
       isManager = true;
+      // Check if this manager is a coordinator
+      const roleRow = db.prepare("SELECT role FROM managers WHERE id = ?").get(mgr.manager_id);
+      row._isCoordinator = (roleRow?.role === 'coordinator');
     }
   }
 
@@ -309,6 +312,7 @@ export function lookupStylist(identifier) {
     salon_name: row.salon_name,
     salon_info,
     role: isManager ? "manager" : "stylist",
+    isCoordinator: isManager && !!row._isCoordinator,
     compliance_opt_in: !!row.compliance_opt_in,
     compliance_timestamp: row.compliance_timestamp || null,
     consent: consentObj,
