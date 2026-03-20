@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 02-02-PLAN.md — Cadence Scheduler (pickNextPost)
+stopped_at: Completed 02-04-PLAN.md — Auto-Recycle Notice Banner and Undo
 last_updated: "2026-03-20T02:11:06.209Z"
 progress:
   total_phases: 4
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 02 (content-engine) — EXECUTING
-Plan: 2 of 5
+Plan: 4 of 5
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Plan: 2 of 5
 | Phase 01-vendor-sync P04 | 2 | 1 tasks | 1 files |
 | Phase quick P260319-t0p | 4 | 2 tasks | 4 files |
 | Phase 02-content-engine P02 | 181 | 2 tasks | 3 files |
+| Phase 02-content-engine P04 | 4 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Recent decisions affecting current work:
 - [Phase 02-content-engine]: Reel posts excluded from 7-day distribution query and scored -1 — bonus content that never skews cadence
 - [Phase 02-content-engine]: pickNextPost falls back to full posts array when all candidates filtered — scheduler never stalls
 - [Phase 02-content-engine]: Deficit scoring (target.min - current_ratio) replaces static priority sort — dynamic cadence enforcement
+- [Phase 02-content-engine Plan 04]: Recycle banner uses datetime('now', '-7 days') rolling window — not calendar week boundary
+- [Phase 02-content-engine Plan 04]: Undo form passes salon as query param matching resolveSalonId(req) pattern in dashboard.js
 
 ### Pending Todos
 
@@ -107,6 +110,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-20T02:11:06.207Z
-Stopped at: Completed 02-02-PLAN.md — Cadence Scheduler (pickNextPost)
+Last session: 2026-03-20T02:14:10Z
+Stopped at: Completed 02-04-PLAN.md — Auto-Recycle Notice Banner and Undo
 Resume file: None

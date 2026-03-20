@@ -31,7 +31,7 @@
 - [ ] **RECYC-08**: Manager can toggle auto-recycle on/off per salon in Admin settings
 - [ ] **RECYC-09**: Manager can flag individual published posts as "block from recycling" in Database view
 - [ ] **RECYC-10**: Manager can manually trigger recycle on any published post via Recycle button
-- [ ] **RECYC-11**: Dashboard shows a notice when posts were auto-recycled this week with link to view/undo
+- [x] **RECYC-11**: Dashboard shows a notice when posts were auto-recycled this week with link to view/undo
 
 ### Intelligent Scheduler (FEAT-001)
 

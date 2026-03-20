@@ -41,7 +41,7 @@ Plans:
   3. Manager can toggle auto-recycle on/off per salon in Admin settings and manually trigger recycling on any individual published post
   4. Dashboard shows a notice this week when posts were auto-recycled, with a link to view or undo
   5. Over any rolling 7-day window, the scheduled post mix reflects the target distribution: ~50-60% standard, 15-20% before/after (skewed Tue-Thu), promotions never back-to-back and capped at 2-3/week, availability slots mid-week only
-**Plans:** 1/5 plans executed
+**Plans:** 3/5 plans executed
 
 Plans:
 - [ ] 02-01-PLAN.md — Migration 048 + content recycler core logic (checkAndAutoRecycle) + scheduler wiring
@@ -79,6 +79,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Vendor Sync | 5/5 | Complete   | 2026-03-19 |
-| 2. Content Engine | 1/5 | In Progress|  |
+| 2. Content Engine | 3/5 | In Progress|  |
 | 3. Reels & Video | 0/TBD | Not started | - |
 | 4. Reputation Manager | 0/TBD | Not started | - |
