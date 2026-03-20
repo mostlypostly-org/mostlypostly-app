@@ -433,6 +433,27 @@ router.get("/", requireAuth, async (req, res) => {
   `;
 
   /* -------------------------------------------------------------
+     AUTO-RECYCLE NOTICE BANNER
+  ------------------------------------------------------------- */
+  const recycledThisWeek = db.prepare(`
+    SELECT COUNT(*) AS n FROM posts
+    WHERE salon_id = ?
+      AND recycled_from_id IS NOT NULL
+      AND datetime(created_at) >= datetime('now', '-7 days')
+  `).get(salon_id)?.n || 0;
+
+  const recycleBanner = recycledThisWeek === 0 ? '' : `
+    <div id="recycle-notice"
+         class="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 flex items-center justify-between gap-4">
+      <p class="text-sm text-blue-700">
+        ${recycledThisWeek} post${recycledThisWeek > 1 ? 's were' : ' was'} auto-recycled this week.
+        <a href="/dashboard?salon=${encodeURIComponent(salon_id)}&status=published" class="underline font-medium">View in Database</a>
+      </p>
+      <button onclick="document.getElementById('recycle-notice').remove()"
+              class="text-blue-400 hover:text-blue-600 text-lg leading-none shrink-0">&times;</button>
+    </div>`;
+
+  /* -------------------------------------------------------------
      PAGE BODY (old layout)
   ------------------------------------------------------------- */
   const body = `
@@ -466,6 +487,7 @@ router.get("/", requireAuth, async (req, res) => {
       </div>
 
       ${failedBanner}
+      ${recycleBanner}
 
       ${upcomingPromoCards}
 
