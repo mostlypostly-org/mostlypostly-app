@@ -624,19 +624,27 @@ export async function runSchedulerOnce() {
           const tiktokEligible = salon.tiktok_enabled
             && salon.tiktok_access_token
             && salon.tiktok_refresh_token
-            && postType !== "availability";
+            && postType !== "availability"
+            && postType !== "promotions"
+            && postType !== "celebration_story";
 
           if (tiktokEligible && tiktokPostedToday < tiktokDailyCap) {
             try {
+              // TikTok doesn't render clickable links — strip the "Book:" line
+              const tiktokCaption = fbCaption
+                .replace(/\n\nBook: https?:\/\/\S+/gi, '')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+
               let tiktokPublishId;
               const isVideo = postType === "reel"
                 || /\.(mp4|mov|avi|webm)$/i.test(allImages[0] || "");
 
               if (isVideo) {
                 const videoUrl = allImages[0] || post.image_url;
-                tiktokPublishId = await publishVideoToTikTok(salon, videoUrl, fbCaption);
+                tiktokPublishId = await publishVideoToTikTok(salon, videoUrl, tiktokCaption);
               } else {
-                tiktokPublishId = await publishPhotoToTikTok(salon, allImages, fbCaption);
+                tiktokPublishId = await publishPhotoToTikTok(salon, allImages, tiktokCaption);
               }
 
               if (tiktokPublishId) {

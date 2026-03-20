@@ -2,6 +2,7 @@
 import express from "express";
 import crypto from "crypto";
 import { db } from "../../db.js";
+import { encrypt } from "../core/encryption.js";
 
 function requireAuth(req, res, next) {
   if (!req.session?.manager_id) return res.redirect("/manager/login");
@@ -54,6 +55,12 @@ router.get("/callback", async (req, res) => {
     return res.redirect("/manager/integrations?tiktok=error");
   }
 
+  // Guard: must have an active session
+  const manager_id = req.session?.manager_id;
+  if (!manager_id) {
+    return res.redirect("/manager/login");
+  }
+
   const pkce = req.session.tiktok_pkce;
   if (!pkce || pkce.salon_id !== salon_id) {
     console.error("[TikTok OAuth] PKCE session mismatch");
@@ -61,12 +68,7 @@ router.get("/callback", async (req, res) => {
   }
   delete req.session.tiktok_pkce;
 
-  // Verify the salon_id from state belongs to the session manager (IDOR guard)
-  const manager_id = req.session?.manager_id;
-  if (!manager_id) {
-    console.error("[TikTok OAuth] No session manager_id in callback");
-    return res.redirect("/manager/login");
-  }
+  // IDOR guard: confirm the salon from state belongs to this session's manager
   const salonOwned = db.prepare(
     `SELECT 1 FROM managers WHERE id = ? AND salon_id = ?`
   ).get(manager_id, salon_id);
@@ -115,7 +117,7 @@ router.get("/callback", async (req, res) => {
         tiktok_token_expiry  = ?,
         tiktok_enabled       = 1
       WHERE slug = ?
-    `).run(open_id, username, access_token, refresh_token, expiry, salon_id);
+    `).run(open_id, username, encrypt(access_token), encrypt(refresh_token), expiry, salon_id);
 
     console.log(`[TikTok] Connected salon ${salon_id} → @${username} (${open_id})`);
     res.redirect(`/manager/integrations?tiktok=connected`);
