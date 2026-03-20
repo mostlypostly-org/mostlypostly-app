@@ -216,3 +216,83 @@ export async function publishToFacebookMulti(pageOrSalon, caption, imageUrls, to
   console.log("✅ [Facebook Multi] Feed post success:", feedData);
   return feedData;
 }
+
+/**
+ * publishFacebookReel(salonOrPageId, caption, videoUrl, tokenOverride?)
+ * Three-phase FB Reels API: init -> upload via file_url -> publish.
+ * Supports both salon object and legacy string pageId signatures (same as publishToFacebook).
+ */
+export async function publishFacebookReel(salonOrPageId, caption, videoUrl, tokenOverride = null) {
+  if (!videoUrl) throw new Error("publishFacebookReel: missing videoUrl");
+
+  let pageId, token, graphVersion = "v19.0";
+  if (typeof salonOrPageId === "object" && salonOrPageId !== null) {
+    pageId = salonOrPageId.facebook_page_id;
+    token = salonOrPageId.facebook_page_token || process.env.FACEBOOK_PAGE_TOKEN || process.env.FACEBOOK_SYSTEM_USER_TOKEN;
+    graphVersion = salonOrPageId.graph_version || graphVersion;
+  } else {
+    pageId = salonOrPageId;
+    token = tokenOverride || process.env.FACEBOOK_PAGE_TOKEN || process.env.FACEBOOK_SYSTEM_USER_TOKEN;
+  }
+
+  if (!pageId) throw new Error("publishFacebookReel: invalid pageId");
+  if (!token) throw new Error("publishFacebookReel: missing token");
+
+  const safeCaption = (caption || "").toString().slice(0, 2200);
+
+  console.log(`[Facebook Reel] Publishing to pageId=${pageId}`);
+
+  // Step 1: Initialize upload session
+  const initResp = await fetch(
+    `https://graph.facebook.com/${graphVersion}/${pageId}/video_reels`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ upload_phase: "start", access_token: token }),
+    }
+  );
+  const initData = await initResp.json();
+  if (!initResp.ok || !initData.video_id) {
+    throw new Error(`FB Reel init failed: ${JSON.stringify(initData?.error || initData)}`);
+  }
+  const { video_id: videoId, upload_url: uploadUrl } = initData;
+  console.log(`  [Facebook Reel] Init success: videoId=${videoId}`);
+
+  // Step 2: Upload via file_url (video is publicly hosted — no binary streaming needed)
+  const uploadResp = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `OAuth ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ file_url: videoUrl }),
+  });
+  const uploadData = await uploadResp.json();
+  if (!uploadData.success) {
+    throw new Error(`FB Reel upload failed: ${JSON.stringify(uploadData?.error || uploadData)}`);
+  }
+  console.log(`  [Facebook Reel] Upload success`);
+
+  // Step 3: Publish
+  const publishResp = await fetch(
+    `https://graph.facebook.com/${graphVersion}/${pageId}/video_reels`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        video_id: videoId,
+        upload_phase: "finish",
+        video_state: "PUBLISHED",
+        description: safeCaption,
+        access_token: token,
+      }),
+    }
+  );
+  const publishData = await publishResp.json();
+  if (!publishResp.ok && publishData?.error) {
+    throw new Error(`FB Reel publish failed: ${JSON.stringify(publishData.error)}`);
+  }
+
+  console.log(`  [Facebook Reel] Published: videoId=${videoId}`);
+  return { id: videoId, post_id: videoId, status: "success", type: "reel" };
+}

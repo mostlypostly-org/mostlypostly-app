@@ -102,8 +102,8 @@ async function createIgMedia({ userId, imageUrl, caption, token, graphVer, colla
   return data.id;
 }
 
-async function waitForContainer(creationId, token, graphVer) {
-  const deadline = Date.now() + IG_MEDIA_MAX_WAIT_MS;
+async function waitForContainer(creationId, token, graphVer, maxWaitMs = IG_MEDIA_MAX_WAIT_MS, pollIntervalMs = IG_MEDIA_POLL_INTERVAL_MS) {
+  const deadline = Date.now() + maxWaitMs;
   while (Date.now() < deadline) {
     const url = `https://graph.facebook.com/${graphVer}/${creationId}?fields=status_code&access_token=${encodeURIComponent(
       token
@@ -113,7 +113,7 @@ async function waitForContainer(creationId, token, graphVer) {
     if (data?.status_code === "FINISHED") return;
     if (data?.status_code === "ERROR")
       throw new Error("IG container ERROR status");
-    await new Promise((r) => setTimeout(r, IG_MEDIA_POLL_INTERVAL_MS));
+    await new Promise((r) => setTimeout(r, pollIntervalMs));
   }
   throw new Error("Timed out waiting for IG container.");
 }
@@ -417,4 +417,65 @@ export async function publishToInstagram(input) {
     });
     throw err;
   }
+}
+
+/**
+ * publishReelToInstagram({ salon_id, videoUrl, caption })
+ * Three-step IG Reels API: create container (REELS) -> poll -> publish.
+ * Uses 120s max wait / 3s poll interval (reels take 30-120s to process).
+ */
+export async function publishReelToInstagram({ salon_id, videoUrl, caption }) {
+  if (!salon_id) throw new Error("publishReelToInstagram: missing salon_id");
+  if (!videoUrl) throw new Error("publishReelToInstagram: missing videoUrl");
+
+  const { userId, token, graphVer } = await resolveIgCredentials(salon_id);
+  if (!token || !userId) throw new Error("Missing Instagram credentials for Reel.");
+
+  // Normalize caption (same as single-image path)
+  let igCaption = (caption || "").trim();
+  igCaption = igCaption.replace(/<a[^>]*href="https?:\/\/instagram\.com\/([^"]+)"[^>]*>@[^<]+<\/a>/gi, "@$1");
+  igCaption = igCaption.replace(/https?:\/\/\S+/gi, "").trim();
+  igCaption = igCaption.replace(/^(?:IG|Book(?:\s*now)?):\s*$/gim, "");
+  igCaption = igCaption.replace(/\n{3,}/g, "\n\n").trim();
+  if (!/book via link in bio/i.test(igCaption)) {
+    igCaption += (igCaption ? "\n\n" : "") + "Book via link in bio.";
+  }
+
+  console.log(`[Instagram Reel] Publishing for salon_id=${salon_id}`);
+
+  // Step 1: Create Reel container
+  const creationId = await retryIg(async () => {
+    const url = `https://graph.facebook.com/${graphVer}/${userId}/media`;
+    const params = new URLSearchParams({
+      media_type: "REELS",
+      video_url: videoUrl,
+      caption: igCaption,
+      share_to_feed: "true",
+      access_token: token,
+    });
+    const resp = await fetch(url, { method: "POST", body: params });
+    const data = await resp.json();
+    if (!resp.ok || !data?.id) {
+      throw new Error(`IG Reel container create failed: ${resp.status} ${JSON.stringify(data)}`);
+    }
+    return data.id;
+  }, "reel container create");
+
+  // Step 2: Poll for FINISHED (120s max, 3s intervals — reels are slower than photos)
+  await waitForContainer(creationId, token, graphVer, 120_000, 3_000);
+
+  // Step 3: Publish
+  const publishRes = await retryIg(
+    () => publishContainer(creationId, userId, token, graphVer),
+    "reel publish"
+  );
+
+  logEvent({
+    event: "instagram_reel_publish_success",
+    salon_id,
+    data: { media_id: publishRes.id, video_url: videoUrl },
+  });
+
+  console.log(`[Instagram Reel] Published: ${publishRes.id}`);
+  return { id: publishRes.id, status: "success", type: "reel" };
 }
