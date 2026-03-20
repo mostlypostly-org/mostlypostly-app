@@ -61,6 +61,20 @@ router.get("/callback", async (req, res) => {
   }
   delete req.session.tiktok_pkce;
 
+  // Verify the salon_id from state belongs to the session manager (IDOR guard)
+  const manager_id = req.session?.manager_id;
+  if (!manager_id) {
+    console.error("[TikTok OAuth] No session manager_id in callback");
+    return res.redirect("/manager/login");
+  }
+  const salonOwned = db.prepare(
+    `SELECT 1 FROM managers WHERE id = ? AND salon_id = ?`
+  ).get(manager_id, salon_id);
+  if (!salonOwned) {
+    console.error(`[TikTok OAuth] Manager ${manager_id} does not own salon ${salon_id}`);
+    return res.redirect("/manager/integrations?tiktok=error");
+  }
+
   try {
     // 1. Exchange code for tokens
     const tokenResp = await fetch(TIKTOK_TOKEN_URL, {

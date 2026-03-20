@@ -46,6 +46,9 @@ export async function publishPhotoToTikTok(salon, imageUrls, caption) {
   }
 
   const publishId = data.data?.publish_id;
+  if (!publishId) {
+    throw new Error(`[TikTok] Photo post response missing publish_id: ${JSON.stringify(data)}`);
+  }
   console.log(`[TikTok] Photo post published for salon ${salon.slug}: ${publishId}`);
   return publishId;
 }
@@ -91,6 +94,9 @@ export async function publishVideoToTikTok(salon, videoUrl, caption) {
   }
 
   const publishId = data.data?.publish_id;
+  if (!publishId) {
+    throw new Error(`[TikTok] Video post response missing publish_id: ${JSON.stringify(data)}`);
+  }
   console.log(`[TikTok] Video post published for salon ${salon.slug}: ${publishId}`);
   return publishId;
 }
