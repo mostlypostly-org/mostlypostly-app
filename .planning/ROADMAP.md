@@ -59,7 +59,7 @@ Plans:
   2. After manager approval, the video publishes as a Reel on both Instagram and Facebook; failures surface with plain-English error messages via the existing error flow
   3. Analytics and the team leaderboard correctly count and score reel posts (20 pts vs 10 for standard)
   4. A tiktok.js publisher stub exists in the codebase, ready to be wired once TikTok Developer app approval is received
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 
 Plans:
 - [ ] 03-01-PLAN.md — Video download utility + Express static serving + Twilio video detection
@@ -86,7 +86,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 |-------|----------------|--------|-----------|
 | 1. Vendor Sync | 5/5 | Complete   | 2026-03-19 |
 | 2. Content Engine | 4/5 | In Progress|  |
-| 3. Reels & Video | 0/4 | Not started | - |
+| 3. Reels & Video | 1/4 | In Progress|  |
 | 4. Reputation Manager | 0/TBD | Not started | - |
 
 ### Phase 5: Guest Care and Support Staff

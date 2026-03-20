@@ -44,8 +44,8 @@
 
 ### Reels & Video Publishing (FEAT-022)
 
-- [ ] **REEL-01**: messageRouter.js detects video/* content type from Twilio MMS and branches to video flow
-- [ ] **REEL-02**: System downloads Twilio video file (auth required) and saves to data/uploads/videos/
+- [x] **REEL-01**: messageRouter.js detects video/* content type from Twilio MMS and branches to video flow
+- [x] **REEL-02**: System downloads Twilio video file (auth required) and saves to data/uploads/videos/
 - [ ] **REEL-03**: System sends SMS prompt to stylist asking for service description to inform caption
 - [ ] **REEL-04**: System generates Reel caption from stylist's SMS answer + salon tone via GPT-4o
 - [ ] **REEL-05**: Post is created in DB with post_type=reel and enters standard approval queue
