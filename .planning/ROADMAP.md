@@ -88,3 +88,13 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 2. Content Engine | 4/5 | In Progress|  |
 | 3. Reels & Video | 0/4 | Not started | - |
 | 4. Reputation Manager | 0/TBD | Not started | - |
+
+### Phase 5: Guest Care and Support Staff
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 4
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 5 to break down)

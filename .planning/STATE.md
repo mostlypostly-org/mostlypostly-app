@@ -59,6 +59,10 @@ Plan: 4 of 5
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 5 added: Guest Care and Support Staff — receptionist/front-desk staff type that posts on behalf of stylists with modified portal flow, service provider dropdown, support member leaderboard scoring, and tailored welcome SMS
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
