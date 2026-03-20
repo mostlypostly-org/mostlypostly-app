@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-03-20T19:03:27.902Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-03-20T19:07:27.651Z"
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 20
-  completed_plans: 18
+  completed_plans: 20
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 06 (per-salon-platform-content-routing) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Plan: 2 of 3
 | Phase 05-guest-care-and-support-staff P03 | 8 | 2 tasks | 6 files |
 | Phase 05 P02 | 413 | 3 tasks | 3 files |
 | Phase 06-per-salon-platform-content-routing P01 | 2 | 2 tasks | 3 files |
+| Phase 06-per-salon-platform-content-routing P02 | 2 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,8 @@ Recent decisions affecting current work:
 - [Phase 06-per-salon-platform-content-routing]: platform_routing stored as TEXT JSON on salons row — consistent with brand_palette/default_hashtags columns, avoids separate routing table join on scheduler tick
 - [Phase 06-per-salon-platform-content-routing]: NULL platform_routing = all-enabled defaults — zero migration of existing data required, fully backward compatible
 - [Phase 06-per-salon-platform-content-routing]: isEnabledFor() returns true for unknown post types — new types will not be accidentally suppressed before routing rules are set
+- [Phase 06-per-salon-platform-content-routing]: buildRoutingRows() defined as closure in GET handler — needs access to isGmbPlanAllowed, fbConnected, tiktokConnected without extra params
+- [Phase 06-per-salon-platform-content-routing]: TikTok column greyed for availability, promotions, celebration_story — skipped by scheduler anyway; greying prevents manager confusion
 
 ### Pending Todos
 
@@ -144,6 +147,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-20T19:03:27.900Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-03-20T19:07:22.347Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None

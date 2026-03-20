@@ -113,9 +113,9 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 **Goal:** Salon managers control which content types publish to which platforms — per-salon routing rules stored as JSON, enforced by the scheduler, managed via the Integrations page toggle grid
 **Requirements**: TBD
 **Depends on:** Phase 5
-**Plans:** 1/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 06-01-PLAN.md — Migration 051 (platform_routing column) + platformRouting.js helper module
-- [ ] 06-02-PLAN.md — Content Routing card on Integrations page (toggle grid + save handler)
-- [ ] 06-03-PLAN.md — Scheduler routing guards + Platform Console global defaults viewer
+- [x] 06-02-PLAN.md — Content Routing card on Integrations page (toggle grid + save handler)
+- [x] 06-03-PLAN.md — Scheduler routing guards + Platform Console global defaults viewer
