@@ -148,9 +148,10 @@ None yet.
 | 260319-t0p | KB article workflow — template, Post Queue demo article, Definition of Done enforcement | 2026-03-20 | f505962 | [260319-t0p-ensure-kb-article-is-created-for-every-n](./quick/260319-t0p-ensure-kb-article-is-created-for-every-n/) |
 | 260320-ate | Fix CSP inline event handler violations in vendorAdmin (onerror/onclick → event delegation) | 2026-03-20 | 57b8a71 | [260320-ate-fix-csp-inline-event-handler-violation-o](./quick/260320-ate-fix-csp-inline-event-handler-violation-o/) |
 | 260320-dn3 | Add collapsible recent activity section to manager dashboard (5 visible, rest collapsible, 14-day window) | 2026-03-20 | 40feec9 | [260320-dn3-add-collapsible-recent-activity-section-](./quick/260320-dn3-add-collapsible-recent-activity-section-/) |
+| 260321-0r9 | restrict manager caption editor to caption only, reattach hashtags booking url styled-by at post time | 2026-03-21 | df60646 | [260321-0r9-restrict-manager-caption-editor-to-capti](./quick/260321-0r9-restrict-manager-caption-editor-to-capti/) |
 
 ## Session Continuity
 
-Last session: 2026-03-20T19:07:42.655Z
-Stopped at: Completed 06-03-PLAN.md
+Last session: 2026-03-21T04:40:00.000Z
+Stopped at: Completed quick task 260321-0r9: restrict manager caption editor to caption only, reattach hashtags booking url styled-by at post time
 Resume file: None
