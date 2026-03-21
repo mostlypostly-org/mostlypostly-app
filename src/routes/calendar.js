@@ -177,13 +177,13 @@ router.get("/", requireAuth, (req, res) => {
 
   const body = `
     <!-- Day panel backdrop -->
-    <div id="day-panel-backdrop" class="hidden fixed inset-0 z-30 bg-black/20" onclick="closeDayPanel()"></div>
+    <div id="day-panel-backdrop" class="hidden fixed inset-0 z-30 bg-black/20" data-action="close-day-panel"></div>
 
     <!-- Day panel -->
     <div id="day-panel" class="hidden fixed inset-y-0 right-0 z-40 w-96 max-w-full bg-white border-l border-mpBorder shadow-2xl overflow-y-auto transition-transform">
-      <div class="flex items-center justify-between px-5 py-4 border-b border-mpBorder">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-mpBorder sticky top-0 bg-white z-10">
         <h2 id="day-panel-title" class="text-base font-bold text-mpCharcoal"></h2>
-        <button onclick="closeDayPanel()" class="text-mpMuted hover:text-mpCharcoal text-2xl leading-none">&times;</button>
+        <button type="button" data-action="close-day-panel" class="text-mpMuted hover:text-mpCharcoal text-2xl leading-none">&times;</button>
       </div>
       <div id="day-panel-content" class="px-5 py-4"></div>
     </div>
@@ -249,6 +249,10 @@ router.get("/", requireAuth, (req, res) => {
         panelEl.classList.add('hidden');
         backdropEl.classList.add('hidden');
       };
+
+      document.addEventListener('click', function(e) {
+        if (e.target.closest('[data-action="close-day-panel"]')) closeDayPanel();
+      });
 
       window.openDayPanel = function(date) {
         var parts = date.split('-');
