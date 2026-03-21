@@ -109,7 +109,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 4. Reputation Manager | 0/TBD | Not started | - |
 | 5. Guest Care | 3/3 | Complete   | 2026-03-20 |
 | 6. Content Routing | 3/3 | Complete | - |
-| 7. Content Calendar View | 3/3 | Complete   | 2026-03-21 |
+| 7. Content Calendar View | 3/4 | Gap closure | 2026-03-21 |
 
 ### Phase 6: Per-Salon Platform Content Routing
 
@@ -128,9 +128,10 @@ Plans:
 **Goal:** Managers can see all scheduled and published posts on a visual 4-week calendar, click any day to preview posts in a slide-out panel, approve/deny/post-now directly from the panel, and drag-drop posts to reschedule them (FEAT-018)
 **Depends on:** Phase 6
 **Requirements**: CAL-01, CAL-02, CAL-03, CAL-04, CAL-05
-**Plans:** 3/3 plans complete
+**Plans:** 4 plans (3 complete, 1 gap closure)
 
 Plans:
 - [x] 07-00-PLAN.md — Wave 0 test scaffold (calendarPillClass, date range, reschedule date math)
 - [x] 07-01-PLAN.md — Calendar route + month grid with color-coded post pills + pageShell nav + server.js mount
 - [x] 07-02-PLAN.md — Day panel fragment endpoint + approve/deny/post-now actions + drag-to-reschedule
+- [ ] 07-03-PLAN.md — Gap closure: CSP fix (SortableJS CDN), animation:0 pill shift, Remove return-to-calendar
