@@ -1102,6 +1102,8 @@ router.get("/coordinator/upload", requireAuth, (req, res) => {
     ? "Something went wrong. Please try again."
     : "";
 
+  const prefillDate = req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : '';
+
   const body = `
     <section class="mb-8">
       <div class="flex items-center gap-3 mb-1">
@@ -1147,6 +1149,14 @@ router.get("/coordinator/upload", requireAuth, (req, res) => {
           <textarea name="caption_note" rows="2" placeholder="Any context for the AI caption (e.g. 'balayage on a new client')"
             class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-mpCharcoal placeholder:text-mpMuted focus:border-mpAccent focus:ring-1 focus:ring-mpAccent"></textarea>
         </div>
+        ${prefillDate ? `
+        <div>
+          <label class="block text-xs font-semibold text-mpCharcoal mb-1.5">Schedule for date</label>
+          <input type="date" name="scheduled_date" value="${esc(prefillDate)}"
+            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-mpCharcoal focus:border-mpAccent focus:ring-1 focus:ring-mpAccent" />
+          <p class="text-[11px] text-mpMuted mt-1">Post will be scheduled for this date. Time will be auto-assigned by the scheduler.</p>
+        </div>
+        ` : ''}
         <button type="submit"
           class="inline-flex items-center justify-center rounded-full bg-mpAccent px-6 py-2 text-sm font-semibold text-white shadow-md hover:bg-[#2E5E9E]">
           Upload &amp; Generate Caption
@@ -1166,7 +1176,7 @@ router.post("/coordinator/upload", requireAuth, coordinatorUpload.single("photo"
   const manager_id = req.manager.id;
 
   try {
-    const { stylist_id, caption_note } = req.body;
+    const { stylist_id, caption_note, scheduled_date } = req.body;
     if (!stylist_id || !req.file) {
       return res.redirect("/manager/coordinator/upload?error=missing");
     }
@@ -1220,7 +1230,17 @@ router.post("/coordinator/upload", requireAuth, coordinatorUpload.single("photo"
       submitted_by: manager_id,
     };
 
-    savePost(null, stylistPayload, caption, [], "manager_pending", null, { salon_id });
+    const savedPost = savePost(null, stylistPayload, caption, [], "manager_pending", null, { salon_id });
+
+    if (scheduled_date && /^\d{4}-\d{2}-\d{2}$/.test(scheduled_date)) {
+      const salonTzRow = db.prepare("SELECT timezone FROM salons WHERE slug = ?").get(salon_id);
+      const tz = salonTzRow?.timezone || "America/Indiana/Indianapolis";
+      const localDt = DateTime.fromISO(scheduled_date + "T10:00:00", { zone: tz });
+      if (localDt.isValid) {
+        const utcStr = localDt.toUTC().toFormat("yyyy-LL-dd HH:mm:ss");
+        db.prepare("UPDATE posts SET scheduled_for = ? WHERE id = ?").run(utcStr, savedPost.id);
+      }
+    }
 
     return res.redirect(`/manager?notice=${encodeURIComponent(`Post uploaded for ${stylistRow.name} — pending approval`)}`);
   } catch (err) {
