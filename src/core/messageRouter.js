@@ -46,6 +46,7 @@ import {
 import moderateAIOutput from "../utils/moderation.js";
 import { sendQuickStart } from "./stylistWelcome.js";
 import { getOrCreateLeaderboardToken } from "./gamification.js";
+import { isRealCaption } from "./captionDetection.js";
 console.log("[Router Debug] moderateAIOutput type:", typeof moderateAIOutput);
 
 
@@ -378,24 +379,33 @@ async function createCoordinatorPost(chatId, imageUrls, messageBody, coordinator
   const imageUrlsArray = Array.isArray(imageUrls) ? imageUrls : [imageUrls].filter(Boolean);
   const primaryImageUrl = imageUrlsArray[0] || null;
 
-  // Generate AI caption using the standard generateCaption function
+  // Caption passthrough: if coordinator provided a real caption, keep it verbatim
+  const captionKept = isRealCaption(messageBody);
+
+  // Generate AI caption (or use passthrough) for the coordinator post
   let caption = "";
-  try {
-    const { generateCaption } = await import("../openai.js");
-    const fullSalon = getSalonPolicy(salonId) || salonRow;
-    const imageDataUri = await fetchTwilioImageAsDataUri(primaryImageUrl);
-    const aiJson = await generateCaption({
-      imageDataUrl: imageDataUri,
-      notes: messageBody || "",
-      salon: fullSalon,
-      stylist: { stylist_name: matchedStylist.name, name: matchedStylist.name, instagram_handle: matchedStylist.instagram_handle || null },
-      postType: "standard_post",
-      city: salonRow?.city || "",
-    });
-    caption = aiJson?.caption || "";
-  } catch (err) {
-    console.error("[Coordinator] Caption generation failed:", err.message);
-    caption = "";
+  if (captionKept) {
+    // Keep the coordinator's text verbatim — no AI call
+    caption = (messageBody || "").trim();
+    console.log("[Coordinator] Caption passthrough — keeping coordinator text verbatim");
+  } else {
+    try {
+      const { generateCaption } = await import("../openai.js");
+      const fullSalon = getSalonPolicy(salonId) || salonRow;
+      const imageDataUri = await fetchTwilioImageAsDataUri(primaryImageUrl);
+      const aiJson = await generateCaption({
+        imageDataUrl: imageDataUri,
+        notes: messageBody || "",
+        salon: fullSalon,
+        stylist: { stylist_name: matchedStylist.name, name: matchedStylist.name, instagram_handle: matchedStylist.instagram_handle || null },
+        postType: "standard_post",
+        city: salonRow?.city || "",
+      });
+      caption = aiJson?.caption || "";
+    } catch (err) {
+      console.error("[Coordinator] Caption generation failed:", err.message);
+      caption = "";
+    }
   }
 
   // Build stylist-like payload for savePost — attributed to the matched stylist, tracked to coordinator
@@ -421,15 +431,24 @@ async function createCoordinatorPost(chatId, imageUrls, messageBody, coordinator
   ).run(crypto.randomUUID(), post.id, token, expiresAt);
 
   const BASE_URL = process.env.PUBLIC_BASE_URL || process.env.BASE_URL || "https://app.mostlypostly.com";
-  const portalUrl = `${BASE_URL}/stylist/${post.id}?token=${token}`;
+  const captionKeptParam = captionKept ? "&caption_kept=1" : "";
+  const portalUrl = `${BASE_URL}/stylist/${post.id}?token=${token}${captionKeptParam}`;
 
   const { sendViaTwilio } = await import("../routes/twilio.js");
-  await sendViaTwilio(
-    chatId,
-    `Got it! I've drafted a post for ${matchedStylist.name}. ` +
-    `Review and confirm here: ${portalUrl}\n\n` +
-    `Or reply APPROVE to submit now, or CANCEL to discard.`
-  );
+  if (captionKept) {
+    await sendViaTwilio(
+      chatId,
+      `Got it! Your caption for ${matchedStylist.name} was kept. Review here:\n${portalUrl}\n\n` +
+      `Or reply APPROVE to submit now, or CANCEL to discard.`
+    );
+  } else {
+    await sendViaTwilio(
+      chatId,
+      `Got it! I've drafted a post for ${matchedStylist.name}. ` +
+      `Review and confirm here: ${portalUrl}\n\n` +
+      `Or reply APPROVE to submit now, or CANCEL to discard.`
+    );
+  }
 }
 
 // ------------------------------------
@@ -682,22 +701,32 @@ async function processNewImageFlow({
     return;
   }
 
-  // 1️⃣ Generate AI caption object
+  // 1️⃣ Caption passthrough: if stylist provided a real caption, skip AI generation
+  // Only applies to standard_post — before_after, availability have dedicated flows above
+  const captionKept = postType === "standard_post" && isRealCaption(text);
+
   // Hydrate salon with DB-backed config (tone, hashtags, rules, etc.)
   const fullSalon = getSalonPolicy(
     salon?.slug || salon?.salon_id || salon?.id
   );
 
-  const activeImageDataUri = await fetchTwilioImageAsDataUri(activeImageUrl);
-  const aiJson = await generateCaption({
-    imageDataUrl: activeImageDataUri,
-    notes: text || "",
-    salon: fullSalon,
-    stylist,
-    postType,
-    city: stylist?.city || ""
-  });
-
+  let aiJson;
+  if (captionKept) {
+    // Keep stylist's text verbatim — no AI call
+    const keptText = (text || "").trim();
+    aiJson = { caption: keptText, hashtags: [], cta: "" };
+    console.log(`[Router] Caption passthrough — keeping stylist text verbatim (${keptText.length} chars)`);
+  } else {
+    const activeImageDataUri = await fetchTwilioImageAsDataUri(activeImageUrl);
+    aiJson = await generateCaption({
+      imageDataUrl: activeImageDataUri,
+      notes: text || "",
+      salon: fullSalon,
+      stylist,
+      postType,
+      city: stylist?.city || ""
+    });
+  }
 
   aiJson.image_url = activeImageUrl;
   aiJson.original_notes = text;
@@ -768,12 +797,20 @@ async function processNewImageFlow({
       `).run(crypto.randomUUID(), postId, portalToken, expiresAt);
 
       const baseUrl = process.env.PUBLIC_BASE_URL || "";
-      const portalUrl = `${baseUrl}/stylist/${postId}?token=${portalToken}`;
+      const captionKeptParam = captionKept ? "&caption_kept=1" : "";
+      const portalUrl = `${baseUrl}/stylist/${postId}?token=${portalToken}${captionKeptParam}`;
 
-      const previewMsg =
-        `Your caption preview is ready!\n\n` +
-        `Review or edit here:\n${portalUrl}\n\n` +
-        `Or tap a button below (or reply APPROVE/REDO/CANCEL). Link expires in 24 hours.`;
+      let previewMsg;
+      if (captionKept) {
+        previewMsg =
+          `Your caption was kept! Review and approve here:\n${portalUrl}\n\n` +
+          `Or reply APPROVE to submit now, or CANCEL to discard. (Link expires in 24 hours.)`;
+      } else {
+        previewMsg =
+          `Your caption preview is ready!\n\n` +
+          `Review or edit here:\n${portalUrl}\n\n` +
+          `Or tap a button below (or reply APPROVE/REDO/CANCEL). Link expires in 24 hours.`;
+      }
 
       if (sendMessage.sendRcs) {
         await sendMessage.sendRcs(chatId, previewMsg, ["reply:APPROVE", "reply:REDO", "reply:CANCEL"]);
