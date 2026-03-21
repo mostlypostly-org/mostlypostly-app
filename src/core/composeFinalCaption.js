@@ -118,7 +118,10 @@ export function composeFinalCaption({
     }
   }
 
-  parts.push(credit);
+  // Reels: no "Styled By" credit — caption + tags only
+  if (postType !== 'reel') {
+    parts.push(credit);
+  }
 
   // --- 3️⃣ Hashtags ---
   const aiTags = normalizeHashtags(hashtags);

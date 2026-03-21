@@ -104,8 +104,18 @@ function resolveDisplayUrls(post) {
 
 const BROKEN_PORTAL = `onload="this.parentElement.querySelector('.img-expired').style.display='none'" onerror="this.style.display='none';this.parentElement.querySelector('.img-expired').style.display='flex'"`;
 
-function renderImages(displayUrls) {
+function renderVideo(videoUrl) {
+  return `
+    <div class="w-full mb-5">
+      <video src="${esc(videoUrl)}" controls playsinline class="rounded-2xl w-full max-h-72 border border-mpBorder bg-black"></video>
+      <p class="text-xs text-mpMuted mt-1">Your Reel preview</p>
+    </div>`;
+}
+
+function renderImages(displayUrls, postType) {
   if (!displayUrls.length) return "";
+  // Reel posts: render as video
+  if (postType === 'reel') return renderVideo(displayUrls[0]);
   if (displayUrls.length === 1) {
     return `
       <div class="relative w-full max-h-72 mb-5">
@@ -209,7 +219,7 @@ router.get("/:id", validateToken, async (req, res) => {
     ${floodWarningHtml}
     ${stylistDropdownHtml}
 
-    ${renderImages(displayUrls)}
+    ${renderImages(displayUrls, post.post_type)}
 
     ${justRegenerated ? `<div class="bg-green-50 border border-green-200 rounded-xl px-4 py-2 text-green-700 text-sm mb-4">Caption regenerated with your input!</div>` : ""}
     ${req.query.updated === "1" ? `<div class="bg-green-50 border border-green-200 rounded-xl px-4 py-2 text-green-700 text-sm mb-4">Availability updated!</div>` : ""}

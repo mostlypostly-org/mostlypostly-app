@@ -370,17 +370,19 @@ function fuzzyMatchStylist(extractedName, salonId) {
 
 // ------------------------------------
 // Create a coordinator post and send portal link
-async function createCoordinatorPost(chatId, imageUrl, messageBody, coordinator, matchedStylist, salon, io) {
+async function createCoordinatorPost(chatId, imageUrls, messageBody, coordinator, matchedStylist, salon, io) {
   const salonId = salon?.salon_id;
   const salonRow = db.prepare("SELECT * FROM salons WHERE slug = ?").get(salonId);
   const salonName = salonRow?.name || salonId;
+  const imageUrlsArray = Array.isArray(imageUrls) ? imageUrls : [imageUrls].filter(Boolean);
+  const primaryImageUrl = imageUrlsArray[0] || null;
 
   // Generate AI caption using the standard generateCaption function
   let caption = "";
   try {
     const { generateCaption } = await import("../openai.js");
     const fullSalon = getSalonPolicy(salonId) || salonRow;
-    const imageDataUri = await fetchTwilioImageAsDataUri(imageUrl);
+    const imageDataUri = await fetchTwilioImageAsDataUri(primaryImageUrl);
     const aiJson = await generateCaption({
       imageDataUrl: imageDataUri,
       notes: messageBody || "",
@@ -402,7 +404,8 @@ async function createCoordinatorPost(chatId, imageUrl, messageBody, coordinator,
     stylist_name: matchedStylist.name,
     stylist_phone: matchedStylist.phone || chatId,
     instagram_handle: matchedStylist.instagram_handle || null,
-    image_url: imageUrl,
+    image_url: primaryImageUrl,
+    image_urls: imageUrlsArray,
     post_type: "standard_post",
     submitted_by: coordinator.manager_id || coordinator.id,
   };
@@ -430,8 +433,10 @@ async function createCoordinatorPost(chatId, imageUrl, messageBody, coordinator,
 
 // ------------------------------------
 // Handle coordinator incoming photo — extract stylist name or ask "Who is this for?"
-async function handleCoordinatorPost(chatId, imageUrl, messageBody, coordinator, salon, io) {
+async function handleCoordinatorPost(chatId, imageUrls, messageBody, coordinator, salon, io) {
   const salonId = salon?.salon_id;
+  const imageUrlsArray = Array.isArray(imageUrls) ? imageUrls : [imageUrls].filter(Boolean);
+  const primaryImageUrl = imageUrlsArray[0] || null;
 
   const extractedName = await extractStylistName(messageBody || "", salonId);
   const matchedStylist = fuzzyMatchStylist(extractedName, salonId);
@@ -440,7 +445,8 @@ async function handleCoordinatorPost(chatId, imageUrl, messageBody, coordinator,
     // No name found — store pending entry (including original messageBody) and ask
     pendingCoordinatorPosts.set(chatId, {
       chatId,
-      imageUrl,
+      imageUrl: primaryImageUrl,
+      imageUrls: imageUrlsArray,
       messageBody: messageBody || "",
       salonId,
       salon,
@@ -453,7 +459,7 @@ async function handleCoordinatorPost(chatId, imageUrl, messageBody, coordinator,
   }
 
   // Name found — create draft and send portal link
-  await createCoordinatorPost(chatId, imageUrl, messageBody, coordinator, matchedStylist, salon, io);
+  await createCoordinatorPost(chatId, imageUrlsArray, messageBody, coordinator, matchedStylist, salon, io);
 }
 
 function hasConsent(stylist) {
@@ -814,6 +820,7 @@ async function generateReelCaption({
   chatId, videoPublicUrl, serviceDescription,
   drafts, generateCaption, moderateAIOutput, sendMessage,
   stylist, salon,
+  isCoordinator = false, coordinator = null,
 }) {
   const salonInfo = salon?.salon_info || salon || {};
   const salonSlug = salonInfo.slug || salon?.salon_id || salon?.id || '';
@@ -873,20 +880,25 @@ async function generateReelCaption({
   // Derive stylistId from parameter — do NOT reference _stylistId (local to handleIncomingMessage)
   const stylistId = stylist?.id || stylist?.stylist_id || null;
 
+  // Build stylist payload — for coordinator flows, attribute to resolved stylist
+  const coordinatorId = coordinator?.manager_id || coordinator?.id || null;
+  const stylistPayload = {
+    ...stylist,
+    id: postId,
+    image_url: videoPublicUrl,
+    image_urls: [videoPublicUrl],
+    final_caption: caption,
+    post_type: 'reel',
+    stylist_name: stylistName,
+    salon_id: salonSlug,
+    ...(coordinatorId ? { submitted_by: coordinatorId } : {}),
+  };
+
   // Save draft to DB as post_type='reel'
   try {
     savePost(
       chatId,
-      {
-        ...stylist,
-        id: postId,
-        image_url: videoPublicUrl,
-        image_urls: [videoPublicUrl],
-        final_caption: caption,
-        post_type: 'reel',
-        stylist_name: stylistName,
-        salon_id: salonSlug,
-      },
+      stylistPayload,
       aiJson?.caption || '',
       aiJson?.hashtags || [],
       'draft',
@@ -895,6 +907,20 @@ async function generateReelCaption({
     );
   } catch (err) {
     console.warn('[Router] Could not persist reel draft to DB:', err.message);
+  }
+
+  // Create portal token so coordinator/stylist can review via web
+  let portalUrl = null;
+  try {
+    const portalToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    db.prepare(
+      'INSERT INTO stylist_portal_tokens (id, post_id, token, expires_at) VALUES (?, ?, ?, ?)'
+    ).run(crypto.randomUUID(), postId, portalToken, expiresAt);
+    const BASE_URL = process.env.PUBLIC_BASE_URL || process.env.BASE_URL || 'https://app.mostlypostly.com';
+    portalUrl = `${BASE_URL}/stylist/${postId}?token=${portalToken}`;
+  } catch (err) {
+    console.warn('[Router] Could not create reel portal token:', err.message);
   }
 
   // Store in-memory draft (same shape as photo drafts)
@@ -913,10 +939,12 @@ async function generateReelCaption({
   };
   drafts.set(chatId, draft);
 
-  // Send preview — "Here's your Reel caption:" (locked decision from CONTEXT.md)
+  // Send preview with portal URL
   const previewCaption = buildFacebookCaption(caption, stylistName, stylistHandle);
-  const preview = `Here's your Reel caption:\n\n${previewCaption}\n\nReply APPROVE to submit, EDIT <your changes> to modify, or REDO for a new caption.`;
-  await sendMessage.sendText(chatId, preview);
+  const portalLine = portalUrl
+    ? `\n\nReview and confirm here: ${portalUrl}\n\nOr reply APPROVE to submit, EDIT <your changes> to modify, or REDO for a new caption.`
+    : `\n\nReply APPROVE to submit, EDIT <your changes> to modify, or REDO for a new caption.`;
+  await sendMessage.sendText(chatId, `Here's your Reel caption:\n\n${previewCaption}${portalLine}`);
 }
 
 // --------------------------------------
@@ -1076,7 +1104,7 @@ export async function handleIncomingMessage({
       if (matchedStylist) {
         // Use the original messageBody so AI caption includes the original context/keywords
         await createCoordinatorPost(
-          chatId, pendingCoord.imageUrl, pendingCoord.messageBody || "",
+          chatId, pendingCoord.imageUrls || [pendingCoord.imageUrl], pendingCoord.messageBody || "",
           pendingCoord.coordinator, matchedStylist, pendingCoord.salon, io
         );
         endTimer(start);
@@ -1104,6 +1132,8 @@ export async function handleIncomingMessage({
       pendingVideoDescriptions.delete(chatId);
       const serviceDescription = cleanText || '';
       console.log(`[Router] Video description received from ${chatId}: "${serviceDescription.slice(0, 80)}"`);
+      // If a coordinator sent the video, use the resolved stylist (not the coordinator)
+      const reelStylist = pendingVideo.resolvedStylist || stylist;
       await generateReelCaption({
         chatId,
         videoPublicUrl: pendingVideo.videoPublicUrl,
@@ -1112,8 +1142,10 @@ export async function handleIncomingMessage({
         generateCaption,
         moderateAIOutput,
         sendMessage,
-        stylist,
+        stylist: reelStylist,
         salon,
+        isCoordinator: stylist?.isCoordinator || false,
+        coordinator: stylist?.isCoordinator ? stylist : null,
       });
       endTimer(start);
       return;
@@ -1308,7 +1340,7 @@ export async function handleIncomingMessage({
 
       // Per-stylist auto-approve overrides salon-level manager approval requirement
       const stylistRow = db.prepare(`SELECT auto_approve FROM stylists WHERE phone = ? AND salon_id = ? LIMIT 1`)
-        .get(from, salonSlug);
+        .get(chatId, salonSlug);
       const stylistAutoApprove = Number(stylistRow?.auto_approve) === 1;
 
       const requiresManager = Number(salonRow?.require_manager_approval) === 1 && !stylistAutoApprove;
@@ -1778,7 +1810,7 @@ Log in to review: ${managerLink}
   // Coordinators with a photo get the attribution flow (after video detection,
   // so a coordinator video still goes through the video flow below).
   if (stylist?.isCoordinator && primaryImageUrl && !isVideo) {
-    await handleCoordinatorPost(chatId, primaryImageUrl, cleanText, stylist, salon, io);
+    await handleCoordinatorPost(chatId, allImageUrls, cleanText, stylist, salon, io);
     endTimer(start);
     return;
   }
@@ -1813,12 +1845,24 @@ Log in to review: ${managerLink}
 
     // Store pending video context and send description prompt
     const stylistId = stylist?.id || stylist?.stylist_id;
+    const pendingVideoSalonId = salon?.salon_id || salon?.id || salon?.salon_info?.slug;
+
+    // Coordinator: extract stylist name from message text (e.g. "Nicole reel of balayage")
+    let resolvedVideoStylist = null;
+    if (stylist?.isCoordinator && cleanText) {
+      try {
+        const extractedName = await extractStylistName(cleanText, pendingVideoSalonId);
+        resolvedVideoStylist = extractedName ? fuzzyMatchStylist(extractedName, pendingVideoSalonId) : null;
+      } catch {}
+    }
+
     pendingVideoDescriptions.set(chatId, {
       videoPublicUrl: videoResult.publicUrl,
-      salonId: salon?.salon_id || salon?.id || salon?.salon_info?.slug,
+      salonId: pendingVideoSalonId,
       stylistId,
       stylistName: getStylistName(stylist),
       expiresAt: Date.now() + VIDEO_DESC_TTL_MS,
+      resolvedStylist: resolvedVideoStylist || null,
     });
 
     // Send the description prompt (locked decision from CONTEXT.md)
@@ -1841,8 +1885,10 @@ Log in to review: ${managerLink}
             generateCaption,
             moderateAIOutput,
             sendMessage,
-            stylist,
+            stylist: stillPending.resolvedStylist || stylist,
             salon,
+            isCoordinator: stylist?.isCoordinator || false,
+            coordinator: stylist?.isCoordinator ? stylist : null,
           });
         } catch (err) {
           console.error('[Router] Auto-caption after video timeout failed:', err.message);
