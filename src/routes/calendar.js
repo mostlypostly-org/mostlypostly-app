@@ -28,6 +28,25 @@ function safe(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// Inline SVG platform icon badges — no external CDN
+function platformIconsHtml(salon) {
+  const icons = [];
+  if (salon.facebook_page_token) {
+    icons.push(`<svg width="20" height="20" viewBox="0 0 24 24" title="Facebook"><rect width="24" height="24" rx="5" fill="#1877F2"/><path d="M14 8h-1.5c-.3 0-.5.2-.5.5V10h2l-.3 2H12v6h-2v-6H8.5v-2H10V8.5C10 7.1 11.1 6 12.5 6H14v2z" fill="#fff"/></svg>`);
+  }
+  if (salon.instagram_business_id) {
+    icons.push(`<svg width="20" height="20" viewBox="0 0 24 24" title="Instagram"><rect width="24" height="24" rx="5" fill="#C13584"/><rect x="6.5" y="6.5" width="11" height="11" rx="3" stroke="#fff" stroke-width="1.5" fill="none"/><circle cx="12" cy="12" r="3" stroke="#fff" stroke-width="1.5" fill="none"/><circle cx="16" cy="8" r="0.8" fill="#fff"/></svg>`);
+  }
+  if (salon.tiktok_enabled) {
+    icons.push(`<svg width="20" height="20" viewBox="0 0 24 24" title="TikTok"><circle cx="12" cy="12" r="12" fill="#000"/><text x="12" y="16" text-anchor="middle" fill="#fff" font-size="9" font-family="sans-serif" font-weight="bold">TT</text></svg>`);
+  }
+  if (salon.google_location_id) {
+    icons.push(`<svg width="20" height="20" viewBox="0 0 24 24" title="Google Business"><circle cx="12" cy="12" r="12" fill="#fff" stroke="#E2E8F0"/><text x="7.5" y="16.5" fill="#4285F4" font-size="13" font-family="sans-serif" font-weight="bold">G</text></svg>`);
+  }
+  if (!icons.length) return "";
+  return `<div class="flex gap-1 mt-1">${icons.join("")}</div>`;
+}
+
 // Color-coded pill class per post type (failed overrides, vendor overrides type)
 function calendarPillClass(post) {
   if (post.status === "failed") return "bg-red-100 text-red-700";
@@ -67,9 +86,9 @@ function calendarPillLabel(post) {
 // Status badge label for day panel cards
 function statusBadge(status) {
   const map = {
-    manager_pending:  { label: "Pending Approval", color: "bg-yellow-100 text-yellow-700" },
-    manager_approved: { label: "Scheduled",        color: "bg-blue-100 text-blue-700" },
-    published:        { label: "Published",         color: "bg-green-100 text-green-700" },
+    manager_pending:  { label: "Pending Approval", color: "bg-orange-100 text-orange-700" },
+    manager_approved: { label: "Scheduled",        color: "bg-gray-100 text-gray-600" },
+    published:        { label: "✓ Published",      color: "bg-green-100 text-green-700" },
     failed:           { label: "Failed",            color: "bg-red-100 text-red-700" },
   };
   const s = map[status] || { label: status, color: "bg-gray-100 text-gray-600" };
@@ -158,7 +177,13 @@ router.get("/", requireAuth, (req, res) => {
         const cls = calendarPillClass(p);
         const lbl = calendarPillLabel(p);
         const isDraggable = p.status === "manager_approved" && !!p.scheduled_for;
-        pills += `<div class="calendar-post-card ${isDraggable ? "cursor-grab" : "cursor-default"} px-1.5 py-0.5 rounded text-[10px] font-semibold truncate mb-0.5 ${cls}" data-id="${safe(p.id)}"${isDraggable ? ' data-draggable="true"' : ""}>${safe(lbl)}</div>`;
+        let pillThumb = null;
+        try { pillThumb = JSON.parse(p.image_urls || "[]")[0] || p.image_url; } catch { pillThumb = p.image_url; }
+        pillThumb = toProxyUrl(pillThumb);
+        const thumbHtml = pillThumb
+          ? `<img src="${safe(pillThumb)}" alt="" class="w-5 h-5 rounded-sm object-cover flex-shrink-0" />`
+          : "";
+        pills += `<div class="calendar-post-card ${isDraggable ? "cursor-grab" : "cursor-default"} flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold mb-0.5 ${cls}" data-id="${safe(p.id)}"${isDraggable ? ' data-draggable="true"' : ""}>${thumbHtml}<span class="truncate">${safe(lbl)}</span></div>`;
       }
       if (dayPosts.length > 3) {
         pills += `<div class="text-[9px] text-mpMuted font-semibold pl-0.5">+${dayPosts.length - 3} more</div>`;
@@ -316,7 +341,7 @@ router.get("/day/:date", requireAuth, (req, res) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).send("Invalid date");
 
   const salon_id = req.session.salon_id;
-  const salon = db.prepare("SELECT timezone FROM salons WHERE slug = ?").get(salon_id);
+  const salon = db.prepare("SELECT timezone, facebook_page_token, instagram_business_id, tiktok_enabled, google_location_id FROM salons WHERE slug = ?").get(salon_id);
   const tz = salon?.timezone || "America/Indiana/Indianapolis";
 
   const dayStart = DateTime.fromISO(date, { zone: tz }).startOf("day");
@@ -355,69 +380,76 @@ router.get("/day/:date", requireAuth, (req, res) => {
     const timeDisplay = timeDt.isValid ? timeDt.setZone(tz).toFormat("h:mm a") : "";
 
     const isVendor = !!p.vendor_campaign_id;
+    const nameDisplay = isVendor ? safe(p.vendor_name || "Vendor") : safe(p.stylist_name || "Unknown");
     const typeLabel = isVendor
-      ? `<span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700">${safe(p.vendor_name || "Vendor")}</span>`
+      ? `<span class="text-[10px] font-semibold text-purple-700">Vendor · ${safe(p.vendor_name || "Brand")}</span>`
       : `<span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${calendarPillClass(p)}">${safe(calendarPillLabel(p))}</span>`;
+    const cardStyle = isVendor ? ` style="border-left: 4px solid #7C3AED"` : "";
+    const platformIcons = platformIconsHtml(salon);
 
     // CSRF token read from res.locals (set by csrf middleware on every request)
     const csrfToken = res.locals?.csrfToken || "";
 
     let actions = "";
-    if (p.status === "manager_pending") {
-      actions = `
-        <a href="/manager/approve?post=${safe(p.id)}&return=calendar"
-           class="text-[11px] text-green-600 hover:text-green-800 font-semibold">Approve</a>
-        <button type="button" onclick="this.nextElementSibling.classList.toggle('hidden')"
-           class="text-[11px] text-red-400 hover:text-red-600 font-semibold">Deny</button>
-        <a href="/manager/post-now?post=${safe(p.id)}&return=calendar"
-           class="text-[11px] text-mpAccent hover:text-mpCharcoal font-semibold ml-auto"
-           onclick="return confirm('Publish this post right now?')">Post Now</a>`;
-      // Inline deny form (initially hidden, toggled by Deny button above)
-      actions += `
-        <form method="POST" action="/manager/deny" class="hidden w-full mt-2 space-y-1">
-          <input type="hidden" name="_csrf" value="${safe(csrfToken)}" />
-          <input type="hidden" name="post_id" value="${safe(p.id)}" />
-          <input type="hidden" name="return" value="calendar" />
-          <textarea name="reason" required placeholder="Reason for denial..."
-            class="w-full p-2 rounded border border-mpBorder bg-mpBg text-xs text-mpCharcoal h-16"></textarea>
-          <button type="submit"
-            class="text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded">Submit Denial</button>
-        </form>`;
-    } else if (p.status === "manager_approved") {
-      actions = `
-        <a href="/manager/post-now?post=${safe(p.id)}&return=calendar"
-           class="text-[11px] text-mpAccent hover:text-mpCharcoal font-semibold"
-           onclick="return confirm('Publish this post right now?')">Post Now</a>
-        <a href="/manager/cancel-post?post=${safe(p.id)}&return=calendar"
-           class="text-[11px] text-red-400 hover:text-red-600 font-semibold"
-           onclick="return confirm('Remove from queue?')">Remove</a>`;
-    } else if (p.status === "failed") {
-      actions = `
-        <form method="POST" action="/manager/retry-post" style="display:inline">
-          <input type="hidden" name="_csrf" value="${safe(csrfToken)}" />
-          <input type="hidden" name="post_id" value="${safe(p.id)}" />
-          <input type="hidden" name="return" value="calendar" />
-          <button type="submit" class="text-[11px] text-amber-600 hover:text-amber-800 font-semibold">Retry</button>
-        </form>`;
+    if (!isVendor) {
+      if (p.status === "manager_pending") {
+        actions = `
+          <a href="/manager/approve?post=${safe(p.id)}&return=calendar"
+             class="text-xs font-semibold text-white bg-mpAccent hover:opacity-90 px-3 py-1.5 rounded-lg transition-opacity">Approve</a>
+          <button type="button" onclick="this.closest('.day-panel-card').querySelector('.deny-form').classList.toggle('hidden')"
+             class="text-xs font-semibold text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition-colors">Deny</button>
+          <a href="/manager/post-now?post=${safe(p.id)}&return=calendar"
+             class="text-xs font-semibold text-mpAccent hover:text-mpCharcoal border border-mpBorder hover:border-mpAccent px-3 py-1.5 rounded-lg transition-colors ml-auto"
+             onclick="return confirm('Publish this post right now?')">Post Now</a>`;
+        actions += `
+          <form method="POST" action="/manager/deny" class="deny-form hidden w-full mt-2 space-y-1">
+            <input type="hidden" name="_csrf" value="${safe(csrfToken)}" />
+            <input type="hidden" name="post_id" value="${safe(p.id)}" />
+            <input type="hidden" name="return" value="calendar" />
+            <textarea name="reason" required placeholder="Reason for denial..."
+              class="w-full p-2 rounded border border-mpBorder bg-mpBg text-xs text-mpCharcoal h-16"></textarea>
+            <button type="submit"
+              class="text-xs font-semibold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg">Submit Denial</button>
+          </form>`;
+      } else if (p.status === "manager_approved") {
+        actions = `
+          <a href="/manager/post-now?post=${safe(p.id)}&return=calendar"
+             class="text-xs font-semibold text-white bg-mpAccent hover:opacity-90 px-3 py-1.5 rounded-lg transition-opacity"
+             onclick="return confirm('Publish this post right now?')">Post Now</a>
+          <a href="/manager/cancel-post?post=${safe(p.id)}&return=calendar"
+             class="text-xs font-semibold text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition-colors"
+             onclick="return confirm('Remove from queue?')">Remove</a>`;
+      } else if (p.status === "failed") {
+        actions = `
+          <form method="POST" action="/manager/retry-post" style="display:inline">
+            <input type="hidden" name="_csrf" value="${safe(csrfToken)}" />
+            <input type="hidden" name="post_id" value="${safe(p.id)}" />
+            <input type="hidden" name="return" value="calendar" />
+            <button type="submit" class="text-xs font-semibold text-amber-600 hover:text-amber-800 border border-amber-200 px-3 py-1.5 rounded-lg">Retry</button>
+          </form>`;
+      }
     }
 
     return `
-      <div class="border border-mpBorder rounded-xl p-3 mb-3">
+      <div class="day-panel-card bg-white rounded-lg border border-mpBorder p-3 shadow-sm mb-3"${cardStyle}>
         <div class="flex gap-3">
           ${imgUrl
-            ? `<img src="${safe(imgUrl)}" alt="Post thumbnail" class="w-14 h-14 rounded-lg object-cover flex-shrink-0 border border-mpBorder" />`
-            : `<div class="w-14 h-14 rounded-lg bg-mpBg flex items-center justify-center flex-shrink-0 text-2xl">&#128247;</div>`}
+            ? `<img src="${safe(imgUrl)}" alt="Post thumbnail" class="w-[60px] h-[60px] rounded-lg object-cover flex-shrink-0 border border-mpBorder" />`
+            : `<div class="w-[60px] h-[60px] rounded-lg bg-mpBg flex items-center justify-center flex-shrink-0 text-2xl border border-mpBorder">&#128247;</div>`}
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-1.5 flex-wrap mb-1">
+            <div class="flex items-center justify-between mb-0.5">
+              <span class="font-medium text-sm text-mpCharcoal truncate">${nameDisplay}</span>
+              ${timeDisplay ? `<span class="text-xs text-mpMuted ml-2 flex-shrink-0">${safe(timeDisplay)}</span>` : ""}
+            </div>
+            ${platformIcons}
+            <div class="flex items-center gap-1.5 mt-1 flex-wrap">
               ${typeLabel}
               ${statusBadge(p.status)}
-              ${timeDisplay ? `<span class="text-[10px] text-mpMuted">${safe(timeDisplay)}</span>` : ""}
             </div>
-            <p class="text-xs text-mpMuted truncate mb-0.5">${safe(p.stylist_name || "Unknown")}</p>
-            <p class="text-xs text-mpCharcoal line-clamp-2 leading-relaxed">${safe(preview)}</p>
+            ${preview ? `<p class="text-sm text-mpMuted line-clamp-2 mt-2">${safe(preview)}</p>` : ""}
           </div>
         </div>
-        ${actions ? `<div class="mt-2 pt-2 border-t border-mpBorder flex flex-wrap items-center gap-3">${actions}</div>` : ""}
+        ${actions ? `<div class="mt-2 pt-2 border-t border-mpBorder flex flex-wrap items-center gap-2">${actions}</div>` : ""}
       </div>`;
   }).join("");
 
