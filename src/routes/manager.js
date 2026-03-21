@@ -237,7 +237,7 @@ router.get("/", requireAuth, async (req, res) => {
       ? `<p class="text-mpMuted text-sm">No pending posts.</p>`
       : pending
           .map((p) => {
-            const caption = esc(p.final_caption || p.caption || "")
+            const caption = esc(p.base_caption || p.final_caption || p.caption || "")
               .replace(/\n/g, "<br/>");
 
             const isPromo = p.post_type === "promotions";
@@ -318,7 +318,7 @@ router.get("/", requireAuth, async (req, res) => {
   const gmbConnected = !!salonRow?.google_location_id;
 
   function renderRecentCard(p) {
-        const caption = esc(p.final_caption || p.caption || "")
+        const caption = esc(p.base_caption || p.final_caption || p.caption || "")
           .replace(/\n/g, "<br/>");
 
         const platformBadges = (() => {
@@ -862,7 +862,8 @@ router.get("/edit/:id", requireAuth, (req, res) => {
         <textarea
           name="caption"
           class="w-full p-3 rounded-lg bg-mpBg border border-mpBorder text-mpCharcoal h-48"
-        >${esc(post.final_caption || post.caption || "")}</textarea>
+        >${esc(post.base_caption || post.caption || "")}</textarea>
+        <p class="text-xs text-mpMuted mt-1">Hashtags, stylist credit, and booking link are added automatically when posted.</p>
 
         <button class="w-full bg-mpCharcoal hover:bg-mpCharcoalDark p-3 rounded-lg text-sm font-semibold text-white">
           Save Changes
@@ -898,12 +899,12 @@ router.post("/edit/:id", requireAuth, (req, res) => {
     .replace(/\n{3,}/g, "\n\n") // Collapse 3+ blank lines into 1 blank line
     .trim();
 
-  // Save cleaned caption
+  // Save cleaned caption to both columns — scheduler rebuilds full caption at publish time
   db.prepare(
     `UPDATE posts
-     SET final_caption = ?, updated_at=datetime('now')
+     SET base_caption = ?, final_caption = ?, updated_at=datetime('now')
      WHERE id = ? AND salon_id = ?`
-  ).run(cleaned, id, req.manager.salon_id);
+  ).run(cleaned, cleaned, id, req.manager.salon_id);
 
   // Redirect back to manager for the appropriate salon
   const salonSlug = req.manager?.salon_id || "";
