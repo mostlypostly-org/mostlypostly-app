@@ -73,7 +73,7 @@ Salons never run out of quality content — the platform generates, recycles, an
 
 ## Current State
 
-Phase 05 (Guest Care & Support Staff) complete — coordinator role can submit posts on behalf of stylists via SMS or portal upload, with attribution badges, leaderboard scoring, and welcome SMS.
+Phase 07 (Content Calendar View) complete — managers have a month-view calendar at /manager/calendar showing color-coded post pills, a slide-out day panel with approve/deny/post-now actions, and drag-to-reschedule (approved posts only). Calendar nav item added between Post Queue and Analytics. All actions redirect back to calendar via `return=calendar` param.
 
 ---
-*Last updated: 2026-03-20 — Phase 05 complete*
+*Last updated: 2026-03-21 — Phase 07 complete*
