@@ -284,6 +284,10 @@ router.get("/", requireSecret, requirePin, (req, res) => {
   `).all();
   const openIssueCount = issues.filter(i => i.status === 'open').length;
 
+  // Load the current standard routing from the DB (first salon with explicit routing set, or all-enabled defaults)
+  const savedRoutingRow = db.prepare(`SELECT platform_routing FROM salons WHERE platform_routing IS NOT NULL LIMIT 1`).get();
+  const currentRouting = savedRoutingRow ? mergeRoutingDefaults(savedRoutingRow.platform_routing) : DEFAULT_ROUTING;
+
   // Feature requests across all salons
   const featureRequests = (() => {
     try {
@@ -1000,17 +1004,21 @@ router.get("/", requireSecret, requirePin, (req, res) => {
                 <!-- Apply All row — visually separated with accent background -->
                 <tr class="bg-mpAccentLight border border-mpBorder rounded-lg">
                   <td class="py-2 pr-6 pl-2 text-xs font-bold text-mpAccent uppercase tracking-wide rounded-l-lg">Apply All</td>
-                  ${["facebook","instagram","gmb","tiktok"].map(plat => `
+                  ${["facebook","instagram","gmb","tiktok"].map(plat => {
+                    const POST_TYPES_ALL = ["availability","before_after","celebration","celebration_story","standard_post","reel","promotions","product_education"];
+                    const allOn = POST_TYPES_ALL.every(pt => currentRouting[pt]?.[plat] !== false);
+                    return `
                   <td class="text-center py-2 px-3${plat === "tiktok" ? " rounded-r-lg" : ""}">
                     <label class="relative inline-flex items-center cursor-pointer" title="Toggle all ${plat} channels" data-apply-all="${plat}">
-                      <input type="checkbox" checked
+                      <input type="checkbox"${allOn ? ' checked' : ''}
                         class="sr-only peer"
                         data-apply-all="${plat}">
                       <div class="w-11 h-6 rounded-full transition-colors peer-checked:bg-mpAccent bg-gray-300 relative
                         after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:rounded-full after:bg-white after:shadow after:transition-all
                         peer-checked:after:translate-x-5"></div>
                     </label>
-                  </td>`).join('')}
+                  </td>`;
+                  }).join('')}
                 </tr>
                 <!-- Spacer row for visual separation -->
                 <tr><td colspan="5" class="py-1"></td></tr>
@@ -1030,7 +1038,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
                     <td class="text-sm text-gray-700 py-2 pr-6 font-medium">${label}</td>
                     ${["facebook","instagram","gmb","tiktok"].map(plat => {
                       const name = `routing_${pt}_${plat}`;
-                      const checked = DEFAULT_ROUTING[pt]?.[plat] !== false;
+                      const checked = currentRouting[pt]?.[plat] !== false;
                       return `<td class="text-center py-2 px-3">
                         <label class="relative inline-flex items-center cursor-pointer">
                           <input type="checkbox" name="${name}" value="1"${checked ? ' checked' : ''}
