@@ -2563,7 +2563,8 @@ async function aiGen(btn) {
   }
 }
 
-document.getElementById('ai-btn').addEventListener('click', function() { aiGen(this); });
+var aiBtn = document.getElementById('ai-btn');
+if (aiBtn) aiBtn.addEventListener('click', function() { aiGen(this); });
 
 var applyRoutingBtn = document.getElementById('apply-routing-btn');
 if (applyRoutingBtn) {
