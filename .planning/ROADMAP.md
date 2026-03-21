@@ -8,7 +8,7 @@ This milestone extends the MostlyPostly content engine with four capabilities: a
 
 - [x] **Phase 1: Vendor Sync** - Nightly automated ingestion of Aveda brand assets into the vendor campaign library (completed 2026-03-19)
 - [ ] **Phase 2: Content Engine** - Smart content recycler and intelligent cadence scheduler that keep the queue balanced and non-empty
-- [ ] **Phase 7: Content Calendar View** - Visual 4-week calendar grid showing scheduled and published posts by date, with click-to-preview, day panel actions, and drag-to-reschedule (FEAT-018)
+- [x] **Phase 7: Content Calendar View** - Visual 4-week calendar grid showing scheduled and published posts by date, with click-to-preview, day panel actions, and drag-to-reschedule (FEAT-018) (completed 2026-03-21)
 - [ ] **Phase 3: Reels & Video** - Detect, download, and publish Instagram/Facebook Reels from stylist MMS video with same approval flow
 - [ ] **Phase 4: Reputation Manager** - Pull Google reviews, generate AI replies, surface Featured Review posts, and expose a Reputation portal tab
 - [x] **Phase 5: Guest Care and Support Staff** - Coordinator role SMS posting, stylist attribution, leaderboard scoring, and welcome SMS (completed 2026-03-20)
@@ -109,7 +109,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 4. Reputation Manager | 0/TBD | Not started | - |
 | 5. Guest Care | 3/3 | Complete   | 2026-03-20 |
 | 6. Content Routing | 3/3 | Complete | - |
-| 7. Content Calendar View | 2/3 | In Progress|  |
+| 7. Content Calendar View | 3/3 | Complete   | 2026-03-21 |
 
 ### Phase 6: Per-Salon Platform Content Routing
 
@@ -128,9 +128,9 @@ Plans:
 **Goal:** Managers can see all scheduled and published posts on a visual 4-week calendar, click any day to preview posts in a slide-out panel, approve/deny/post-now directly from the panel, and drag-drop posts to reschedule them (FEAT-018)
 **Depends on:** Phase 6
 **Requirements**: CAL-01, CAL-02, CAL-03, CAL-04, CAL-05
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 07-00-PLAN.md — Wave 0 test scaffold (calendarPillClass, date range, reschedule date math)
 - [x] 07-01-PLAN.md — Calendar route + month grid with color-coded post pills + pageShell nav + server.js mount
-- [ ] 07-02-PLAN.md — Day panel fragment endpoint + approve/deny/post-now actions + drag-to-reschedule
+- [x] 07-02-PLAN.md — Day panel fragment endpoint + approve/deny/post-now actions + drag-to-reschedule
