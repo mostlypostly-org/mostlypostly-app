@@ -92,6 +92,9 @@ export async function publishPhotoToTikTok(salon, imageUrls, caption) {
     media_type: "PHOTO",
   };
 
+  console.log(`[TikTok] Photo post_info:`, JSON.stringify(body.post_info));
+  console.log(`[TikTok] Photo source_info images:`, validImages.length, validImages[0]?.slice(0,80));
+
   const resp = await fetch(`${API_BASE}/post/publish/content/init/`, {
     method: "POST",
     headers: {
@@ -103,6 +106,7 @@ export async function publishPhotoToTikTok(salon, imageUrls, caption) {
 
   const data = await resp.json();
   if (!resp.ok || data.error?.code !== "ok") {
+    console.error(`[TikTok] Full error response:`, JSON.stringify(data));
     throw new Error(`[TikTok] Photo post failed: ${JSON.stringify(data.error || data)}`);
   }
 
