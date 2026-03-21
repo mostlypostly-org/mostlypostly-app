@@ -158,6 +158,7 @@ router.get("/:id", validateToken, async (req, res) => {
   const token = req.query.token;
   const justRegenerated = req.query.regen === "1";
   const justSwapped = req.query.swapped === "1";
+  const captionKept = req.query.caption_kept === "1";
   const displayUrls = resolveDisplayUrls(post);
 
   // Build the locked full-post preview
@@ -214,7 +215,9 @@ router.get("/:id", validateToken, async (req, res) => {
     <h1 class="text-xl font-bold mb-1 text-mpCharcoal">Your Post Preview</h1>
     <p class="text-sm text-mpMuted mb-5">${post.post_type === "availability"
       ? "Review your availability post below. Update the details if needed, then submit."
-      : "Review your caption below. Add notes and regenerate before submitting."}</p>
+      : captionKept
+        ? "We kept your caption exactly as you wrote it. Generate an AI version anytime, or submit as-is."
+        : "Review your caption below. Add notes and regenerate before submitting."}</p>
 
     ${floodWarningHtml}
     ${stylistDropdownHtml}
@@ -254,8 +257,32 @@ router.get("/:id", validateToken, async (req, res) => {
         class="w-full bg-mpBg hover:bg-mpAccentLight border border-mpBorder text-mpCharcoal font-semibold py-2.5 rounded-xl text-sm mb-5 transition-colors">
         Rebuild Availability Post
       </button>
-    </form>` : `
-    <!-- Caption preview -->
+    </form>` : captionKept ? `
+    <!-- Caption kept: show prominent Generate AI Version button above caption box -->
+    <form method="POST" action="/stylist/${esc(post.id)}/regenerate?token=${esc(token)}" class="mb-4">
+      <label class="block text-sm font-semibold text-mpCharcoal mb-1">
+        Add direction for AI <span class="text-mpMuted font-normal">(optional)</span>
+      </label>
+      <textarea
+        name="notes"
+        rows="2"
+        placeholder="e.g. Make it more playful, emphasize the color transformation…"
+        class="w-full bg-mpBg border border-mpBorder rounded-xl p-3 text-mpCharcoal text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-mpAccent focus:border-mpAccent"
+      ></textarea>
+      <button type="submit"
+        class="w-full bg-mpAccent hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm mb-5 transition-colors">
+        Generate AI Version
+      </button>
+    </form>
+
+    <!-- Caption from your message label + preview -->
+    <p class="text-xs text-mpAccent font-medium mb-1">Caption from your message</p>
+    <div class="bg-white border border-mpBorder rounded-2xl p-4 mb-6 shadow-sm">
+      <p class="text-sm text-mpCharcoal leading-relaxed whitespace-pre-line">${esc(post.base_caption || "")}</p>
+      ${hashtagLine ? `<p class="text-sm text-mpAccent mt-3 font-medium">${esc(hashtagLine)}</p>` : ""}
+      <p class="text-xs text-mpMuted mt-3">By ${esc(post.stylist_name || "")}</p>
+    </div>` : `
+    <!-- Caption preview (AI-generated) -->
     <div class="bg-white border border-mpBorder rounded-2xl p-4 mb-6 shadow-sm">
       <p class="text-xs font-bold text-mpMuted uppercase tracking-widest mb-3">Caption Preview</p>
       <p class="text-sm text-mpCharcoal leading-relaxed whitespace-pre-line">${esc(post.base_caption || "")}</p>
