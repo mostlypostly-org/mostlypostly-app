@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Phase 08 context gathered
-last_updated: "2026-03-21T21:03:44.416Z"
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-03-21T21:32:11.774Z"
 progress:
   total_phases: 8
   completed_phases: 6
-  total_plans: 24
-  completed_plans: 24
+  total_plans: 27
+  completed_plans: 25
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** Salons never run out of quality content — the platform generates, recycles, and publishes it automatically while building the salon's online reputation.
-**Current focus:** Phase 07 — content-calendar-view
+**Current focus:** Phase 08 — calendar-views-and-controls
 
 ## Current Position
 
-Phase: 07 (content-calendar-view) — EXECUTING
-Plan: 2 of 4
+Phase: 08 (calendar-views-and-controls) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Plan: 2 of 4
 | Phase 07 P01 | 4 | 2 tasks | 3 files |
 | Phase 07 P02 | 144 | 2 tasks | 2 files |
 | Phase 07 P03 | 5 | 2 tasks | 3 files |
+| Phase 08-calendar-views-and-controls P01 | 6 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -138,6 +139,8 @@ Recent decisions affecting current work:
 - [Phase 07]: Inline deny form in day panel toggled by button — CSRF from res.locals.csrfToken; data-draggable only on manager_approved posts; SortableJS selector restricted to draggable attribute
 - [Phase 07-content-calendar-view]: animation:0 prevents layout shift — SortableJS animation param controls init transitions not drag feedback; 0 eliminates pill shift on page render
 - [Phase 07-content-calendar-view]: cdn.jsdelivr.net added to CSP scriptSrc — single entry unblocks SortableJS on both /manager/calendar and /manager/queue
+- [Phase 08-calendar-views-and-controls]: normalizePostType() maps DB post_type variants to canonical filter keys — single source of truth for both data-post-type HTML attributes and client-side filter state
+- [Phase 08-calendar-views-and-controls]: switchView() for month triggers window.location.href reload to preserve SortableJS init; week/agenda use fetch() fragment swap into #calendar-view-body
 
 ### Pending Todos
 
@@ -168,6 +171,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T21:03:44.413Z
-Stopped at: Phase 08 context gathered
-Resume file: .planning/phases/08-calendar-views-and-controls/08-CONTEXT.md
+Last session: 2026-03-21T21:32:11.772Z
+Stopped at: Completed 08-01-PLAN.md
+Resume file: None

@@ -111,7 +111,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 5. Guest Care | 3/3 | Complete   | 2026-03-20 |
 | 6. Content Routing | 3/3 | Complete | - |
 | 7. Content Calendar View | 4/4 | Complete   | 2026-03-21 |
-| 8. Calendar Views & Controls | 0/3 | Not started | - |
+| 8. Calendar Views & Controls | 1/3 | In Progress|  |
 
 ### Phase 6: Per-Salon Platform Content Routing
 
@@ -130,10 +130,10 @@ Plans:
 **Goal:** Managers can switch between Month, Week, and Agenda views on the calendar; filter the calendar by post type, platform, and status; create new posts directly from the calendar header; and toggle which fields appear on calendar cards — all view preferences persisted in localStorage
 **Depends on:** Phase 7
 **Requirements**: CAL-06, CAL-07, CAL-08, CAL-09, CAL-10
-**Plans:** 0/3 plans complete
+**Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 08-01-PLAN.md — View toggle + filter bar + New Post button + card display settings gear + localStorage persistence
+- [x] 08-01-PLAN.md — View toggle + filter bar + New Post button + card display settings gear + localStorage persistence
 - [ ] 08-02-PLAN.md — Week view (7-column grid fragment with drag-reschedule)
 - [ ] 08-03-PLAN.md — Agenda view (30-day rolling list) + coordinator upload date pre-fill
 
