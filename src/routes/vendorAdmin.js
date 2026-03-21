@@ -1002,7 +1002,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
                   <td class="py-2 pr-6 pl-2 text-xs font-bold text-mpAccent uppercase tracking-wide rounded-l-lg">Apply All</td>
                   ${["facebook","instagram","gmb","tiktok"].map(plat => `
                   <td class="text-center py-2 px-3${plat === "tiktok" ? " rounded-r-lg" : ""}">
-                    <label class="relative inline-flex items-center cursor-pointer" title="Toggle all ${plat} channels">
+                    <label class="relative inline-flex items-center cursor-pointer" title="Toggle all ${plat} channels" data-apply-all="${plat}">
                       <input type="checkbox" checked
                         class="sr-only peer"
                         data-apply-all="${plat}">
@@ -2567,12 +2567,18 @@ async function aiGen(btn) {
 document.getElementById('ai-btn').addEventListener('click', function() { aiGen(this); });
 
 document.addEventListener('change', function(e) {
-  var toggle = e.target.closest('[data-apply-all]');
-  if (!toggle) return;
-  var plat = toggle.getAttribute('data-apply-all');
-  var checked = toggle.checked;
+  var el = e.target.closest('[data-apply-all]');
+  if (!el) return;
+  var plat = el.getAttribute('data-apply-all');
+  // e.target may be the label or the input — always read from the input
+  var input = el.tagName === 'INPUT' ? el : el.querySelector('input[type="checkbox"]');
+  if (!input) return;
+  var checked = input.checked;
   document.querySelectorAll('.col-' + plat).forEach(function(cb) {
-    cb.checked = checked;
+    if (cb.checked !== checked) {
+      cb.checked = checked;
+      cb.dispatchEvent(new Event('change', { bubbles: false }));
+    }
   });
 });
 </script>
