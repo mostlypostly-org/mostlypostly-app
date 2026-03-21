@@ -128,8 +128,9 @@ Plans:
 **Goal:** Managers can see all scheduled and published posts on a visual 4-week calendar, click any day to preview posts in a slide-out panel, approve/deny/post-now directly from the panel, and drag-drop posts to reschedule them (FEAT-018)
 **Depends on:** Phase 6
 **Requirements**: CAL-01, CAL-02, CAL-03, CAL-04, CAL-05
-**Plans:** 0/2 plans complete
+**Plans:** 0/3 plans complete
 
 Plans:
+- [ ] 07-00-PLAN.md — Wave 0 test scaffold (calendarPillClass, date range, reschedule date math)
 - [ ] 07-01-PLAN.md — Calendar route + month grid with color-coded post pills + pageShell nav + server.js mount
 - [ ] 07-02-PLAN.md — Day panel fragment endpoint + approve/deny/post-now actions + drag-to-reschedule
