@@ -860,9 +860,135 @@ router.get("/week", requireAuth, (req, res) => {
   res.send(fragment);
 });
 
-// ── GET /agenda — Stub fragment for agenda view (Plan 03 implements full view) ─
+// ── GET /agenda — 30-day rolling list of posts grouped by date ────────────────
 router.get("/agenda", requireAuth, (req, res) => {
-  res.send(`<p class="text-sm text-mpMuted text-center py-12">Agenda view loading...</p>`);
+  const salon_id = req.session.salon_id;
+
+  const salon = db.prepare("SELECT timezone, facebook_page_token, instagram_business_id, tiktok_enabled, google_location_id FROM salons WHERE slug = ?").get(salon_id);
+  const tz = salon?.timezone || "America/Indiana/Indianapolis";
+
+  // Compute 30-day range in salon timezone
+  const now       = DateTime.now().setZone(tz);
+  const rangeStart = now.startOf("day");
+  const rangeEnd   = rangeStart.plus({ days: 30 }).endOf("day");
+
+  const rangeStartUtc = rangeStart.toUTC().toFormat("yyyy-LL-dd HH:mm:ss");
+  const rangeEndUtc   = rangeEnd.toUTC().toFormat("yyyy-LL-dd HH:mm:ss");
+
+  const posts = db.prepare(`
+    SELECT p.id, p.post_type, p.status, p.scheduled_for, p.published_at, p.stylist_name,
+           p.image_url, p.image_urls, p.final_caption, p.base_caption, p.vendor_campaign_id,
+           p.salon_post_number, vc.vendor_name
+    FROM posts p
+    LEFT JOIN vendor_campaigns vc ON p.vendor_campaign_id = vc.id
+    WHERE p.salon_id = ?
+      AND p.status NOT IN ('draft', 'cancelled')
+      AND (p.scheduled_for BETWEEN ? AND ? OR p.published_at BETWEEN ? AND ?)
+    ORDER BY COALESCE(p.scheduled_for, p.published_at) ASC
+  `).all(salon_id, rangeStartUtc, rangeEndUtc, rangeStartUtc, rangeEndUtc);
+
+  if (posts.length === 0) {
+    res.send(`<p class="text-sm text-mpMuted text-center py-12">No upcoming posts in the next 30 days.</p>`);
+    return;
+  }
+
+  // Group posts by local salon date
+  const byDate = new Map();
+  const dateOrder = [];
+  for (const post of posts) {
+    const rawTs = post.scheduled_for || post.published_at;
+    if (!rawTs) continue;
+    let dt = DateTime.fromSQL(rawTs, { zone: "utc" });
+    if (!dt.isValid) dt = DateTime.fromISO(rawTs, { zone: "utc" });
+    const localDate = dt.setZone(tz).toFormat("yyyy-LL-dd");
+    if (!byDate.has(localDate)) {
+      byDate.set(localDate, []);
+      dateOrder.push(localDate);
+    }
+    byDate.get(localDate).push(post);
+  }
+
+  // Sort dates chronologically
+  dateOrder.sort();
+
+  let html = "";
+
+  for (const dateStr of dateOrder) {
+    const datePosts = byDate.get(dateStr);
+    const dt = DateTime.fromISO(dateStr, { zone: tz });
+    const dateLabel = dt.toFormat("EEEE, MMMM d");
+
+    let cards = "";
+    for (const p of datePosts) {
+      const postTypeNorm = normalizePostType(p);
+
+      // Thumbnail
+      let imgUrl = null;
+      try { imgUrl = JSON.parse(p.image_urls || "[]")[0] || p.image_url; } catch { imgUrl = p.image_url; }
+      imgUrl = toProxyUrl(imgUrl);
+
+      const thumbnail = imgUrl
+        ? `<img src="${safe(imgUrl)}" alt="Post thumbnail" class="w-[60px] h-[60px] rounded-lg object-cover flex-shrink-0 border border-mpBorder" />`
+        : `<div class="w-[60px] h-[60px] rounded-lg bg-mpBg flex items-center justify-center flex-shrink-0 text-2xl border border-mpBorder">&#128247;</div>`;
+
+      // Time display
+      const rawTs = p.scheduled_for || p.published_at;
+      let timeDt = DateTime.fromSQL(rawTs, { zone: "utc" });
+      if (!timeDt.isValid) timeDt = DateTime.fromISO(rawTs, { zone: "utc" });
+      const timeDisplay = timeDt.isValid ? timeDt.setZone(tz).toFormat("h:mm a") : "";
+
+      // Name display
+      const isVendor = !!p.vendor_campaign_id;
+      const nameDisplay = isVendor ? safe(p.vendor_name || "Vendor") : safe(p.stylist_name || "Unknown");
+
+      // Type label
+      const typeLabel = isVendor
+        ? `<span class="text-[10px] font-semibold text-purple-700">Vendor · ${safe(p.vendor_name || "Brand")}</span>`
+        : `<span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${calendarPillClass(p)}">${safe(calendarPillLabel(p))}</span>`;
+
+      // Caption preview (120 chars)
+      const caption = p.final_caption || p.base_caption || "";
+      const preview = caption.length > 120 ? caption.slice(0, 120) + "\u2026" : caption;
+
+      cards += `
+      <div class="agenda-post-card bg-white rounded-lg border border-mpBorder p-3 shadow-sm mb-2 cursor-pointer hover:border-mpAccent/40 transition-colors" data-post-type="${safe(postTypeNorm)}" data-status="${safe(p.status)}" data-date="${safe(dateStr)}">
+        <div class="flex gap-3">
+          ${thumbnail}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between mb-0.5">
+              <span class="font-medium text-sm text-mpCharcoal truncate card-field-stylist">${nameDisplay}</span>
+              <span class="text-xs text-mpMuted ml-2 flex-shrink-0 card-field-time">${safe(timeDisplay)}</span>
+            </div>
+            <div class="card-field-platforms">${platformIcons(salon, "md")}</div>
+            <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+              ${typeLabel}
+              ${statusBadge(p.status)}
+            </div>
+            <p class="text-sm text-mpMuted line-clamp-2 mt-2 card-field-caption">${safe(preview)}</p>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    html += `
+    <div class="mb-6">
+      <h3 class="text-sm font-bold text-mpCharcoal mb-2 sticky top-0 bg-[#F8FAFC] py-1 z-10">${safe(dateLabel)}</h3>
+      ${cards}
+    </div>`;
+  }
+
+  html += `
+  <script>
+  (function() {
+    document.querySelectorAll('.agenda-post-card').forEach(function(card) {
+      card.addEventListener('click', function() {
+        if (typeof window.openDayPanel === 'function') window.openDayPanel(card.dataset.date);
+      });
+    });
+  })();
+  <\/script>`;
+
+  res.send(html);
 });
 
 // ── GET /day/:date — HTML fragment for day panel ──────────────────────────────
