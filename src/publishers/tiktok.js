@@ -71,7 +71,12 @@ export async function publishPhotoToTikTok(salon, imageUrls, caption) {
     throw new Error("[TikTok] Photo post requires at least one image URL");
   }
 
-  const safeCaption = (caption || "").trim().slice(0, 2200) || ".";
+  const fullCaption = (caption || "").trim();
+  // TikTok photo title: max 90 UTF-16 runes. Use first sentence / first line, then truncate.
+  const firstLine = fullCaption.split(/\n/)[0].trim();
+  const safeTitle = (firstLine.length <= 90 ? firstLine : firstLine.slice(0, 87) + "...") || ".";
+  // Full caption goes in description (max 4000 chars)
+  const safeDescription = fullCaption.slice(0, 4000) || ".";
 
   const creatorInfo  = await getCreatorInfo(accessToken);
   const privacyLevel = pickPrivacyLevel(creatorInfo);
@@ -80,13 +85,15 @@ export async function publishPhotoToTikTok(salon, imageUrls, caption) {
 
   const body = {
     post_info: {
-      title:           safeCaption,
+      title:           safeTitle,
+      description:     safeDescription,
       privacy_level:   privacyLevel,
       disable_comment: creatorInfo.comment_disabled ?? false,
     },
     source_info: {
-      source:       "PULL_FROM_URL",
-      photo_images: validImages,
+      source:            "PULL_FROM_URL",
+      photo_images:      validImages,
+      photo_cover_index: 0,
     },
     post_mode:  "DIRECT_POST",
     media_type: "PHOTO",
@@ -131,7 +138,11 @@ export async function publishVideoToTikTok(salon, videoUrl, caption) {
     throw new Error("[TikTok] Video post requires a video URL");
   }
 
-  const safeCaption = (caption || "").trim().slice(0, 2200) || ".";
+  const fullCaption = (caption || "").trim();
+  // TikTok title: max 90 UTF-16 runes
+  const firstLine = fullCaption.split(/\n/)[0].trim();
+  const safeTitle = (firstLine.length <= 90 ? firstLine : firstLine.slice(0, 87) + "...") || ".";
+  const safeDescription = fullCaption.slice(0, 4000) || ".";
 
   const creatorInfo  = await getCreatorInfo(accessToken);
   const privacyLevel = pickPrivacyLevel(creatorInfo);
@@ -139,7 +150,8 @@ export async function publishVideoToTikTok(salon, videoUrl, caption) {
 
   const body = {
     post_info: {
-      title:           safeCaption,
+      title:           safeTitle,
+      description:     safeDescription,
       privacy_level:   privacyLevel,
       disable_duet:    creatorInfo.duet_disabled    ?? false,
       disable_stitch:  creatorInfo.stitch_disabled  ?? false,
