@@ -79,9 +79,8 @@ export async function publishPhotoToTikTok(salon, imageUrls, caption) {
 
   const body = {
     post_info: {
-      title:           safeCaption,
-      privacy_level:   privacyLevel,
-      disable_comment: creatorInfo.comment_disabled ?? false,
+      title:         safeCaption,
+      privacy_level: privacyLevel,
     },
     source_info: {
       source:            "PULL_FROM_URL",
