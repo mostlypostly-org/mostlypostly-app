@@ -11,8 +11,7 @@ import { publishPhotoToTikTok, publishVideoToTikTok } from "./publishers/tiktok.
 import { logEvent } from "./core/analyticsDb.js";
 import { runCelebrationCheck } from "./core/celebrationScheduler.js";
 import { runVendorSync } from './core/vendorSync.js';
-import { appendUtm, slugify } from './core/utm.js';
-import { buildTrackingToken, buildShortUrl } from './core/trackingUrl.js';
+import { slugify } from './core/utm.js';
 import { checkAndAutoRecycle } from './core/contentRecycler.js';
 import { pickNextPost } from './core/pickNextPost.js';
 import { isEnabledFor } from './core/platformRouting.js';
