@@ -131,6 +131,6 @@ Plans:
 **Plans:** 0/3 plans complete
 
 Plans:
-- [ ] 07-00-PLAN.md — Wave 0 test scaffold (calendarPillClass, date range, reschedule date math)
+- [x] 07-00-PLAN.md — Wave 0 test scaffold (calendarPillClass, date range, reschedule date math)
 - [ ] 07-01-PLAN.md — Calendar route + month grid with color-coded post pills + pageShell nav + server.js mount
 - [ ] 07-02-PLAN.md — Day panel fragment endpoint + approve/deny/post-now actions + drag-to-reschedule
