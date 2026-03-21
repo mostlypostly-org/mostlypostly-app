@@ -661,7 +661,7 @@ router.get("/approve", requireAuth, async (req, res) => {
 
   if (!pendingPost) {
     console.warn("⚠️ Dashboard approve: post not found or not pending", id);
-    return res.redirect("/manager");
+    return res.redirect(req.query.return === "calendar" ? "/manager/calendar" : "/manager");
   }
 
   // Look up salon settings for notification prefs
@@ -696,7 +696,8 @@ router.get("/approve", requireAuth, async (req, res) => {
     }
   }
 
-  return res.redirect("/manager");
+  const returnToApprove = req.query.return === "calendar" ? "/manager/calendar" : "/manager";
+  return res.redirect(returnToApprove);
 });
 
 /* -------------------------------------------------------------
@@ -717,7 +718,8 @@ router.get("/post-now", requireAuth, (req, res) => {
     `).run(id, salon_id);
   }
 
-  return res.redirect("/manager");
+  const returnToPostNow = req.query.return === "calendar" ? "/manager/calendar" : "/manager";
+  return res.redirect(returnToPostNow);
 });
 
 /* -------------------------------------------------------------
@@ -765,7 +767,8 @@ router.post("/retry-post", requireAuth, (req, res) => {
        WHERE id=? AND salon_id=? AND status='failed'`
     ).run(retryAt, post_id, salon_id);
   }
-  return res.redirect("/manager");
+  const returnToRetry = req.body.return === "calendar" ? "/manager/calendar" : "/manager";
+  return res.redirect(returnToRetry);
 });
 
 router.get("/deny", requireAuth, (req, res) => {
@@ -812,7 +815,7 @@ router.post("/deny", requireAuth, async (req, res) => {
   const salon_id = req.manager.salon_id;
 
   const post = db.prepare(`SELECT * FROM posts WHERE id = ? AND salon_id = ?`).get(post_id, salon_id);
-  if (!post) return res.redirect("/manager");
+  if (!post) return res.redirect(req.body.return === "calendar" ? "/manager/calendar" : "/manager");
 
   db.prepare(
     `UPDATE posts
@@ -841,7 +844,8 @@ router.post("/deny", requireAuth, async (req, res) => {
     }
   }
 
-  return res.redirect("/manager");
+  const returnToDeny = req.body.return === "calendar" ? "/manager/calendar" : "/manager";
+  return res.redirect(returnToDeny);
 });
 
 /* -------------------------------------------------------------
