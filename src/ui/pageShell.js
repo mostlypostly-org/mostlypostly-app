@@ -127,11 +127,11 @@ export default function pageShell({
     <!-- Logo mark -->
     ${navLocked
       ? `<div class="flex h-16 w-16 shrink-0 items-center justify-center border-b border-[#2E5E9E]">
-        <img src="/public/logo/logo-mark.png" alt="MostlyPostly" class="h-5 w-auto" style="filter:brightness(0) invert(1);" />
+        <img src="/public/logo/logo-mark.png" alt="MostlyPostly" class="h-5 w-auto" />
       </div>`
       : `<a href="/manager${qs}"
          class="flex h-16 w-16 shrink-0 items-center justify-center border-b border-[#2E5E9E]">
-        <img src="/public/logo/logo-mark.png" alt="MostlyPostly" class="h-5 w-auto" style="filter:brightness(0) invert(1);" />
+        <img src="/public/logo/logo-mark.png" alt="MostlyPostly" class="h-5 w-auto" />
       </a>`}
 
     <!-- Active location indicator -->
