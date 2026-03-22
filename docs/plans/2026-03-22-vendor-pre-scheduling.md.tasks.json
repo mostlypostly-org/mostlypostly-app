@@ -1,0 +1,11 @@
+{
+  "planPath": "docs/plans/2026-03-22-vendor-pre-scheduling.md",
+  "tasks": [
+    {"id": 1, "subject": "Task 1: Migration — Add vendor_scheduled status support", "status": "pending"},
+    {"id": 2, "subject": "Task 2: Rewrite vendorScheduler 30-day lookahead algorithm", "status": "pending", "blockedBy": [1]},
+    {"id": 3, "subject": "Task 3: Update scheduler publish loop to include vendor_scheduled", "status": "pending", "blockedBy": [1]},
+    {"id": 4, "subject": "Task 4: Calendar display — ghost purple pill, drag, filter chip", "status": "pending", "blockedBy": [1]},
+    {"id": 5, "subject": "Task 5: Push to staging and verify end-to-end", "status": "pending", "blockedBy": [2, 3, 4]}
+  ],
+  "lastUpdated": "2026-03-22T00:00:00Z"
+}
