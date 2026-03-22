@@ -10,6 +10,7 @@ export default function pageShell({
   manager_phone = "",
   manager_id = "",
   navLocked = false,
+  bodyBg = "bg-mpBg",
 }) {
   const qs = salon_id ? `?salon=${encodeURIComponent(salon_id)}` : "";
 
@@ -115,7 +116,7 @@ export default function pageShell({
   </style>
 </head>
 
-<body class="bg-mpBg text-mpCharcoal antialiased">
+<body class="${bodyBg} text-mpCharcoal antialiased">
 
   <!-- ══════════════════════════════════════════════════
        LEFT SIDEBAR (desktop)

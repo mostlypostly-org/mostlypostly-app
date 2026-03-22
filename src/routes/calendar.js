@@ -677,7 +677,7 @@ router.get("/", requireAuth, (req, res) => {
     </script>
   `;
 
-  res.send(pageShell({ title: "Calendar", body, current: "calendar", salon_id, manager_id }));
+  res.send(pageShell({ title: "Calendar", body, current: "calendar", salon_id, manager_id, bodyBg: "bg-white" }));
 });
 
 // ── GET /week — Week view fragment: 7-column grid for a single week ───────────
