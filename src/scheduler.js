@@ -268,7 +268,7 @@ async function recoverMissedPosts() {
       .prepare(`
         SELECT id, salon_id, scheduled_for, retry_count
         FROM posts
-        WHERE (status='manager_approved' OR status='failed')
+        WHERE (status IN ('manager_approved','vendor_scheduled') OR status='failed')
           AND scheduled_for IS NOT NULL
           AND datetime(scheduled_for) < datetime('now')
           AND (retry_count IS NULL OR retry_count < 3)
@@ -357,7 +357,7 @@ export async function runSchedulerOnce() {
       .prepare(`
         SELECT DISTINCT salon_id
         FROM posts
-        WHERE status='manager_approved'
+        WHERE status IN ('manager_approved','vendor_scheduled')
           AND scheduled_for IS NOT NULL
       `)
       .all()
@@ -384,7 +384,7 @@ export async function runSchedulerOnce() {
         .prepare(`
           SELECT *
           FROM posts
-          WHERE status='manager_approved'
+          WHERE status IN ('manager_approved','vendor_scheduled')
             AND scheduled_for IS NOT NULL
             AND datetime(scheduled_for) <= datetime('now')
             AND salon_id=?
