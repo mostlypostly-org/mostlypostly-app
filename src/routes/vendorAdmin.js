@@ -197,7 +197,8 @@ router.post("/set-plan", requireSecret, requirePin, (req, res) => {
 
   enforceStaffLimits(salon_slug);
   console.log(`[vendorAdmin] Set ${salon_slug} → plan:${plan} status:${plan_status}`);
-  res.redirect(`/internal/vendors${qs(req)}`);
+  const redirectTo = req.body.redirect_to;
+  res.redirect(redirectTo ? `${redirectTo}${qs(req)}&saved=1` : `/internal/vendors${qs(req)}`);
 });
 
 // ── POST /reset-routing — Reset a salon's platform_routing to NULL (use defaults) ─
@@ -926,7 +927,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
       <div class="px-6 py-4 border-b flex items-center justify-between">
         <div>
           <h2 class="font-bold">Account Management</h2>
-          <p class="text-xs text-gray-500 mt-0.5">Override plan/status and delete accounts. Changes take effect immediately.</p>
+          <p class="text-xs text-gray-500 mt-0.5">View plan/status and access per-salon settings. Click Settings to override plan, configure vendor limits, and more.</p>
         </div>
       </div>
       <div class="overflow-x-auto">
@@ -938,7 +939,6 @@ router.get("/", requireSecret, requirePin, (req, res) => {
               <th class="px-4 py-3">Plan</th>
               <th class="px-4 py-3">Status</th>
               <th class="px-4 py-3">Created</th>
-              <th class="px-4 py-3">Override</th>
               <th class="px-4 py-3"></th>
             </tr>
           </thead>
@@ -961,19 +961,9 @@ router.get("/", requireSecret, requirePin, (req, res) => {
                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor(s.plan_status)}">${safe(s.plan_status || "trialing")}</span>
               </td>
               <td class="px-4 py-3 text-xs text-gray-400">${safe((s.created_at || "").slice(0, 10))}</td>
-              <td class="px-4 py-3">
-                <form method="POST" action="/internal/vendors/set-plan${qs(req)}" class="flex items-center gap-1.5">
-                  <input type="hidden" name="salon_slug" value="${safe(s.slug)}" />
-                  <select name="plan" class="text-xs border rounded px-1.5 py-1">
-                    ${["trial","starter","growth","pro"].map(p => `<option value="${p}" ${s.plan === p ? "selected" : ""}>${p}</option>`).join("")}
-                  </select>
-                  <select name="plan_status" class="text-xs border rounded px-1.5 py-1">
-                    ${["trialing","active","past_due","canceled"].map(st => `<option value="${st}" ${s.plan_status === st ? "selected" : ""}>${st}</option>`).join("")}
-                  </select>
-                  <button type="submit" class="text-xs bg-gray-900 text-white rounded px-2.5 py-1 hover:bg-gray-700">Set</button>
-                </form>
-              </td>
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 flex items-center gap-3">
+                <a href="/internal/vendors/salon/${safe(s.slug)}${qs(req)}"
+                   class="text-xs bg-gray-900 text-white rounded px-2.5 py-1 hover:bg-gray-700 whitespace-nowrap">Settings →</a>
                 <form method="POST" action="/internal/vendors/delete-salon${qs(req)}"
                       data-confirm="Permanently delete ${safe(s.name)} and all associated data? This cannot be undone.">
                   <input type="hidden" name="salon_slug" value="${safe(s.slug)}" />
@@ -2738,6 +2728,158 @@ router.post("/resequence-posts", requireSecret, requirePin, (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
+});
+
+// ── GET /salon/:slug — Per-salon config page ──────────────────────────────────
+router.get("/salon/:slug", requireSecret, requirePin, (req, res) => {
+  const { slug } = req.params;
+  const salon = db.prepare(`
+    SELECT s.slug, s.name, s.plan, s.plan_status, s.created_at, s.city, s.state,
+           COALESCE(s.vendor_monthly_cap, 8) AS vendor_monthly_cap,
+           m.email, m.name AS manager_name
+    FROM salons s
+    LEFT JOIN managers m ON m.salon_id = s.slug AND m.role = 'owner'
+    WHERE s.slug = ?
+  `).get(slug);
+
+  if (!salon) return res.status(404).send("Salon not found");
+
+  const safe = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const planColor = p => ({ pro: "bg-purple-100 text-purple-700", growth: "bg-blue-100 text-blue-700", starter: "bg-green-100 text-green-700", trial: "bg-gray-100 text-gray-600" }[p] || "bg-gray-100 text-gray-600");
+  const statusColor = s => ({ active: "bg-green-100 text-green-700", trialing: "bg-blue-100 text-blue-700", past_due: "bg-yellow-100 text-yellow-700", canceled: "bg-red-100 text-red-600" }[s] || "bg-gray-100 text-gray-600");
+
+  // Current month vendor post count
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().replace("T", " ").slice(0, 19);
+  const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().replace("T", " ").slice(0, 19);
+  const { vendorMonthCount } = db.prepare(`
+    SELECT COUNT(*) AS vendorMonthCount FROM posts
+    WHERE salon_id = ? AND vendor_campaign_id IS NOT NULL
+      AND status IN ('vendor_scheduled','manager_pending','manager_approved','published')
+      AND scheduled_for >= ? AND scheduled_for < ?
+  `).get(slug, monthStart, monthEnd);
+
+  const flash = req.query.saved ? `<div class="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800 font-medium mb-6">Settings saved.</div>` :
+                req.query.reset ? `<div class="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800 font-medium mb-6">Monthly vendor count reset. Scheduler will refill on next run.</div>` : "";
+
+  res.send(`<!DOCTYPE html><html lang="en"><head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>${safe(salon.name)} — Salon Settings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>body{font-family:'Plus Jakarta Sans',sans-serif;background:#F8FAFC;}</style>
+  </head><body class="p-6 max-w-2xl mx-auto">
+    <div class="mb-6">
+      <a href="/internal/vendors${qs(req)}#tab-salons" class="text-xs text-gray-400 hover:text-gray-600">← Back to Console</a>
+      <h1 class="text-xl font-bold mt-2">${safe(salon.name)}</h1>
+      <div class="text-xs text-gray-400 font-mono">${safe(salon.slug)}${salon.city ? ` · ${safe(salon.city)}${salon.state ? ", " + safe(salon.state) : ""}` : ""}</div>
+    </div>
+
+    ${flash}
+
+    <!-- Account Info -->
+    <div class="border rounded-2xl bg-white overflow-hidden mb-6">
+      <div class="px-6 py-4 border-b"><h2 class="font-bold text-sm">Account</h2></div>
+      <div class="px-6 py-4 flex flex-wrap gap-6 text-sm">
+        <div>
+          <div class="text-xs text-gray-400 mb-1">Plan</div>
+          <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${planColor(salon.plan)}">${safe(salon.plan || "trial")}</span>
+        </div>
+        <div>
+          <div class="text-xs text-gray-400 mb-1">Status</div>
+          <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor(salon.plan_status)}">${safe(salon.plan_status || "trialing")}</span>
+        </div>
+        <div>
+          <div class="text-xs text-gray-400 mb-1">Owner</div>
+          <div class="text-xs text-gray-700">${safe(salon.manager_name || "—")}</div>
+          ${salon.email ? `<div class="text-xs text-gray-400">${safe(salon.email)}</div>` : ""}
+        </div>
+        <div>
+          <div class="text-xs text-gray-400 mb-1">Created</div>
+          <div class="text-xs text-gray-700">${safe((salon.created_at || "").slice(0, 10))}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plan Override -->
+    <div class="border rounded-2xl bg-white overflow-hidden mb-6">
+      <div class="px-6 py-4 border-b"><h2 class="font-bold text-sm">Plan Override</h2><p class="text-xs text-gray-500 mt-0.5">Changes take effect immediately.</p></div>
+      <div class="px-6 py-4">
+        <form method="POST" action="/internal/vendors/set-plan${qs(req)}" class="flex items-center gap-2 flex-wrap">
+          <input type="hidden" name="salon_slug" value="${safe(salon.slug)}" />
+          <input type="hidden" name="redirect_to" value="/internal/vendors/salon/${safe(salon.slug)}" />
+          <select name="plan" class="text-sm border rounded-lg px-2 py-1.5">
+            ${["trial","starter","growth","pro"].map(p => `<option value="${p}" ${salon.plan === p ? "selected" : ""}>${p}</option>`).join("")}
+          </select>
+          <select name="plan_status" class="text-sm border rounded-lg px-2 py-1.5">
+            ${["trialing","active","past_due","canceled"].map(st => `<option value="${st}" ${salon.plan_status === st ? "selected" : ""}>${st}</option>`).join("")}
+          </select>
+          <button type="submit" class="text-sm bg-gray-900 text-white rounded-lg px-3 py-1.5 hover:bg-gray-700">Set Plan</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Vendor Config -->
+    <div class="border rounded-2xl bg-white overflow-hidden mb-6">
+      <div class="px-6 py-4 border-b"><h2 class="font-bold text-sm">Vendor Post Config</h2><p class="text-xs text-gray-500 mt-0.5">Controls how many vendor posts this salon receives per month.</p></div>
+      <div class="px-6 py-5 space-y-5">
+        <form method="POST" action="/internal/vendors/salon/${safe(salon.slug)}/config${qs(req)}" class="flex items-end gap-4">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Monthly vendor post cap</label>
+            <input type="number" name="vendor_monthly_cap" value="${salon.vendor_monthly_cap}" min="1" max="30"
+              class="text-sm border rounded-lg px-3 py-1.5 w-24">
+            <div class="text-xs text-gray-400 mt-1">Default: 8. Max: 30.</div>
+          </div>
+          <button type="submit" class="text-sm bg-gray-900 text-white rounded-lg px-3 py-1.5 hover:bg-gray-700">Save</button>
+        </form>
+
+        <div class="border-t pt-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm font-medium text-gray-800">Monthly vendor posts this month</div>
+              <div class="text-xs text-gray-500 mt-0.5">${vendorMonthCount} of ${salon.vendor_monthly_cap} used — resets on the 1st of each month</div>
+            </div>
+            <form method="POST" action="/internal/vendors/salon/${safe(salon.slug)}/reset-vendor-month${qs(req)}"
+                  onsubmit="return confirm('Delete all vendor_scheduled posts for this salon this month and reset the counter? The scheduler will refill on its next run.')">
+              <button type="submit" class="text-xs border border-red-200 text-red-500 rounded-lg px-3 py-1.5 hover:bg-red-50">Reset Month</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body></html>`);
+});
+
+// ── POST /salon/:slug/config — Save per-salon config ──────────────────────────
+router.post("/salon/:slug/config", requireSecret, requirePin, (req, res) => {
+  const { slug } = req.params;
+  const cap = parseInt(req.body.vendor_monthly_cap, 10);
+  if (!cap || cap < 1 || cap > 30) return res.redirect(`/internal/vendors/salon/${slug}${qs(req)}`);
+
+  db.prepare(`UPDATE salons SET vendor_monthly_cap = ? WHERE slug = ?`).run(cap, slug);
+  console.log(`[vendorAdmin] Set vendor_monthly_cap=${cap} for salon ${slug}`);
+  res.redirect(`/internal/vendors/salon/${slug}${qs(req)}&saved=1`);
+});
+
+// ── POST /salon/:slug/reset-vendor-month — Delete this month's vendor_scheduled posts ──
+router.post("/salon/:slug/reset-vendor-month", requireSecret, requirePin, (req, res) => {
+  const { slug } = req.params;
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().replace("T", " ").slice(0, 19);
+  const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().replace("T", " ").slice(0, 19);
+
+  // Only delete vendor_scheduled posts — leave manager_approved/published untouched
+  const { changes } = db.prepare(`
+    DELETE FROM posts
+    WHERE salon_id = ?
+      AND vendor_campaign_id IS NOT NULL
+      AND status = 'vendor_scheduled'
+      AND scheduled_for >= ?
+      AND scheduled_for < ?
+  `).run(slug, monthStart, monthEnd);
+
+  console.log(`[vendorAdmin] Reset vendor month for ${slug}: deleted ${changes} vendor_scheduled post(s)`);
+  res.redirect(`/internal/vendors/salon/${slug}${qs(req)}&reset=1`);
 });
 
 export default router;
