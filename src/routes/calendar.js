@@ -148,11 +148,16 @@ router.get("/", requireAuth, (req, res) => {
     monthStart = DateTime.now().setZone(tz).startOf("month");
   }
 
-  // Compute Sunday-based grid start (5 weeks to cover any month)
+  // Compute Sunday-based grid start
   let gridStart = monthStart.startOf("week"); // Luxon weeks start Monday by default
   // Adjust back to Sunday if the week doesn't start on Sunday (weekday 7 = Sunday in Luxon)
   if (gridStart.weekday !== 7) gridStart = gridStart.minus({ days: gridStart.weekday });
-  const gridEnd = gridStart.plus({ weeks: 5 }).endOf("day");
+  // Compute the Sunday that contains the last day of the month, then extend to Saturday
+  let gridEndAnchor = monthStart.endOf("month").startOf("week");
+  if (gridEndAnchor.weekday !== 7) gridEndAnchor = gridEndAnchor.minus({ days: gridEndAnchor.weekday });
+  const gridEnd = gridEndAnchor.plus({ days: 6 }).endOf("day");
+  // Number of weeks needed (5 or 6 depending on month layout)
+  const totalWeeks = Math.round(gridEnd.diff(gridStart, "weeks").weeks);
 
   // UTC range for DB query
   const rangeStartUtc = gridStart.startOf("day").toUTC().toFormat("yyyy-LL-dd HH:mm:ss");
@@ -190,7 +195,7 @@ router.get("/", requireAuth, (req, res) => {
   const DAY_HEADERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   let rows = "";
   let cursor = gridStart;
-  for (let week = 0; week < 5; week++) {
+  for (let week = 0; week < totalWeeks; week++) {
     let cells = "";
     for (let dow = 0; dow < 7; dow++) {
       const dateStr = cursor.toFormat("yyyy-LL-dd");
