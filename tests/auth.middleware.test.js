@@ -28,15 +28,19 @@ describe("requireAuth", () => {
   });
 
   it("redirects to /manager/login when no session manager_id", () => {
+    const next = vi.fn();
     const res = makeRes();
-    requireAuth(makeReq({ session: {} }), res, vi.fn());
+    requireAuth(makeReq({ session: {} }), res, next);
     expect(res.redirectUrl).toBe("/manager/login");
+    expect(next).not.toHaveBeenCalled();
   });
 
   it("redirects to /manager/login when no req.manager", () => {
+    const next = vi.fn();
     const res = makeRes();
-    requireAuth(makeReq({ manager: undefined }), res, vi.fn());
+    requireAuth(makeReq({ manager: undefined }), res, next);
     expect(res.redirectUrl).toBe("/manager/login");
+    expect(next).not.toHaveBeenCalled();
   });
 });
 
@@ -48,15 +52,27 @@ describe("requireRole", () => {
   });
 
   it("returns 403 when role not in list", () => {
+    const next = vi.fn();
     const res = makeRes();
-    requireRole("owner", "manager")(makeReq({ manager: { role: "coordinator" } }), res, vi.fn());
+    requireRole("owner", "manager")(makeReq({ manager: { role: "coordinator" } }), res, next);
     expect(res.statusCode).toBe(403);
+    expect(next).not.toHaveBeenCalled();
   });
 
   it("returns 403 when manager is undefined", () => {
+    const next = vi.fn();
     const res = makeRes();
-    requireRole("owner")(makeReq({ manager: undefined }), res, vi.fn());
+    requireRole("owner")(makeReq({ manager: undefined }), res, next);
     expect(res.statusCode).toBe(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when staff role hits owner/manager gate", () => {
+    const next = vi.fn();
+    const res = makeRes();
+    requireRole("owner", "manager")(makeReq({ manager: { role: "staff" } }), res, next);
+    expect(res.statusCode).toBe(403);
+    expect(next).not.toHaveBeenCalled();
   });
 
   it("allows owner through owner-only gate", () => {
