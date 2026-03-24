@@ -48,6 +48,7 @@ import { UPLOADS_DIR } from "./src/core/uploadPath.js";
 // Middleware imports
 // =====================================================
 import tenantFromLink from "./src/middleware/tenantFromLink.js";
+import { requireAuth, requireRole } from "./src/middleware/auth.js";
 
 // =====================================================
 // Core Logic
@@ -560,8 +561,8 @@ app.use("/api", analyticsRoute);
 // =====================================================
 // DASHBOARD / POSTS / ANALYTICS UI ROUTES
 // =====================================================
-app.use("/dashboard", dashboardRoute);
-app.use("/posts", postsRoute);
+app.use("/dashboard", requireAuth, requireRole("owner", "manager"), dashboardRoute);
+app.use("/posts",     requireAuth, requireRole("owner", "manager"), postsRoute);
 app.use("/analytics", analyticsRoute);
 app.use("/analytics/scheduler", analyticsSchedulerRoute);
 app.use("/auth/facebook", facebookAuthRoutes);
