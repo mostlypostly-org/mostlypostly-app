@@ -10,16 +10,15 @@ import bcrypt from "bcryptjs";
 import db from "../../db.js";
 import pageShell from "../ui/pageShell.js";
 import { TONE_GROUPS, TONE_VARIANT_MAP } from "../core/toneVariants.js";
-
-const router = express.Router();
-
-router.use(requireAuth, requireRole("owner", "manager"));
-
 import { UPLOADS_DIR, toUploadUrl } from "../core/uploadPath.js";
 import { PLAN_LIMITS } from "./billing.js";
 import { sendViaTwilio } from "./twilio.js";
 import { sendWelcomeSms, sendCoordinatorWelcomeSms } from "../core/stylistWelcome.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+
+const router = express.Router();
+
+router.use(requireAuth, requireRole("owner", "manager"));
 
 function normalizePhone(raw) {
   if (!raw) return null;
