@@ -17,6 +17,7 @@ import { translatePostError } from "../core/postErrorTranslator.js";
 import { savePost } from "../core/storage.js";
 import { UPLOADS_DIR, toUploadUrl } from "../core/uploadPath.js";
 import { requireRole } from "../middleware/auth.js";
+import { getDefaultPlacement, getPlatformReach, deriveFromPostType } from "../core/contentType.js";
 
 // Multer config for coordinator photo uploads
 const coordinatorUpload = multer({
@@ -29,6 +30,24 @@ const coordinatorUpload = multer({
 });
 
 const router = express.Router();
+
+const CONTENT_TYPE_OPTIONS = [
+  { value: "standard_post", label: "Standard Post" },
+  { value: "before_after", label: "Before & After" },
+  { value: "education", label: "Education / Tutorial" },
+  { value: "vendor_product", label: "Vendor Product" },
+  { value: "vendor_promotion", label: "Vendor Promotion" },
+  { value: "reviews", label: "Review" },
+  { value: "celebration", label: "Celebration" },
+  { value: "stylist_availability", label: "Stylist Availability" },
+];
+
+const PLATFORM_LABELS = {
+  instagram: "Instagram",
+  facebook: "Facebook",
+  gmb: "Google Business",
+  tiktok: "TikTok",
+};
 
 // Escape all HTML special characters, safe for use in attributes and text nodes
 function esc(str) {
@@ -266,6 +285,11 @@ router.get("/", requireAuth, async (req, res) => {
               }
             }
 
+            const resolvedPlacement = p.placement || deriveFromPostType(p.post_type);
+            const resolvedContentType = p.content_type || "standard_post";
+            const platformReach = getPlatformReach(resolvedPlacement, resolvedContentType);
+            const reachDisplay = platformReach.map(pl => PLATFORM_LABELS[pl] || pl).join(" · ");
+
             return `
           <div class="rounded-xl bg-white border border-mpBorder p-5 mb-5">
             <div class="flex gap-4">
@@ -287,6 +311,46 @@ router.get("/", requireAuth, async (req, res) => {
                 </p>
 
                 ${bookingHint}
+
+                <div class="border border-gray-200 rounded-lg p-4 mb-4 mt-4 bg-gray-50">
+                  <div class="flex flex-wrap gap-6 items-start mb-3">
+                    <div>
+                      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Content Type</label>
+                      <select
+                        name="content_type"
+                        data-post-id="${esc(p.id)}"
+                        onchange="mpUpdatePlacement(this)"
+                        class="border border-gray-300 rounded px-3 py-1.5 text-sm bg-white"
+                      >
+                        ${CONTENT_TYPE_OPTIONS.map(opt => `
+                          <option value="${opt.value}"${resolvedContentType === opt.value ? " selected" : ""}>${opt.label}</option>
+                        `).join("")}
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Placement</label>
+                      <div class="flex gap-3 items-center pt-1">
+                        ${["reel", "post", "story"].map(pl => `
+                          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                            <input
+                              type="radio"
+                              name="placement_${esc(p.id)}"
+                              value="${pl}"
+                              ${resolvedPlacement === pl ? "checked" : ""}
+                              onchange="mpOnPlacementOverride('${esc(p.id)}', '${resolvedContentType}')"
+                              class="accent-blue-600"
+                            />
+                            ${pl.charAt(0).toUpperCase() + pl.slice(1)}
+                          </label>
+                        `).join("")}
+                      </div>
+                      <p id="mp-placement-label-${esc(p.id)}" class="text-xs text-gray-400 mt-1">${!p.placement_overridden ? "Recommended by MostlyPostly" : ""}</p>
+                    </div>
+                  </div>
+                  <p class="text-xs text-gray-500">
+                    Will post to: <span id="mp-reach-${esc(p.id)}" class="font-medium text-gray-700">${reachDisplay}</span>
+                  </p>
+                </div>
 
                 <div class="flex flex-wrap gap-3 mt-4">
 
@@ -642,6 +706,43 @@ router.get("/", requireAuth, async (req, res) => {
       e.target.nextElementSibling.style.display = 'flex';
     }
   }, true); // useCapture required — error events don't bubble
+
+  // Content type + placement live update helpers
+  var MP_CT_PLACEMENT = {
+    before_after: "reel", standard_post: "post", vendor_product: "story",
+    vendor_promotion: "story", reviews: "post", education: "reel",
+    celebration: "post", stylist_availability: "story",
+  };
+  var MP_PLACEMENT_PLATFORMS = {
+    reel: ["Instagram", "Facebook", "TikTok"],
+    post: ["Instagram", "Facebook", "Google Business"],
+    story: ["Instagram", "Facebook"],
+  };
+  var MP_GMB_OFFER = ["vendor_promotion"];
+  var MP_GMB_EXCLUDED = ["reviews", "stylist_availability"];
+
+  function mpUpdatePlacement(selectEl) {
+    var postId = selectEl.dataset.postId;
+    var ct = selectEl.value;
+    var rec = MP_CT_PLACEMENT[ct] || "post";
+    var radio = document.querySelector('input[name="placement_' + postId + '"][value="' + rec + '"]');
+    if (radio) radio.checked = true;
+    document.getElementById('mp-placement-label-' + postId).textContent = "Recommended by MostlyPostly";
+    mpUpdateReach(postId, rec, ct);
+  }
+
+  function mpOnPlacementOverride(postId, ct) {
+    document.getElementById('mp-placement-label-' + postId).textContent = "";
+    var radio = document.querySelector('input[name="placement_' + postId + '"]:checked');
+    if (radio) mpUpdateReach(postId, radio.value, ct);
+  }
+
+  function mpUpdateReach(postId, placement, ct) {
+    var platforms = (MP_PLACEMENT_PLATFORMS[placement] || ["Instagram", "Facebook"]).slice();
+    if (MP_GMB_EXCLUDED.indexOf(ct) !== -1) platforms = platforms.filter(function(p) { return p !== "Google Business"; });
+    if (MP_GMB_OFFER.indexOf(ct) !== -1 && platforms.indexOf("Google Business") === -1) platforms.push("Google Business");
+    document.getElementById('mp-reach-' + postId).textContent = platforms.join(" · ");
+  }
   </script>
   `;
 
