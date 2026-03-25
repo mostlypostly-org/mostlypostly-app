@@ -13,6 +13,7 @@ import { DateTime } from "luxon";
 import { db } from "../../db.js";
 import { appendUtm, slugify } from './utm.js';
 import { buildTrackingToken, buildShortUrl } from './trackingUrl.js';
+import { mapVendorCampaignType } from './contentType.js';
 
 // Ensure a URL stored as a relative path (/uploads/...) becomes absolute.
 function resolveUrl(url) {
@@ -452,11 +453,14 @@ async function processCampaign(campaign, salon, windowStart, windowEnd, affiliat
       trackedCaption = caption + (lockedBlock ? "\n\n" + lockedBlock : "");
     }
 
+    const vendorContentType = mapVendorCampaignType(campaign.category);
     db.prepare(`
       INSERT INTO posts (id, salon_id, stylist_name, image_url, base_caption, final_caption,
-                         post_type, status, vendor_campaign_id, scheduled_for, salon_post_number, created_at, updated_at)
+                         post_type, status, vendor_campaign_id, scheduled_for, salon_post_number, created_at, updated_at,
+                         content_type, placement)
       VALUES (@id, @salon_id, @stylist_name, @image_url, @base_caption, @final_caption,
-              @post_type, @status, @vendor_campaign_id, @scheduled_for, @salon_post_number, @created_at, @updated_at)
+              @post_type, @status, @vendor_campaign_id, @scheduled_for, @salon_post_number, @created_at, @updated_at,
+              @content_type, @placement)
     `).run({
       id: postId, salon_id: salonId,
       stylist_name: `${campaign.vendor_name} (Campaign)`,
@@ -468,6 +472,8 @@ async function processCampaign(campaign, salon, windowStart, windowEnd, affiliat
       scheduled_for: scheduledFor,
       salon_post_number,
       created_at: now, updated_at: now,
+      content_type: vendorContentType,
+      placement: "story",
     });
 
     // 11. Log to vendor_post_log

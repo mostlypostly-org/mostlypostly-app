@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { db } from "../../db.js"; // NOTE: storage.js is in src/core, db.js is project root
+import { getDefaultPlacement } from "./contentType.js";
 
 // Salons dir still needed for JSON-based consent helpers (local dev)
 const SALONS_DIR = process.env.SALONS_DIR || path.resolve("./salons");
@@ -53,7 +54,9 @@ const insertPostStmt = db.prepare(`
     salon_post_number,
     created_at,
     updated_at,
-    submitted_by
+    submitted_by,
+    content_type,
+    placement
   )
   VALUES (
     @id,
@@ -90,7 +93,9 @@ const insertPostStmt = db.prepare(`
     @salon_post_number,
     @created_at,
     @updated_at,
-    @submitted_by
+    @submitted_by,
+    @content_type,
+    @placement
   )
 `);
 
@@ -166,7 +171,10 @@ export function savePost(
 
     created_at: now,
     updated_at: now,
-    submitted_by: stylist?.submitted_by || null
+    submitted_by: stylist?.submitted_by || null,
+
+    content_type: stylist?.content_type || "standard_post",
+    placement: stylist?.placement || getDefaultPlacement(stylist?.content_type || "standard_post"),
   };
 
   try {

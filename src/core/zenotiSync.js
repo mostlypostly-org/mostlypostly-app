@@ -18,6 +18,7 @@ import {
 } from './zenotiAvailability.js';
 import { buildAvailabilityImage } from './buildAvailabilityImage.js';
 import { resolveDisplayName } from './salonLookup.js';
+import { getDefaultPlacement } from './contentType.js';
 
 // ─── 30-minute availability pool ─────────────────────────────────────────────
 // Shape: Map<salonId, {
@@ -288,8 +289,9 @@ export async function generateAndSaveAvailabilityPost({
   db.prepare(`
     INSERT INTO posts
       (id, salon_id, stylist_name, stylist_id, image_url, base_caption, final_caption,
-       post_type, status, salon_post_number, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'availability', ?, ?, ?, ?)
+       post_type, status, salon_post_number, created_at, updated_at,
+       content_type, placement)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'availability', ?, ?, ?, ?, 'stylist_availability', 'story')
   `).run(
     postId, salonId, stylist.name, stylist.id,
     imageUrl, slots.join('\n'), slots.join('\n'),

@@ -11,6 +11,7 @@ import fs from "fs";
 import { generateCelebrationImage } from "./celebrationImageGen.js";
 import { generateCelebrationCaption } from "./celebrationCaption.js";
 import { resolveDisplayName } from "./salonLookup.js";
+import { getDefaultPlacement } from "./contentType.js";
 
 // Track which salons have already run today (in-memory, resets on restart)
 // Key: "salonSlug-YYYY-MM-DD", Value: true
@@ -75,13 +76,17 @@ function insertPost({ salonId, stylistName, stylistId, imageUrl, caption, postTy
     .plus({ minutes: delayMinutes })
     .toFormat("yyyy-LL-dd HH:mm:ss");
   const postNum = nextPostNumber(salonId);
+  // celebration_story gets placement='story'; celebration feed gets placement='post'
+  const contentType = "celebration";
+  const placement = postType === "celebration_story" ? "story" : getDefaultPlacement(contentType);
   db.prepare(`
     INSERT INTO posts (
       id, salon_id, stylist_name, stylist_id,
       image_url, base_caption, final_caption,
-      post_type, status, scheduled_for, salon_post_number, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manager_approved', ?, ?, ?)
-  `).run(id, salonId, stylistName, stylistId, imageUrl, caption, caption, postType, scheduledFor, postNum, now);
+      post_type, status, scheduled_for, salon_post_number, created_at,
+      content_type, placement
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manager_approved', ?, ?, ?, ?, ?)
+  `).run(id, salonId, stylistName, stylistId, imageUrl, caption, caption, postType, scheduledFor, postNum, now, contentType, placement);
   return id;
 }
 

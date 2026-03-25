@@ -36,6 +36,7 @@ import { buildBeforeAfterCollage } from "./buildBeforeAfterCollage.js";
 import { buildAvailabilityImage } from "./buildAvailabilityImage.js";
 import { resolveDisplayName } from "./salonLookup.js";
 import { isAvailabilityRequest, hasDateHint, parseDateRange } from "./availabilityRequest.js";
+import { getDefaultPlacement } from "./contentType.js";
 import {
   getZenotiClientForSalon,
   syncAvailabilityPool,
@@ -384,6 +385,7 @@ async function createCoordinatorPost(chatId, imageUrls, messageBody, coordinator
 
   // Generate AI caption (or use passthrough) for the coordinator post
   let caption = "";
+  let coordContentType = "standard_post";
   if (captionKept) {
     // Keep the coordinator's text verbatim — no AI call
     caption = (messageBody || "").trim();
@@ -402,6 +404,7 @@ async function createCoordinatorPost(chatId, imageUrls, messageBody, coordinator
         city: salonRow?.city || "",
       });
       caption = aiJson?.caption || "";
+      coordContentType = aiJson?._classification?.content_type || "standard_post";
     } catch (err) {
       console.error("[Coordinator] Caption generation failed:", err.message);
       caption = "";
@@ -419,6 +422,8 @@ async function createCoordinatorPost(chatId, imageUrls, messageBody, coordinator
     image_urls: imageUrlsArray,
     post_type: "standard_post",
     submitted_by: coordinator.manager_id || coordinator.id,
+    content_type: coordContentType,
+    placement: getDefaultPlacement(coordContentType),
   };
 
   const post = savePost(chatId, stylistPayload, caption, [], "draft", io, { salon_id: salonId });
@@ -670,6 +675,8 @@ async function processNewImageFlow({
           image_urls: [storyImageUrl],
           final_caption: text || "Availability post",
           post_type: "availability",
+          content_type: "stylist_availability",
+          placement: "story",
         },
         text || "Availability post",
         [],
@@ -764,12 +771,14 @@ async function processNewImageFlow({
   const previewCaption = buildFacebookCaption(baseCaption, stylistName, stylistHandle);
 
   // Save draft to memory AND DB so it survives a server restart
+  const aiContentType = aiJson?._classification?.content_type || (postType === "before_after" ? "before_after" : "standard_post");
+  const aiPlacement = getDefaultPlacement(aiContentType);
   const draftPayload = { ...aiJson, final_caption: previewCaption, base_caption: baseCaption, image_urls: activeImageUrls, post_type: postType };
 
   try {
     const savedDraft = savePost(
       chatId,
-      { ...stylist, image_url: activeImageUrl, image_urls: activeImageUrls, final_caption: previewCaption, post_type: postType },
+      { ...stylist, image_url: activeImageUrl, image_urls: activeImageUrls, final_caption: previewCaption, post_type: postType, content_type: aiContentType, placement: aiPlacement },
       aiJson.caption,
       aiJson.hashtags || [],
       "draft",
@@ -929,6 +938,8 @@ async function generateReelCaption({
     post_type: 'reel',
     stylist_name: stylistName,
     salon_id: salonSlug,
+    content_type: 'education',
+    placement: 'reel',
     ...(coordinatorId ? { submitted_by: coordinatorId } : {}),
   };
 
