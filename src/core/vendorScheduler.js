@@ -13,7 +13,7 @@ import { DateTime } from "luxon";
 import { db } from "../../db.js";
 import { appendUtm, slugify } from './utm.js';
 import { buildTrackingToken, buildShortUrl } from './trackingUrl.js';
-import { mapVendorCampaignType } from './contentType.js';
+import { mapVendorCampaignType, getDefaultPlacement } from './contentType.js';
 
 // Ensure a URL stored as a relative path (/uploads/...) becomes absolute.
 function resolveUrl(url) {
@@ -473,7 +473,7 @@ async function processCampaign(campaign, salon, windowStart, windowEnd, affiliat
       salon_post_number,
       created_at: now, updated_at: now,
       content_type: vendorContentType,
-      placement: "story",
+      placement: getDefaultPlacement(vendorContentType),
     });
 
     // 11. Log to vendor_post_log

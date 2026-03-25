@@ -42,6 +42,12 @@ const CONTENT_TYPE_OPTIONS = [
   { value: "stylist_availability", label: "Stylist Availability" },
 ];
 
+const VALID_CONTENT_TYPES = new Set([
+  "standard_post", "before_after", "education", "vendor_product",
+  "vendor_promotion", "reviews", "celebration", "stylist_availability",
+]);
+const VALID_PLACEMENTS = new Set(["story", "post", "reel"]);
+
 const PLATFORM_LABELS = {
   instagram: "Instagram",
   facebook: "Facebook",
@@ -805,8 +811,9 @@ router.get("/approve", requireAuth, requireRole("owner", "manager"), async (req,
     SELECT *
     FROM posts
     WHERE id = ?
+      AND salon_id = ?
       AND status = 'manager_pending'
-  `).get(id);
+  `).get(id, req.manager.salon_id);
 
   if (!pendingPost) {
     console.warn("⚠️ Dashboard approve: post not found or not pending", id);
@@ -860,17 +867,20 @@ router.post("/approve", requireAuth, requireRole("owner", "manager"), async (req
     SELECT *
     FROM posts
     WHERE id = ?
+      AND salon_id = ?
       AND status = 'manager_pending'
-  `).get(id);
+  `).get(id, req.manager.salon_id);
 
   if (!pendingPost) {
     console.warn("⚠️ Dashboard approve (POST): post not found or not pending", id);
     return res.redirect("/manager");
   }
 
-  // Save content_type + placement before approving
-  const contentType = req.body.content_type || "standard_post";
-  const placement = req.body.placement || getDefaultPlacement(contentType);
+  // Save content_type + placement before approving (allowlist-validated)
+  const rawContentType = req.body.content_type;
+  const rawPlacement = req.body.placement;
+  const contentType = VALID_CONTENT_TYPES.has(rawContentType) ? rawContentType : "standard_post";
+  const placement = VALID_PLACEMENTS.has(rawPlacement) ? rawPlacement : getDefaultPlacement(contentType);
   const placementOverridden = parseInt(req.body.placement_overridden || "0", 10);
 
   db.prepare(`
@@ -942,8 +952,10 @@ router.post("/post-now", requireAuth, requireRole("owner", "manager"), (req, res
   const salon_id = req.manager.salon_id;
 
   if (id) {
-    const contentType = req.body.content_type || "standard_post";
-    const placement = req.body.placement || getDefaultPlacement(contentType);
+    const rawContentType = req.body.content_type;
+    const rawPlacement = req.body.placement;
+    const contentType = VALID_CONTENT_TYPES.has(rawContentType) ? rawContentType : "standard_post";
+    const placement = VALID_PLACEMENTS.has(rawPlacement) ? rawPlacement : getDefaultPlacement(contentType);
     const placementOverridden = parseInt(req.body.placement_overridden || "0", 10);
 
     db.prepare(`

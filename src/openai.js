@@ -105,8 +105,8 @@ Your reply MUST be a single JSON object. No comments. No code fences.
 - If "Notes" are provided, you MUST incorporate them into the caption — reference the service, technique, season, or context mentioned. Do not ignore notes.
 
 
-## PART 2 — Content Classification (Shadow Mode):
-- This is NOT used for posting yet. Just return the classification fields.
+## PART 2 — Content Classification:
+- Used by messageRouter.js to set content_type on every stylist-submitted draft.
 - "content_type" must be one of:
     "standard_post", "before_after", "education"
 - "content_confidence" must be a number from 0 to 1
