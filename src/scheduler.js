@@ -659,8 +659,9 @@ export async function runSchedulerOnce() {
               const image     = allImages[0] || post.image_url;
               const todayIso  = new Date().toISOString().split("T")[0];
               // Use content_type for routing when available; fall back to post_type heuristic
-              const isOffer   = contentType === "vendor_promotion"
-                || ["promotions", "vendor_post"].includes(postType);
+              const isOffer   = (contentType === "vendor_promotion"
+                || ["promotions", "vendor_post"].includes(postType))
+                && !!post.promotion_expires_at;
               let gmbResp;
 
               if (isOffer) {
