@@ -13,6 +13,7 @@ import { calculateOpenBlocks, formatBlocksAsSlots, categoriesForBlock, formatBlo
 import { buildAvailabilityImage } from "../core/buildAvailabilityImage.js";
 import { getZenotiClientForSalon, fetchStylistSlots, generateAndSaveAvailabilityPost } from "../core/zenotiSync.js";
 import { DEFAULT_ROUTING, mergeRoutingDefaults } from "../core/platformRouting.js";
+import { getSystemPlacementRouting, mergePlacementRouting } from "../core/placementRouting.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -108,6 +109,16 @@ router.get("/", (req, res) => {
   const routing = mergeRoutingDefaults(salon.platform_routing ?? null);
   const routingSaved = req.query.routing === 'saved';
 
+  // Content Placement card data
+  const VALID_PLACEMENTS = new Set(["reel", "story", "post"]);
+  const systemPlacement = getSystemPlacementRouting();
+  const salonPlacementJson = salon.placement_routing ?? null;
+  const resolvedPlacement = mergePlacementRouting(systemPlacement, salonPlacementJson);
+  const salonPlacementOverrides = salonPlacementJson ? (() => {
+    try { return JSON.parse(salonPlacementJson); } catch { return {}; }
+  })() : {};
+  const placementSaved = req.query.placement === 'saved';
+
   // Webhook URL that Zenoti should POST to
   const BASE_URL = process.env.PUBLIC_BASE_URL || process.env.BASE_URL || "";
   const zenotiWebhookUrl = `${BASE_URL}/integrations/webhook/zenoti/${salon_id}`;
@@ -169,6 +180,8 @@ router.get("/", (req, res) => {
     </div>`;
   } else if (routingSaved) {
     alertHtml = `<div class="mb-4 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">Content routing updated.</div>`;
+  } else if (placementSaved) {
+    alertHtml = `<div class="mb-4 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">Content placement updated.</div>`;
   }
 
   // ── Helper: card dot + status label ──────────────────────────
@@ -605,6 +618,79 @@ router.get("/", (req, res) => {
       </div>
     </div>
 
+    <!-- ── Content Placement ────────────────────────────────── -->
+    <div class="rounded-2xl border border-mpBorder bg-mpCard shadow-sm overflow-hidden mb-4">
+      <button type="button"
+        id="toggle-btn-placement"
+        class="w-full flex justify-between items-center p-6 text-left hover:bg-mpBg transition-colors cursor-pointer">
+        <div>
+          <h2 class="text-base font-semibold text-mpCharcoal">Content Placement</h2>
+          <p class="text-sm text-mpMuted mt-0.5">Set which format each content type defaults to — Reel, Story, or Post/Grid.</p>
+        </div>
+        ${chevron('placement')}
+      </button>
+
+      <div id="card-placement" data-open="false" class="border-t border-mpBorder px-6 pb-6">
+        <p class="text-xs text-mpMuted pt-4 pb-3">These settings control the recommended placement for each content type. Changes apply to future posts. The manager can still override placement on individual posts at approval time.</p>
+
+        <form method="POST" action="/manager/integrations/placement-routing">
+          <table class="w-full text-sm mb-4">
+            <thead>
+              <tr>
+                <th class="text-left py-2 pr-4 font-medium text-mpMuted">Content Type</th>
+                <th class="text-left py-2 px-4 font-medium text-mpMuted">Placement</th>
+                <th class="py-2 px-4 font-medium text-mpMuted text-right"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-mpBorder">
+              ${[
+                ["standard_post",        "Standard Post"],
+                ["before_after",         "Before &amp; After"],
+                ["education",            "Education / Tutorial"],
+                ["vendor_product",       "Vendor Product"],
+                ["vendor_promotion",     "Vendor Promotion"],
+                ["reviews",              "Review / Testimonial"],
+                ["celebration",          "Celebration"],
+                ["stylist_availability", "Stylist Availability"],
+              ].map(([ct, label]) => {
+                const current = resolvedPlacement[ct] || "post";
+                const isCustom = ct in salonPlacementOverrides && VALID_PLACEMENTS.has(salonPlacementOverrides[ct]);
+                return `
+                  <tr>
+                    <td class="py-2 pr-4 font-medium text-mpCharcoal">${label}</td>
+                    <td class="py-2 px-4">
+                      <select name="placement_${ct}"
+                        class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white">
+                        <option value="post"${current === "post" ? " selected" : ""}>Post / Grid</option>
+                        <option value="reel"${current === "reel" ? " selected" : ""}>Reel</option>
+                        <option value="story"${current === "story" ? " selected" : ""}>Story</option>
+                      </select>
+                    </td>
+                    <td class="py-2 px-4 text-xs text-right">
+                      ${isCustom
+                        ? `<span class="inline-flex items-center rounded-full bg-mpAccentLight px-2 py-0.5 text-mpAccent font-semibold">Custom</span>`
+                        : `<span class="text-mpMuted">System default</span>`
+                      }
+                    </td>
+                  </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+          <div class="flex items-center justify-between pt-2 border-t border-mpBorder">
+            <button type="button" onclick="document.getElementById('placement-reset-form').submit()"
+              class="text-sm text-mpMuted hover:text-red-600 transition-colors">
+              Reset to system defaults
+            </button>
+            <button type="submit"
+              class="rounded-full bg-mpAccent px-5 py-2 text-sm font-semibold text-white hover:bg-mpCharcoalDark transition-colors">
+              Save Placement
+            </button>
+          </div>
+        </form>
+        <form id="placement-reset-form" method="POST" action="/manager/integrations/placement-routing/reset" class="hidden"></form>
+      </div>
+    </div>
+
     <!-- ── Coming Soon ──────────────────────────────────────── -->
     <div class="border border-mpBorder rounded-2xl bg-white overflow-hidden mb-4 opacity-60">
       <div class="flex items-center justify-between px-6 py-4">
@@ -631,7 +717,7 @@ router.get("/", (req, res) => {
 
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        ['fb', 'gmb', 'zenoti', 'tiktok', 'routing'].forEach(function(id) {
+        ['fb', 'gmb', 'zenoti', 'tiktok', 'routing', 'placement'].forEach(function(id) {
           var btn    = document.getElementById('toggle-btn-' + id);
           var card   = document.getElementById('card-' + id);
           var chevron = document.getElementById('chevron-' + id);
@@ -694,6 +780,41 @@ router.post("/routing-update", (req, res) => {
   ).run(JSON.stringify(routing), salon_id);
 
   res.redirect("/manager/integrations?routing=saved");
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /manager/integrations/placement-routing — save per-salon placement routing
+// ─────────────────────────────────────────────────────────────────
+router.post("/placement-routing", (req, res) => {
+  const salon_id = req.manager?.salon_id;
+
+  const CONTENT_TYPES = [
+    "standard_post", "before_after", "education",
+    "vendor_product", "vendor_promotion", "reviews",
+    "celebration", "stylist_availability",
+  ];
+  const VALID = ["reel", "story", "post"];
+
+  const routing = {};
+  for (const ct of CONTENT_TYPES) {
+    const val = req.body[`placement_${ct}`];
+    if (VALID.includes(val)) routing[ct] = val;
+  }
+
+  db.prepare(
+    `UPDATE salons SET placement_routing = ? WHERE slug = ?`
+  ).run(JSON.stringify(routing), salon_id);
+
+  res.redirect("/manager/integrations?placement=saved");
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /manager/integrations/placement-routing/reset — clear salon placement override
+// ─────────────────────────────────────────────────────────────────
+router.post("/placement-routing/reset", (req, res) => {
+  const salon_id = req.manager?.salon_id;
+  db.prepare(`UPDATE salons SET placement_routing = NULL WHERE slug = ?`).run(salon_id);
+  res.redirect("/manager/integrations?placement=saved");
 });
 
 // ─────────────────────────────────────────────────────────────────
