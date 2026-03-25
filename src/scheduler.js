@@ -17,6 +17,7 @@ import { pickNextPost } from './core/pickNextPost.js';
 import { isEnabledFor } from './core/platformRouting.js';
 import { composeFinalCaption } from './core/composeFinalCaption.js';
 import { deriveFromPostType } from './core/contentType.js';
+import { resolveContentPlacement } from './core/placementRouting.js';
 
 const log = createLogger("scheduler");
 
@@ -195,7 +196,8 @@ function getSalonPolicy(salonSlug) {
         tiktok_account_id, tiktok_access_token, tiktok_refresh_token,
         tiktok_token_expiry, tiktok_enabled,
         auto_recycle, caption_refresh_on_recycle, auto_publish,
-        platform_routing
+        platform_routing,
+        placement_routing
       FROM salons
       WHERE slug = ?
     `)
@@ -425,7 +427,12 @@ export async function runSchedulerOnce() {
       for (const post of due) {
         const localNow  = nowUtc.setZone(tz);
         const postType  = post.post_type || "standard_post";
-        const resolvedPlacement = post.placement || deriveFromPostType(postType);
+        // Resolution order:
+        //   1. Manager explicitly overrode placement at approval time → use stored value
+        //   2. Configurable routing: salon override → system default → hardcoded fallback
+        const resolvedPlacement = post.placement_overridden
+          ? (post.placement || deriveFromPostType(postType))
+          : resolveContentPlacement(null, salon, post.content_type || postType);
         // "reel" | "story" | "post"
         const storyOnly = resolvedPlacement === "story";
 
