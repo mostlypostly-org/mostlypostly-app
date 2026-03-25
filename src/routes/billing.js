@@ -261,9 +261,30 @@ router.get("/manager/billing", requireRole("owner"), async (req, res) => {
   const liMuted = (text, dark) => `<li class="flex items-start gap-2 ${dark ? "text-slate-400" : "text-mpMuted"}"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${dark ? "bg-white/10 text-slate-400" : "bg-mpBorder text-mpMuted"} text-[10px] font-bold">+</span><span>${text}</span></li>`;
 
   const PLAN_CONFIG = {
+    solo: {
+      monthly: 39, annual: 31.20,
+      annualTotal: 374.40, annualSave: 93.60,
+      badge: "Solo Stylist",
+      badgeDark: false,
+      tagline: "For independent stylists who are their own boss.",
+      strikethrough: null,
+      founderNote: null,
+      features: [
+        "<strong>20 posts</strong> per month",
+        "<strong>1 stylist</strong> (you!)",
+        "<strong>1 location</strong>",
+        "AI captions, hashtags &amp; CTAs",
+        "<strong>Auto-publish</strong> — no approval step needed",
+        "Facebook &amp; Instagram publishing",
+        "SMS + Telegram channels",
+        "Brand tone, hashtags &amp; booking URL",
+      ],
+      overage: "Overage: $3.00 per 10 additional posts",
+      dark: false,
+    },
     starter: {
-      monthly: 99, annual: 89,
-      annualTotal: 1068, annualSave: 120,
+      monthly: 99, annual: 79,
+      annualTotal: 948, annualSave: 240,
       badge: "Single Location",
       badgeDark: false,
       tagline: "Perfect for a single-location salon getting started.",
@@ -284,8 +305,8 @@ router.get("/manager/billing", requireRole("owner"), async (req, res) => {
       dark: false,
     },
     growth: {
-      monthly: 149, annual: 134,
-      annualTotal: 1609, annualSave: 179,
+      monthly: 149, annual: 119,
+      annualTotal: 1428, annualSave: 360,
       badge: "Most Popular",
       badgeDark: true,
       tagline: "For growing salons with an active team.",
@@ -304,8 +325,8 @@ router.get("/manager/billing", requireRole("owner"), async (req, res) => {
       dark: true,
     },
     pro: {
-      monthly: 249, annual: 224,
-      annualTotal: 2689, annualSave: 299,
+      monthly: 249, annual: 199,
+      annualTotal: 2388, annualSave: 600,
       badge: "Vendor Integration",
       badgeDark: false,
       tagline: "Multi-location salons and brand-aligned teams.",
@@ -327,7 +348,7 @@ router.get("/manager/billing", requireRole("owner"), async (req, res) => {
     },
   };
 
-  const planCards = ["starter", "growth", "pro"].map(p => {
+  const planCards = ["solo", "starter", "growth", "pro"].map(p => {
     const isCurrent = salon.plan === p;
     const isHinted  = planHint === p && !isCurrent;
     const c = PLAN_CONFIG[p];
@@ -373,7 +394,7 @@ router.get("/manager/billing", requireRole("owner"), async (req, res) => {
             <span class="text-sm ${dark ? "text-slate-400" : "text-mpMuted"}">/mo</span>
           </div>
           <p class="price-annual-note hidden text-[11px] ${dark ? "text-slate-400" : "text-mpMuted"} mt-0.5">
-            Billed as <strong class="${dark ? "text-white" : "text-mpCharcoal"}">$${c.annualTotal.toLocaleString()}/yr</strong> — save $${c.annualSave} vs monthly
+            Billed as <strong class="${dark ? "text-white" : "text-mpCharcoal"}">$${Number(c.annualTotal).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/yr</strong> — save $${Number(c.annualSave).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} vs monthly
           </p>
           ${c.founderNote ? `<p class="mt-1 text-[11px] text-mpAccent font-semibold">${c.founderNote}</p>` : `<p class="mt-1 invisible text-[11px]">&#8203;</p>`}
         </div>
@@ -478,7 +499,7 @@ router.get("/manager/billing", requireRole("owner"), async (req, res) => {
                 <span id="cycleThumb" class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform translate-x-1"></span>
               </button>
               <span id="label-annual" class="text-xs font-semibold text-mpMuted">
-                Annual <span class="text-green-600 font-bold">–10%</span>
+                Annual <span class="text-green-600 font-bold">–20%</span>
               </span>
             </div>
           </div>
@@ -486,7 +507,7 @@ router.get("/manager/billing", requireRole("owner"), async (req, res) => {
           <div class="mb-4 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-xs text-yellow-800">
             <strong>Heads up:</strong> Upgrading or changing your plan during your free trial will end your trial immediately and start billing on the new plan.
           </div>` : ""}
-          <div class="grid gap-4 sm:grid-cols-3">
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             ${planCards}
           </div>
           <p class="mt-4 text-xs text-mpMuted">${salon.trial_used ? "Cancel anytime." : "New accounts include a 30-day free trial. Cancel anytime."}</p>
