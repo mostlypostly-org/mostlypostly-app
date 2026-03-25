@@ -1386,7 +1386,7 @@ export async function handleIncomingMessage({
         salon?.salon_id;
 
       const salonRow = db.prepare(`
-        SELECT require_manager_approval
+        SELECT require_manager_approval, plan
         FROM salons
         WHERE slug = ?
         LIMIT 1
@@ -1397,7 +1397,10 @@ export async function handleIncomingMessage({
         .get(chatId, salonSlug);
       const stylistAutoApprove = Number(stylistRow?.auto_approve) === 1;
 
-      const requiresManager = Number(salonRow?.require_manager_approval) === 1 && !stylistAutoApprove;
+      // Solo plan: approval workflow is always bypassed — the stylist IS the manager
+      const requiresManager = salonRow?.plan !== "solo"
+        && Number(salonRow?.require_manager_approval) === 1
+        && !stylistAutoApprove;
 
       console.log("🔐 Manager approval resolved from DB:", {
         salonSlug,
