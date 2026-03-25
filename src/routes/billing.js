@@ -192,7 +192,7 @@ router.get("/success", (req, res) => {
 
 // ─── GET /manager/billing ──────────────────────────────────────────────────
 
-router.get("/manager/billing", requireRole("owner"), async (req, res) => {
+router.get("/", requireRole("owner"), async (req, res) => {
   const { manager_id, salon_id } = req.session;
   const isNewAccount = req.query.new === "1";
   const planHint = ["solo","starter","growth","pro"].includes(req.query.plan) ? req.query.plan : null;

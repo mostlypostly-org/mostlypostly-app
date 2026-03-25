@@ -413,7 +413,7 @@ app.use(restoreManagerSession);
 // Must come AFTER restoreManagerSession so req.manager is set for auth checks.
 // -------------------------------------------------------
 app.use("/billing", billingRoutes);
-app.use(billingRoutes); // also handles /manager/billing
+app.use("/manager/billing", billingRoutes);
 
 // -------------------------------------------------------
 // 7. ADMIN ROUTES
