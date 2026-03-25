@@ -462,6 +462,25 @@ router.post("/add", photoUpload.single("photo"), async (req, res) => {
   }
 
   // Stylist path (existing logic)
+
+  // Enforce per-plan stylist limit
+  const salonForStylistLimit = db.prepare("SELECT plan FROM salons WHERE slug = ?").get(salon_id);
+  const stylistLimitCheck = PLAN_LIMITS[salonForStylistLimit?.plan] || PLAN_LIMITS.trial;
+  if (stylistLimitCheck.stylists !== null) {
+    const currentCount = db.prepare(
+      "SELECT COUNT(*) as c FROM stylists WHERE salon_id = ?"
+    ).get(salon_id)?.c || 0;
+    if (currentCount >= stylistLimitCheck.stylists) {
+      const plan = salonForStylistLimit?.plan || "trial";
+      const upgradeMap = { solo: "Starter", starter: "Growth", growth: "Pro" };
+      const upgradeTo = upgradeMap[plan] || "a higher plan";
+      const msg = plan === "solo"
+        ? `The Solo plan supports 1 stylist. Upgrade to ${upgradeTo} to add your team.`
+        : `You've reached your ${stylistLimitCheck.stylists}-stylist limit on the ${plan} plan. Upgrade to ${upgradeTo} to add more.`;
+      return res.redirect(`/manager/stylists/add${qs}&error=${encodeURIComponent(msg)}`);
+    }
+  }
+
   const specialtiesRaw = req.body.specialties || "";
   const specialties = JSON.stringify(
     specialtiesRaw.split(",").map(x => x.trim()).filter(Boolean)
