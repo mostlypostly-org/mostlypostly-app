@@ -149,6 +149,8 @@ export async function runVendorScheduler() {
 
   log.info(`Running vendor scheduler. Window: ${windowStart.toISOString().slice(0,10)} → ${windowEnd.toISOString().slice(0,10)}`);
 
+  // Vendor campaigns are a Pro-only feature. Solo, Starter, Growth, and Trial
+  // salons are excluded by the plan filter below.
   const proSalons = db.prepare(`
     SELECT slug, name, tone, default_hashtags, require_manager_approval,
            posting_start_time, posting_end_time, timezone,
