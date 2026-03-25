@@ -337,7 +337,7 @@ router.get("/", requireAuth, async (req, res) => {
                               name="placement_${esc(p.id)}"
                               value="${pl}"
                               ${resolvedPlacement === pl ? "checked" : ""}
-                              onchange="mpOnPlacementOverride('${esc(p.id)}', '${resolvedContentType}')"
+                              onchange="mpOnPlacementOverride('${esc(p.id)}')"
                               class="accent-blue-600"
                             />
                             ${pl.charAt(0).toUpperCase() + pl.slice(1)}
@@ -731,7 +731,9 @@ router.get("/", requireAuth, async (req, res) => {
     mpUpdateReach(postId, rec, ct);
   }
 
-  function mpOnPlacementOverride(postId, ct) {
+  function mpOnPlacementOverride(postId) {
+    var sel = document.querySelector('select[data-post-id="' + postId + '"]');
+    var ct = sel ? sel.value : "standard_post";
     document.getElementById('mp-placement-label-' + postId).textContent = "";
     var radio = document.querySelector('input[name="placement_' + postId + '"]:checked');
     if (radio) mpUpdateReach(postId, radio.value, ct);
