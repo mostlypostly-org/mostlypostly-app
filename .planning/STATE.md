@@ -178,9 +178,10 @@ None yet.
 | 260322-sq7 | Add POST /internal/vendors/resequence-posts to fix salon_post_number gaps in production | 2026-03-22 | 35e695b | [260322-sq7-resequence-salon-post-number-starting-fr](./quick/260322-sq7-resequence-salon-post-number-starting-fr/) |
 | 260322-tew | Add inline frequency cap editor and reset-cap endpoint on brand detail page | 2026-03-22 | 6df87f5 | [260322-tew-add-vendor-campaign-frequency-cap-reset-](./quick/260322-tew-add-vendor-campaign-frequency-cap-reset-/) |
 | 260325-kfa | Fix Apply All toggle on salon Content Routing card — col-{platform} class, Apply All row, cascade+submit guard | 2026-03-25 | 9023998 | [260325-kfa-fix-apply-all-toggle-on-salon-content-pl](./quick/260325-kfa-fix-apply-all-toggle-on-salon-content-pl/) |
+| 260325-kv4 | Remove auto-submit from Content Routing checkboxes — onchange removed, Apply All form.submit removed, Save Routing is sole persist | 2026-03-25 | 3e8e971 | [260325-kv4-apply-all-on-salon-content-routing-shoul](./quick/260325-kv4-apply-all-on-salon-content-routing-shoul/) |
 
 ## Session Continuity
 
 Last session: 2026-03-25T00:00:00Z
-Stopped at: Completed quick task 260325-kfa: fix Apply All toggle on salon Content Routing card
+Stopped at: Completed quick task 260325-kv4: remove auto-submit from Content Routing checkboxes
 Resume file: None
