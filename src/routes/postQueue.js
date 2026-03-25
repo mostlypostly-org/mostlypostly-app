@@ -12,7 +12,7 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.use(requireAuth, requireRole("owner", "manager"));
+router.use(requireAuth);
 
 function toProxyUrl(url) {
   if (!url) return null;
@@ -238,7 +238,7 @@ router.get("/", (req, res) => {
 });
 
 // ── POST /reorder — Reassign time slots to new order ─────────────────────────
-router.post("/reorder", (req, res) => {
+router.post("/reorder", requireRole("owner", "manager"), (req, res) => {
   const salon_id = req.session.salon_id;
   const { ids } = req.body;
 

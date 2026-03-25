@@ -59,7 +59,7 @@ import { run as run055 } from "./055_vendor_monthly_cap.js";
 import { run as run056 } from "./056_vendor_campaigns_dedup.js";
 import { run as run057 } from "./057_content_type_placement.js";
 import { run as run058 } from "./058_placement_routing.js";
-import { up as run059 } from "./059_fix_team_email_verified.js";
+import { run as run059 } from "./059_fix_team_email_verified.js";
 
 export const migrations = [
   { name: "001_baseline_patches",        run: run001 },

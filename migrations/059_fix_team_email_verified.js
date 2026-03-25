@@ -3,7 +3,7 @@
 // so email verification doesn't apply to them).
 // Targets rows with a password_hash (portal accounts) that are still unverified.
 
-export function up(db) {
+export function run(db) {
   db.prepare(`
     UPDATE managers
     SET email_verified = 1
