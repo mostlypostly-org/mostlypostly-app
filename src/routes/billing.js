@@ -17,6 +17,10 @@ function getStripe() {
 }
 
 const PLAN_PRICES = {
+  solo: {
+    monthly: process.env.STRIPE_PRICE_SOLO_MONTHLY,
+    annual:  process.env.STRIPE_PRICE_SOLO_ANNUAL,
+  },
   starter: {
     monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY,
     annual:  process.env.STRIPE_PRICE_STARTER_ANNUAL,
@@ -32,6 +36,7 @@ const PLAN_PRICES = {
 };
 
 export const PLAN_LIMITS = {
+  solo:    { posts: 20,  stylists: 1,    locations: 1, managers: 0    },
   starter: { posts: 60,  stylists: 4,    locations: 1, managers: 0    },
   growth:  { posts: 150, stylists: 12,   locations: 2, managers: 1    },
   pro:     { posts: 400, stylists: null,  locations: 5, managers: null },
@@ -42,6 +47,8 @@ export const PLAN_LIMITS = {
 function planFromPriceId(priceId) {
   if (!priceId) return null;
   const map = {};
+  if (process.env.STRIPE_PRICE_SOLO_MONTHLY)    map[process.env.STRIPE_PRICE_SOLO_MONTHLY]    = "solo";
+  if (process.env.STRIPE_PRICE_SOLO_ANNUAL)     map[process.env.STRIPE_PRICE_SOLO_ANNUAL]     = "solo";
   if (process.env.STRIPE_PRICE_STARTER_MONTHLY) map[process.env.STRIPE_PRICE_STARTER_MONTHLY] = "starter";
   if (process.env.STRIPE_PRICE_STARTER_ANNUAL)  map[process.env.STRIPE_PRICE_STARTER_ANNUAL]  = "starter";
   if (process.env.STRIPE_PRICE_GROWTH_MONTHLY)  map[process.env.STRIPE_PRICE_GROWTH_MONTHLY]  = "growth";
@@ -188,7 +195,7 @@ router.get("/success", (req, res) => {
 router.get("/manager/billing", requireRole("owner"), async (req, res) => {
   const { manager_id, salon_id } = req.session;
   const isNewAccount = req.query.new === "1";
-  const planHint = ["starter","growth","pro"].includes(req.query.plan) ? req.query.plan : null;
+  const planHint = ["solo","starter","growth","pro"].includes(req.query.plan) ? req.query.plan : null;
 
   const salon = db.prepare(`
     SELECT name, plan, plan_status, billing_cycle, trial_ends_at, stripe_customer_id, trial_used, status
@@ -199,7 +206,7 @@ router.get("/manager/billing", requireRole("owner"), async (req, res) => {
 
   // New accounts: if they came from a plan selection, skip billing page and go straight to Stripe.
   // This handles the case where the original verify-email tab ends up here instead of checkout.
-  const sessionPlanHint = ["starter","growth","pro"].includes(req.session.pending_plan_hint)
+  const sessionPlanHint = ["solo","starter","growth","pro"].includes(req.session.pending_plan_hint)
     ? req.session.pending_plan_hint : null;
   if (salon.status === "setup_incomplete" && !planHint && sessionPlanHint) {
     return res.redirect(`/billing/checkout?plan=${sessionPlanHint}&cycle=monthly`);
