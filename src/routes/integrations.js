@@ -228,7 +228,7 @@ router.get("/", (req, res) => {
       const inner = `
         <label class="relative inline-flex items-center cursor-pointer${disabled ? ' opacity-40 pointer-events-none cursor-not-allowed' : ''}">
           <input type="checkbox" name="${name}" value="1"${enabled ? ' checked' : ''}
-            class="sr-only peer col-${platform}" onchange="if(!window.__applyAllActive)this.form.submit()">
+            class="sr-only peer col-${platform}">
           <div class="w-11 h-6 rounded-full transition-colors peer-checked:bg-mpAccent bg-gray-200 relative
             after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:rounded-full after:bg-white after:shadow after:transition-all
             peer-checked:after:translate-x-5"></div>
@@ -761,17 +761,11 @@ router.get("/", (req, res) => {
         if (!input.hasAttribute || !input.hasAttribute('data-apply-all')) return;
         var plat = input.getAttribute('data-apply-all');
         var checked = input.checked;
-        // Suppress individual onchange auto-submits during cascade
-        window.__applyAllActive = true;
         document.querySelectorAll('input.col-' + plat).forEach(function(cb) {
           if (cb.checked !== checked) {
             cb.checked = checked;
           }
         });
-        window.__applyAllActive = false;
-        // Submit the routing form once
-        var form = document.querySelector('form[action="/manager/integrations/routing-update"]');
-        if (form) form.submit();
       });
     </script>
   `;
