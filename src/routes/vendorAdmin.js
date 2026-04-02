@@ -67,6 +67,7 @@ const CSV_HEADERS = [
   "cta_instructions",
   "service_pairing_notes",
   "expires_at",
+  "starts_at",
   "frequency_cap",
 ];
 
@@ -80,6 +81,7 @@ const CSV_EXAMPLE = [
   "Ask your stylist about our full Aveda color menu.",
   "Pairs beautifully with balayage, highlights, and full color services.",
   "2026-09-30",
+  "",
   "3",
 ];
 
@@ -459,6 +461,7 @@ router.get("/", requireSecret, requirePin, (req, res) => {
           </div>
           <p class="text-xs text-gray-500 mt-1 line-clamp-2">${safe(c.product_description || "")}</p>
           <div class="mt-1.5 flex flex-wrap gap-3 text-xs text-gray-400">
+            ${c.starts_at ? `<span>Starts: <strong class="text-gray-600">${safe(c.starts_at)}</strong></span>` : ""}
             <span>Expires: <strong class="text-gray-600">${safe(c.expires_at || "&#8212;")}</strong></span>
             <span>Cap: <strong class="text-gray-600">${safe(c.frequency_cap || 4)}/mo</strong></span>
             ${c.category ? `<span>Category: <strong class="text-gray-600">${safe(c.category)}</strong></span>` : ""}
@@ -557,6 +560,11 @@ router.get("/", requireSecret, requirePin, (req, res) => {
             <div>
               <label class="text-xs text-gray-500 block mb-1">Expires At (required for Promotion)</label>
               <input type="date" name="expires_at"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">Starts At <span class="text-gray-400">(optional — leave blank to go live immediately)</span></label>
+              <input type="date" name="starts_at"
                      class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
             </div>
             <div>
@@ -1457,6 +1465,11 @@ router.get("/", requireSecret, requirePin, (req, res) => {
               <input type="date" name="expires_at"
                      class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
             </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">Starts At <span class="text-gray-400">(optional — leave blank to go live immediately)</span></label>
+              <input type="date" name="starts_at"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+            </div>
             <div class="col-span-2">
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs text-gray-500">Product Description *</label>
@@ -1840,8 +1853,8 @@ router.post("/upload", requireSecret, requirePin, csvUpload.single("csv"), (req,
     INSERT OR IGNORE INTO vendor_campaigns
       (id, vendor_name, campaign_name, product_name, product_description,
        photo_url, hashtags, cta_instructions,
-       service_pairing_notes, expires_at, frequency_cap, active)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,1)
+       service_pairing_notes, expires_at, starts_at, frequency_cap, active)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)
   `);
 
   let imported = 0;
@@ -1867,6 +1880,9 @@ router.post("/upload", requireSecret, requirePin, csvUpload.single("csv"), (req,
       expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     }
 
+    const rawStartsAt = getCol(row, "starts_at") || null;
+    const starts_at = rawStartsAt && /^\d{4}-\d{2}-\d{2}$/.test(rawStartsAt) ? rawStartsAt : null;
+
     try {
       insert.run(
         crypto.randomUUID(),
@@ -1879,6 +1895,7 @@ router.post("/upload", requireSecret, requirePin, csvUpload.single("csv"), (req,
         getCol(row, "cta_instructions") || null,
         getCol(row, "service_pairing_notes") || null,
         expires_at,
+        starts_at,
         isNaN(freqCap) ? 3 : freqCap,
       );
       imported++;
@@ -1974,17 +1991,19 @@ router.post("/campaign/add", requireSecret, requirePin, vendorCampaignUpload, (r
 
   db.prepare(`INSERT OR IGNORE INTO vendor_brands (vendor_name) VALUES (?)`).run(vendor_name);
 
+  const starts_at_add = (req.body.starts_at || "").trim() || null;
+
   db.prepare(`
     INSERT INTO vendor_campaigns
       (id, vendor_name, campaign_name, campaign_type, category, product_name, product_description,
        photo_url, product_hashtag, cta_instructions,
-       service_pairing_notes, expires_at, frequency_cap, active)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+       service_pairing_notes, expires_at, starts_at, frequency_cap, active)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
   `).run(
     crypto.randomUUID(), vendor_name, campaign_name, campaign_type, category, product_name,
     product_description || null, finalPhotoUrl, product_hashtag,
     cta_instructions || null,
-    service_pairing_notes || null, expires_at, frequency_cap,
+    service_pairing_notes || null, expires_at, starts_at_add, frequency_cap,
   );
 
   res.redirect(`/internal/vendors${qs(req)}&added=1`);
@@ -2017,16 +2036,18 @@ router.post("/campaign/edit", requireSecret, requirePin, vendorCampaignUpload, (
     finalPhotoUrl = existing?.photo_url || null;
   }
 
+  const starts_at_edit = (req.body.starts_at || "").trim() || null;
+
   db.prepare(`
     UPDATE vendor_campaigns SET
       campaign_name = ?, campaign_type = ?, category = ?, product_name = ?, product_description = ?,
       photo_url = ?, product_hashtag = ?, cta_instructions = ?,
-      service_pairing_notes = ?, expires_at = ?, frequency_cap = ?
+      service_pairing_notes = ?, expires_at = ?, starts_at = ?, frequency_cap = ?
     WHERE id = ?
   `).run(
     campaign_name, campaign_type || "Standard", category || null, product_name, product_description || null,
     finalPhotoUrl, product_hashtag, cta_instructions || null,
-    service_pairing_notes || null, expires_at || null, frequency_cap, campaign_id,
+    service_pairing_notes || null, expires_at || null, starts_at_edit, frequency_cap, campaign_id,
   );
 
   res.redirect(`/internal/vendors${qs(req)}&saved=1`);
@@ -2665,6 +2686,10 @@ router.get("/campaign/:id/edit", requireSecret, requirePin, (req, res) => {
       <div>
         <label>Expires At</label>
         <input type="date" name="expires_at" value="${s(campaign.expires_at || "")}" />
+      </div>
+      <div>
+        <label>Starts At <span style="color:#9ca3af;font-weight:400;">(optional)</span></label>
+        <input type="date" name="starts_at" value="${s(campaign.starts_at || '')}" />
       </div>
       <div>
         <label>Frequency Cap (posts/month)</label>
