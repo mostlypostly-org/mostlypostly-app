@@ -1,0 +1,11 @@
+{
+  "planPath": "docs/plans/2026-04-02-vendor-starts-at-stylist-sync-plan.md",
+  "tasks": [
+    {"id": 0, "subject": "Task 1: Migration 059 — Add starts_at to vendor_campaigns", "status": "pending"},
+    {"id": 1, "subject": "Task 2: Scheduler — Filter and window-clamp starts_at", "status": "pending", "blockedBy": [0]},
+    {"id": 2, "subject": "Task 3: Platform Console — starts_at in CSV, forms, and cards", "status": "pending", "blockedBy": [0]},
+    {"id": 3, "subject": "Task 4: Zenoti — Per-stylist sync button and route", "status": "pending"},
+    {"id": 4, "subject": "Task 5: Push to dev and prod", "status": "pending", "blockedBy": [1, 2, 3]}
+  ],
+  "lastUpdated": "2026-04-02T00:00:00Z"
+}
