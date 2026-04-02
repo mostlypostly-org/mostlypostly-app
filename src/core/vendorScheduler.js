@@ -239,6 +239,7 @@ async function processSalon(salon, windowStart, windowEnd) {
       WHERE vendor_name = ?
         AND active = 1
         AND (expires_at IS NULL OR expires_at >= date('now'))
+        AND (starts_at IS NULL OR starts_at <= date('now'))
     `;
     const queryParams = [vendorName];
     if (categoryFilters.length > 0) {
@@ -325,11 +326,25 @@ async function processCampaign(campaign, salon, windowStart, windowEnd, affiliat
     }
   }
 
+  // Clamp effective window start to campaign starts_at date
+  let effectiveWindowStart = windowStart;
+  if (campaign.starts_at) {
+    const startsAtBeginOfDay = DateTime.fromISO(campaign.starts_at, { zone: tz }).startOf("day").toJSDate();
+    if (startsAtBeginOfDay > effectiveWindowStart) {
+      effectiveWindowStart = startsAtBeginOfDay;
+      log.info(`  Campaign ${campaign.id} starts ${campaign.starts_at} — clamping window start to ${startsAtBeginOfDay.toISOString().slice(0, 10)}`);
+    }
+    if (effectiveWindowStart >= effectiveWindowEnd) {
+      log.info(`  Campaign ${campaign.id} starts after window end — skipping`);
+      return 0;
+    }
+  }
+
   // Recalculate lookahead based on clamped window
-  const effectiveLookaheadMs = effectiveWindowEnd.getTime() - windowStart.getTime();
+  const effectiveLookaheadMs = effectiveWindowEnd.getTime() - effectiveWindowStart.getTime();
 
   // 5. Count existing vendor posts from this campaign in the effective window
-  const windowStartSql = windowStart.toISOString().replace("T", " ").slice(0, 19);
+  const windowStartSql = effectiveWindowStart.toISOString().replace("T", " ").slice(0, 19);
   const windowEndSql   = effectiveWindowEnd.toISOString().replace("T", " ").slice(0, 19);
 
   const { existingCount } = db.prepare(`
@@ -371,8 +386,8 @@ async function processCampaign(campaign, salon, windowStart, windowEnd, affiliat
   const lockedBlock = buildVendorHashtagBlock({ salonHashtags: salonDefaultTags, brandHashtags, productHashtag: campaign.product_hashtag || null });
 
   for (let i = 0; i < cap; i++) {
-    const intStart = new Date(windowStart.getTime() + i * intervalMs);
-    const intEnd   = new Date(Math.min(windowStart.getTime() + (i + 1) * intervalMs, effectiveWindowEnd.getTime()));
+    const intStart = new Date(effectiveWindowStart.getTime() + i * intervalMs);
+    const intEnd   = new Date(Math.min(effectiveWindowStart.getTime() + (i + 1) * intervalMs, effectiveWindowEnd.getTime()));
     const intStartSql = intStart.toISOString().replace("T", " ").slice(0, 19);
     const intEndSql   = intEnd.toISOString().replace("T", " ").slice(0, 19);
 
