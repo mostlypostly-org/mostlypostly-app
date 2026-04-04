@@ -717,8 +717,9 @@ export async function runSchedulerOnce() {
               }).trim();
 
               let tiktokPublishId;
-              const isVideo = resolvedPlacement === "reel"
-                || /\.(mp4|mov|avi|webm)$/i.test(allImages[0] || "");
+              // Determine by file type only — a photo can have placement='reel' (IG/FB reel format)
+              // but TikTok still needs a photo post, not a video post.
+              const isVideo = /\.(mp4|mov|avi|webm)$/i.test(allImages[0] || post.image_url || "");
 
               if (isVideo) {
                 const videoUrl = allImages[0] || post.image_url;
