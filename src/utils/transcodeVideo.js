@@ -48,6 +48,11 @@ export async function transcodeForTikTok(videoUrl, baseUrl) {
   // Ensure output directory exists
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
+  const ffmpegPreset = process.env.FFMPEG_PRESET || "ultrafast";
+  const ffmpegThreads = process.env.FFMPEG_THREADS || "1";
+  if (ffmpegPreset === "ultrafast" || ffmpegThreads === "1") {
+    console.warn(`[Transcode] ⚠️  Memory-limited mode active (optimized for Render 512MB). When you upgrade server RAM, add these env vars in Render: FFMPEG_PRESET=medium, FFMPEG_THREADS=0`);
+  }
   console.log(`[Transcode] Re-encoding ${filename} for TikTok (30fps H.264/AAC)…`);
 
   return new Promise((resolve) => {
@@ -59,8 +64,8 @@ export async function transcodeForTikTok(videoUrl, baseUrl) {
       .outputOptions([
         "-r 30",                // force 30fps
         "-crf 23",              // reasonable quality
-        "-preset ultrafast",    // low memory + CPU — critical for Render 512MB plan
-        "-threads 1",           // single-threaded to stay within Render memory limits
+        `-preset ${process.env.FFMPEG_PRESET || "ultrafast"}`,  // override via FFMPEG_PRESET env var (ultrafast=low RAM, medium=better quality)
+        `-threads ${process.env.FFMPEG_THREADS || "1"}`,        // override via FFMPEG_THREADS env var (1=low RAM, 0=auto-detect)
         "-movflags +faststart", // streaming-friendly
         // Scale up if smaller dimension < 720 (TikTok minimum is 360 but 720 is safe).
         // Maintains aspect ratio; rounds to even numbers required by libx264.

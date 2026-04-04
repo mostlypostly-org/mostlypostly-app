@@ -233,6 +233,9 @@ router.get("/", requireAuth, async (req, res) => {
        LIMIT 25`
     )
     .all(salon_id);
+  const reelsInRecent = recentRaw.filter(p => p.post_type === 'reel');
+  const reelsTotal = db.prepare("SELECT id, status, created_at, salon_id FROM posts WHERE salon_id = ? AND post_type = 'reel' ORDER BY created_at DESC LIMIT 5").all(salon_id);
+  console.log(`[Dashboard] salon=${salon_id} recent=${recentRaw.length} reels_in_recent=${reelsInRecent.length} all_reels:`, JSON.stringify(reelsTotal));
 
   // Fetch failed posts (need manager attention)
   const failedPosts = db
