@@ -1369,18 +1369,57 @@ export async function handleIncomingMessage({
         const contentType = REEL_TYPE_MAP[command];
         const label = REEL_TYPE_LABELS[command];
         const dbId = reelDraft._db_id;
-        if (dbId) {
-          db.prepare(`UPDATE posts SET content_type = ? WHERE id = ?`).run(contentType, dbId);
+
+        // Fix 3: Log the reel type selection
+        console.log(`[Router] Reel type selected: ${contentType} for chatId ${chatId}`);
+
+        // Fix 2: Guard against missing DB id — nothing to enqueue without a persisted post
+        if (!dbId) {
+          await sendMessage.sendText(chatId, "⚠️ Could not save your reel. Please send the video again.");
+          endTimer(start);
+          return;
         }
+
+        db.prepare(`UPDATE posts SET content_type = ? WHERE id = ?`).run(contentType, dbId);
+
         // Re-read from DB so enqueuePost gets the full, correct row shape
-        const postRow = dbId
-          ? db.prepare(`SELECT * FROM posts WHERE id = ? LIMIT 1`).get(dbId)
-          : null;
-        if (postRow) {
-          enqueuePost(postRow);
+        const postRow = db.prepare(`SELECT * FROM posts WHERE id = ? LIMIT 1`).get(dbId);
+
+        // Fix 2: Guard against postRow not found after update
+        if (!postRow) {
+          await sendMessage.sendText(chatId, "⚠️ Could not save your reel. Please send the video again.");
+          endTimer(start);
+          return;
         }
-        drafts.delete(chatId);
-        await sendMessage.sendText(chatId, `Got it — your ${label} reel is queued!`);
+
+        // Fix 1: Respect require_manager_approval — same logic as the APPROVE path
+        const salonRow = db.prepare(
+          `SELECT require_manager_approval, plan FROM salons WHERE slug = ? LIMIT 1`
+        ).get(postRow.salon_id);
+        const stylistAutoApprove = db.prepare(
+          `SELECT auto_approve FROM stylists WHERE phone = ? AND salon_id = ? LIMIT 1`
+        ).get(chatId, postRow.salon_id)?.auto_approve;
+        const requiresManager = salonRow?.plan !== 'solo'
+          && Number(salonRow?.require_manager_approval) === 1
+          && Number(stylistAutoApprove) !== 1;
+
+        if (requiresManager) {
+          db.prepare(`UPDATE posts SET status = 'manager_pending' WHERE id = ?`).run(postRow.id);
+          const manager = db.prepare(
+            `SELECT id, name, phone FROM managers WHERE salon_id = ? LIMIT 1`
+          ).get(postRow.salon_id);
+          if (manager?.phone) {
+            const notifyBody = `MostlyPostly: A reel from ${postRow.stylist_name} needs your approval.\n\nLog in to review: ${process.env.PUBLIC_BASE_URL || ''}/manager`;
+            await sendMessage.sendText(manager.phone, notifyBody);
+          }
+          drafts.delete(chatId);
+          await sendMessage.sendText(chatId, `Your ${label} reel has been sent to your manager for approval!`);
+        } else {
+          enqueuePost(postRow);
+          drafts.delete(chatId);
+          await sendMessage.sendText(chatId, `Got it — your ${label} reel is queued!`);
+        }
+
         endTimer(start);
         return;
       }
