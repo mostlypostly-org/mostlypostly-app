@@ -1348,6 +1348,46 @@ export async function handleIncomingMessage({
     return;
   }
 
+  // REEL TYPE SELECTION — SERVICE / EDUCATION / PROMOTION / CULTURE
+  // Must come before APPROVE so reel drafts never fall through to the generic approve flow.
+  {
+    const REEL_TYPE_MAP = {
+      SERVICE:   'standard_post',
+      EDUCATION: 'education',
+      PROMOTION: 'promotion',
+      CULTURE:   'team_culture',
+    };
+    const REEL_TYPE_LABELS = {
+      SERVICE:   'Service',
+      EDUCATION: 'Education',
+      PROMOTION: 'Promotion',
+      CULTURE:   'Culture',
+    };
+    if (REEL_TYPE_MAP[command] !== undefined) {
+      const reelDraft = drafts.get(chatId);
+      if (reelDraft?.postType === 'reel') {
+        const contentType = REEL_TYPE_MAP[command];
+        const label = REEL_TYPE_LABELS[command];
+        const dbId = reelDraft._db_id;
+        if (dbId) {
+          db.prepare(`UPDATE posts SET content_type = ? WHERE id = ?`).run(contentType, dbId);
+        }
+        // Re-read from DB so enqueuePost gets the full, correct row shape
+        const postRow = dbId
+          ? db.prepare(`SELECT * FROM posts WHERE id = ? LIMIT 1`).get(dbId)
+          : null;
+        if (postRow) {
+          enqueuePost(postRow);
+        }
+        drafts.delete(chatId);
+        await sendMessage.sendText(chatId, `Got it — your ${label} reel is queued!`);
+        endTimer(start);
+        return;
+      }
+      // Command matched a reel keyword but no reel draft — fall through to default handling
+    }
+  }
+
   // APPROVE
   if (/^APPROVE\b/i.test(command)) {
     let draft = drafts.get(chatId);
@@ -1376,6 +1416,16 @@ export async function handleIncomingMessage({
         return;
       }
       await sendMessage.sendText(chatId, "⚠️ No draft found. Please send a photo first.");
+      endTimer(start);
+      return;
+    }
+
+    // Guard: reel drafts must be classified before enqueue — redirect to type selection
+    if (draft?.postType === 'reel') {
+      await sendMessage.sendText(
+        chatId,
+        'To post your reel, reply with the type:\nSERVICE · EDUCATION · PROMOTION · CULTURE'
+      );
       endTimer(start);
       return;
     }
