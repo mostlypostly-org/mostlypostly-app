@@ -35,9 +35,10 @@ async function getCreatorInfo(accessToken) {
   } catch (err) {
     console.warn("[TikTok] creator_info query failed:", err.message);
   }
-  // Safe fallback — let TikTok reject if needed rather than crashing here
+  // Safe fallback — default to SELF_ONLY so unaudited apps don't hit
+  // "unaudited_client_can_only_post_to_private_accounts" errors.
   return {
-    privacy_level_options: ["PUBLIC_TO_EVERYONE"],
+    privacy_level_options: ["SELF_ONLY"],
     comment_disabled: false,
     duet_disabled:    false,
     stitch_disabled:  false,
@@ -45,9 +46,15 @@ async function getCreatorInfo(accessToken) {
 }
 
 /**
- * Pick the most public privacy level the creator actually supports.
+ * Pick the privacy level the creator actually supports.
+ * Set TIKTOK_PRIVACY_LEVEL=SELF_ONLY in env to force private posts
+ * (required while the TikTok developer app is unaudited/in sandbox mode).
+ * Remove the env var once the app is approved to restore public posting.
  */
 function pickPrivacyLevel(creatorInfo) {
+  const forced = process.env.TIKTOK_PRIVACY_LEVEL;
+  if (forced) return forced;
+
   const allowed = creatorInfo?.privacy_level_options ?? [];
   for (const level of PRIVACY_PREFERENCE) {
     if (allowed.includes(level)) return level;

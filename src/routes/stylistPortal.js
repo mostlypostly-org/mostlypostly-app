@@ -469,15 +469,20 @@ router.post("/:id/regenerate", validateToken, async (req, res) => {
   try {
     const fullSalon = getSalonPolicy(post.salon_id);
 
-    // Rehost image so OpenAI can access it
-    const publicImageUrl = await rehostTwilioMedia(post.image_url, post.salon_id).catch(() => post.image_url);
+    // Reel posts use a video URL — OpenAI Vision only accepts images.
+    // Skip imageDataUrl for reels and generate from notes + salon context only.
+    let imageDataUrl = null;
+    if (post.post_type !== 'reel') {
+      imageDataUrl = await rehostTwilioMedia(post.image_url, post.salon_id).catch(() => post.image_url);
+    }
 
     const aiJson = await generateCaption({
-      imageDataUrl: publicImageUrl,
+      imageDataUrl,
       notes: notes || post.original_notes || "",
       salon: fullSalon,
       stylist: { stylist_name: post.stylist_name, name: post.stylist_name },
       city: fullSalon?.city || "",
+      postType: post.post_type,
     });
 
     // Moderation check
