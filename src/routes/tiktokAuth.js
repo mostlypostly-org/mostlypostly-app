@@ -160,4 +160,42 @@ router.post("/toggle", requireAuth, (req, res) => {
   res.redirect("/manager/integrations");
 });
 
+// ── GET /auth/tiktok/debug-status?salon=<slug>&publish_id=<id> ───────────────
+// Check the processing status of a TikTok publish_id.
+// Usage: /auth/tiktok/debug-status?salon=rejuve-salon-spa&publish_id=v_pub_url~v2-xxx
+router.get("/debug-status", requireAuth, async (req, res) => {
+  const { salon: salonSlug, publish_id } = req.query;
+  if (!salonSlug || !publish_id) {
+    return res.json({ error: "Missing salon or publish_id query param" });
+  }
+
+  const salon = db.prepare("SELECT * FROM salons WHERE slug = ? LIMIT 1").get(salonSlug);
+  if (!salon?.tiktok_access_token) {
+    return res.json({ error: "No TikTok token for this salon" });
+  }
+
+  const { refreshTiktokToken } = await import("../core/tiktokTokenRefresh.js");
+  const { decrypt } = await import("../core/encryption.js");
+
+  try {
+    await refreshTiktokToken(salon);
+    const freshSalon = db.prepare("SELECT tiktok_access_token FROM salons WHERE slug = ? LIMIT 1").get(salonSlug);
+    const accessToken = decrypt(freshSalon.tiktok_access_token);
+
+    const resp = await fetch("https://open.tiktokapis.com/v2/post/publish/status/fetch/", {
+      method: "POST",
+      headers: {
+        Authorization:  `Bearer ${accessToken}`,
+        "Content-Type": "application/json; charset=UTF-8",
+      },
+      body: JSON.stringify({ publish_id }),
+    });
+
+    const data = await resp.json();
+    return res.json(data);
+  } catch (err) {
+    return res.json({ error: err.message });
+  }
+});
+
 export default router;
