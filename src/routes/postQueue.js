@@ -93,9 +93,18 @@ router.get("/", (req, res) => {
         <!-- Thumbnail (click to enlarge) -->
         <div class="queue-thumb flex-shrink-0 w-11 h-11 rounded-xl overflow-hidden bg-mpBg border border-mpBorder"
              style="cursor:zoom-in" data-img="${safe(imgUrl || '')}">
-          ${imgUrl
-            ? `<img src="${safe(imgUrl)}" style="width:100%;height:100%;object-fit:cover;pointer-events:none" />`
-            : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px">📷</div>`}
+          ${p.post_type === 'reel' && imgUrl
+            ? `<div style="position:relative;width:100%;height:100%">
+                <video src="${safe(imgUrl)}" style="width:100%;height:100%;object-fit:cover;pointer-events:none" muted playsinline preload="metadata"></video>
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+                  <div style="width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" fill="white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                  </div>
+                </div>
+              </div>`
+            : imgUrl
+              ? `<img src="${safe(imgUrl)}" style="width:100%;height:100%;object-fit:cover;pointer-events:none" />`
+              : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px">📷</div>`}
         </div>
 
         <!-- Content -->
