@@ -74,6 +74,7 @@ import facebookAuthRoutes from "./src/routes/facebookAuth.js";
 import googleAuthRoutes from "./src/routes/googleAuth.js";
 import tiktokAuthRoutes from "./src/routes/tiktokAuth.js";
 import stylistPortal from "./src/routes/stylistPortal.js";
+import videoUploadRoute from "./src/routes/videoUpload.js";
 
 import managerAuthRoutes from "./src/routes/managerAuth.js";
 import managerRoutes from "./src/routes/manager.js";
@@ -387,6 +388,7 @@ app.use("/manager", managerRoutes);
 // 3. STYLIST PORTAL (token-auth, no session — must be before onboarding guard)
 // -------------------------------------------------------
 app.use("/stylist", stylistPortal);
+app.use("/stylist/upload-video", videoUploadRoute);
 
 // -------------------------------------------------------
 // 4. ONBOARDING ROUTES (allowed BEFORE guard)
