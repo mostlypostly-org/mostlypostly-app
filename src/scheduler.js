@@ -8,6 +8,7 @@ import { publishToFacebook, publishToFacebookMulti, publishFacebookReel } from "
 import { publishToInstagram, publishToInstagramCarousel, publishStoryToInstagram, publishReelToInstagram } from "./publishers/instagram.js";
 import { publishWhatsNewToGmb, publishOfferToGmb } from "./publishers/googleBusiness.js";
 import { publishPhotoToTikTok, publishVideoToTikTok } from "./publishers/tiktok.js";
+import { transcodeForTikTok } from "./utils/transcodeVideo.js";
 import { logEvent } from "./core/analyticsDb.js";
 import { runCelebrationCheck } from "./core/celebrationScheduler.js";
 import { runVendorSync } from './core/vendorSync.js';
@@ -722,7 +723,9 @@ export async function runSchedulerOnce() {
               const isVideo = /\.(mp4|mov|avi|webm)$/i.test(allImages[0] || post.image_url || "");
 
               if (isVideo) {
-                const videoUrl = allImages[0] || post.image_url;
+                const rawVideoUrl = allImages[0] || post.image_url;
+                const baseUrl = process.env.PUBLIC_BASE_URL || "https://app.mostlypostly.com";
+                const videoUrl = await transcodeForTikTok(rawVideoUrl, baseUrl);
                 tiktokPublishId = await publishVideoToTikTok(salon, videoUrl, tiktokCaption);
               } else {
                 tiktokPublishId = await publishPhotoToTikTok(salon, allImages, tiktokCaption);
