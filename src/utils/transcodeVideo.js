@@ -8,6 +8,14 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 
+// Prefer system ffmpeg (avoids SIGSEGV in Render's restricted container).
+// Falls back to the bundled static binary for local dev.
+const SYSTEM_FFMPEG_PATHS = ["/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg"];
+const FFMPEG_PATH = process.env.FFMPEG_PATH
+  || SYSTEM_FFMPEG_PATHS.find(p => { try { return fs.existsSync(p); } catch { return false; } })
+  || ffmpegStatic;
+console.log(`[Transcode] Using ffmpeg: ${FFMPEG_PATH}`);
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.join(__dirname, "../../public/uploads/videos");
 
@@ -45,7 +53,7 @@ export async function transcodeForTikTok(videoUrl, baseUrl) {
   return new Promise((resolve) => {
     // Read directly from the public URL — no local file required
     ffmpeg(videoUrl)
-      .setFfmpegPath(ffmpegStatic)
+      .setFfmpegPath(FFMPEG_PATH)
       .videoCodec("libx264")
       .audioCodec("aac")
       .outputOptions([
