@@ -36,6 +36,7 @@ import { buildBeforeAfterCollage } from "./buildBeforeAfterCollage.js";
 import { buildAvailabilityImage } from "./buildAvailabilityImage.js";
 import { resolveDisplayName } from "./salonLookup.js";
 import { isAvailabilityRequest, hasDateHint, parseDateRange } from "./availabilityRequest.js";
+import { isReelRequest } from "./reelRequest.js";
 import { getDefaultPlacement } from "./contentType.js";
 import {
   getZenotiClientForSalon,
@@ -1824,6 +1825,40 @@ Log in to review: ${managerLink}
   }
 
 
+  // -- REEL UPLOAD REQUEST: send direct upload link --
+  if (!primaryImageUrl && isReelRequest(cleanText)) {
+    if (!salon || !stylist?.salon_info) {
+      await sendMessage.sendText(chatId,
+        "Sorry, we couldn't identify your salon account. Please contact your manager."
+      );
+      endTimer(start);
+      return;
+    }
+
+    const { randomUUID } = await import("node:crypto");
+    const { randomBytes } = await import("node:crypto");
+    const stylistId = stylist?.id || stylist?.stylist_id;
+    const salonId   = salon?.salon_id || salon?.id || salon?.salon_info?.slug;
+    const tokenId   = randomUUID();
+    const token     = randomBytes(16).toString("hex");
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+      .replace("T", " ").replace(/\..+$/, "");
+
+    db.prepare(`
+      INSERT INTO video_upload_tokens (id, stylist_id, salon_id, token, expires_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(tokenId, stylistId, salonId, token, expiresAt);
+
+    const base = (process.env.PUBLIC_BASE_URL || "https://app.mostlypostly.com").replace(/\/$/, "");
+    await sendMessage.sendText(chatId,
+      `Here's your upload link (expires in 30 min):\n${base}/stylist/upload-video/${token}\n\nOpen it on your phone, pick your video from your camera roll, and add a description of the look.`
+    );
+
+    console.log(`[Router] Reel upload token created for ${chatId}: ${tokenId}`);
+    endTimer(start);
+    return;
+  }
+
   // SMS availability request → pull from integrated booking software if connected.
   // Uses a 30-minute in-memory pool: the first request syncs ALL mapped stylists for the
   // salon; subsequent requests within 30 minutes read from the cache without hitting Zenoti.
@@ -1962,108 +1997,12 @@ Log in to review: ${managerLink}
     return;
   }
 
-  // -- VIDEO MMS (REEL-01 → REEL-03) --
+  // -- VIDEO MMS: redirect to direct upload for better quality --
   if (isVideo && primaryImageUrl) {
-    console.log(`[Router] Video MMS detected from ${chatId}`);
-
-    // Guard: salon and stylist must be resolved (same guard as processNewImageFlow)
-    if (!salon || !stylist?.salon_info) {
-      console.error(`[Router] Video MMS from ${chatId} but salon or stylist not found — cannot process`);
-      await sendMessage.sendText(chatId,
-        "Sorry, we couldn't identify your salon account. Please contact your manager for help."
-      );
-      endTimer(start);
-      return;
-    }
-
-    // Download video from Twilio (requires auth) and save locally
-    let videoResult;
-    try {
-      videoResult = await downloadTwilioVideo(primaryImageUrl);
-      console.log(`[Router] Video saved: ${videoResult.publicUrl}`);
-    } catch (err) {
-      console.error('[Router] Video download failed:', err.message);
-      await sendMessage.sendText(chatId,
-        "Sorry, we couldn't download your video. Please try sending it again."
-      );
-      endTimer(start);
-      return;
-    }
-
-    // Store pending video context and send description prompt
-    const stylistId = stylist?.id || stylist?.stylist_id;
-    const pendingVideoSalonId = salon?.salon_id || salon?.id || salon?.salon_info?.slug;
-
-    // Coordinator: extract stylist name from message text (e.g. "Nicole reel of balayage")
-    let resolvedVideoStylist = null;
-    if (stylist?.isCoordinator && cleanText) {
-      try {
-        const extractedName = await extractStylistName(cleanText, pendingVideoSalonId);
-        resolvedVideoStylist = extractedName ? fuzzyMatchStylist(extractedName, pendingVideoSalonId) : null;
-      } catch {}
-    }
-
-    // If the stylist included a description with the video, use it immediately
-    if (cleanText) {
-      console.log(`[Router] Video received with inline description from ${chatId}: "${cleanText.slice(0, 80)}"`);
-      const reelStylist = resolvedVideoStylist || stylist;
-      await generateReelCaption({
-        chatId,
-        videoPublicUrl: videoResult.publicUrl,
-        serviceDescription: cleanText,
-        drafts,
-        generateCaption,
-        moderateAIOutput,
-        sendMessage,
-        stylist: reelStylist,
-        salon,
-        isCoordinator: stylist?.isCoordinator || false,
-        coordinator: stylist?.isCoordinator ? stylist : null,
-      });
-      endTimer(start);
-      return;
-    }
-
-    pendingVideoDescriptions.set(chatId, {
-      videoPublicUrl: videoResult.publicUrl,
-      salonId: pendingVideoSalonId,
-      stylistId,
-      stylistName: getStylistName(stylist),
-      expiresAt: Date.now() + VIDEO_DESC_TTL_MS,
-      resolvedStylist: resolvedVideoStylist || null,
-    });
-
-    // Send the description prompt
+    console.log(`[Router] Video MMS from ${chatId} — redirecting to upload link`);
     await sendMessage.sendText(chatId,
-      "Got your video! What service is this? Give me a quick description and I'll write your caption."
+      "For best quality on TikTok and Instagram, upload your video directly instead of texting it here.\n\nText REEL to get your upload link (expires in 30 min)."
     );
-
-    // Set a timeout to auto-generate a generic caption if no reply within 30 minutes
-    setTimeout(async () => {
-      const stillPending = pendingVideoDescriptions.get(chatId);
-      if (stillPending && stillPending.videoPublicUrl === videoResult.publicUrl) {
-        pendingVideoDescriptions.delete(chatId);
-        console.log(`[Router] Video description timeout for ${chatId} — generating generic caption`);
-        try {
-          await generateReelCaption({
-            chatId,
-            videoPublicUrl: videoResult.publicUrl,
-            serviceDescription: '', // empty = generic caption from salon tone
-            drafts,
-            generateCaption,
-            moderateAIOutput,
-            sendMessage,
-            stylist: stillPending.resolvedStylist || stylist,
-            salon,
-            isCoordinator: stylist?.isCoordinator || false,
-            coordinator: stylist?.isCoordinator ? stylist : null,
-          });
-        } catch (err) {
-          console.error('[Router] Auto-caption after video timeout failed:', err.message);
-        }
-      }
-    }, VIDEO_DESC_TTL_MS);
-
     endTimer(start);
     return;
   }
