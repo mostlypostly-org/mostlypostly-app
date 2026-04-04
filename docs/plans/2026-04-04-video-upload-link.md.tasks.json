@@ -1,12 +1,12 @@
 {
   "planPath": "docs/plans/2026-04-04-video-upload-link.md",
   "tasks": [
-    {"id": 7,  "subject": "Task 1: Migration — video_upload_tokens table",  "status": "pending"},
-    {"id": 8,  "subject": "Task 2: isReelRequest() detection",               "status": "pending", "blockedBy": [7]},
-    {"id": 9,  "subject": "Task 3: videoUpload.js route (GET + POST)",        "status": "pending", "blockedBy": [7, 8]},
-    {"id": 10, "subject": "Task 4: Register route in server.js",              "status": "pending", "blockedBy": [9]},
-    {"id": 11, "subject": "Task 5: Update messageRouter.js",                  "status": "pending", "blockedBy": [8, 10]},
-    {"id": 12, "subject": "Task 6: Manual end-to-end test",                   "status": "pending", "blockedBy": [11]}
+    {"id": 7,  "subject": "Task 1: Migration — video_upload_tokens table",  "status": "done", "commit": "e1cf02c"},
+    {"id": 8,  "subject": "Task 2: isReelRequest() detection",               "status": "done", "commit": "13b24de", "blockedBy": [7]},
+    {"id": 9,  "subject": "Task 3: videoUpload.js route (GET + POST)",        "status": "done", "commit": "0538381", "blockedBy": [7, 8]},
+    {"id": 10, "subject": "Task 4: Register route in server.js",              "status": "done", "commit": "7013ce7", "blockedBy": [9]},
+    {"id": 11, "subject": "Task 5: Update messageRouter.js",                  "status": "done", "commit": "5d71dda", "blockedBy": [8, 10]},
+    {"id": 12, "subject": "Task 6: Manual end-to-end test",                   "status": "done", "notes": "automated smoke test passed — imports verified, migration verified, isReelRequest() verified", "blockedBy": [11]}
   ],
-  "lastUpdated": "2026-04-04T00:00:00Z"
+  "lastUpdated": "2026-04-04T22:13:00Z"
 }
