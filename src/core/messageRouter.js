@@ -995,9 +995,10 @@ async function generateReelCaption({
 
   // Send preview with portal URL
   const previewCaption = buildFacebookCaption(caption, stylistName, stylistHandle);
+  const typePrompt = `\n\nTo post, reply with the reel type:\nSERVICE · EDUCATION · PROMOTION · CULTURE\n\nOr EDIT <your changes> to modify, or REDO for a new caption.`;
   const portalLine = portalUrl
-    ? `\n\nReview and confirm here: ${portalUrl}\n\nOr reply APPROVE to submit, EDIT <your changes> to modify, or REDO for a new caption.`
-    : `\n\nReply APPROVE to submit, EDIT <your changes> to modify, or REDO for a new caption.`;
+    ? `\n\nReview here: ${portalUrl}${typePrompt}`
+    : typePrompt;
   await sendMessage.sendText(chatId, `Here's your Reel caption:\n\n${previewCaption}${portalLine}`);
 }
 
