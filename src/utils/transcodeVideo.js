@@ -1,6 +1,7 @@
 // src/utils/transcodeVideo.js
-// Re-encodes a local video file to 30fps H.264/AAC MP4 so TikTok accepts it.
-// Only processes local /uploads/videos/ URLs — external URLs are returned unchanged.
+// Re-encodes a video to 30fps H.264/AAC MP4 so TikTok accepts it.
+// Reads from the public URL directly (ffmpeg supports HTTP inputs), so this
+// works even when the local file was wiped by a Render deploy.
 import ffmpegStatic from "ffmpeg-static";
 import ffmpeg from "fluent-ffmpeg";
 import path from "path";
@@ -12,10 +13,11 @@ const UPLOADS_DIR = path.join(__dirname, "../../public/uploads/videos");
 
 /**
  * Transcode a video URL to a TikTok-compatible MP4 (30fps, H.264, AAC).
+ * Reads from the URL directly so local file presence is not required.
  * Returns a new public URL pointing to the transcoded file.
- * Falls back to the original URL on any error so TikTok publish can still attempt.
+ * Falls back to the original URL on any error.
  *
- * @param {string} videoUrl   - Public URL of the video (e.g. https://app.../uploads/videos/foo.mp4)
+ * @param {string} videoUrl   - Public URL of the video
  * @param {string} baseUrl    - PUBLIC_BASE_URL (e.g. https://app.mostlypostly.com)
  * @returns {Promise<string>} - Public URL of transcoded video (or original on failure)
  */
@@ -26,14 +28,8 @@ export async function transcodeForTikTok(videoUrl, baseUrl) {
   }
 
   const filename   = path.basename(videoUrl);
-  const inputPath  = path.join(UPLOADS_DIR, filename);
   const outName    = `tk-${filename}`;
   const outputPath = path.join(UPLOADS_DIR, outName);
-
-  if (!fs.existsSync(inputPath)) {
-    console.warn(`[Transcode] Input file not found: ${inputPath} — skipping`);
-    return videoUrl;
-  }
 
   // Skip re-transcoding if already done (e.g. retry)
   if (fs.existsSync(outputPath)) {
@@ -41,10 +37,14 @@ export async function transcodeForTikTok(videoUrl, baseUrl) {
     return `${uploadsPrefix}${outName}`;
   }
 
+  // Ensure output directory exists
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
   console.log(`[Transcode] Re-encoding ${filename} for TikTok (30fps H.264/AAC)…`);
 
   return new Promise((resolve) => {
-    ffmpeg(inputPath)
+    // Read directly from the public URL — no local file required
+    ffmpeg(videoUrl)
       .setFfmpegPath(ffmpegStatic)
       .videoCodec("libx264")
       .audioCodec("aac")
@@ -61,7 +61,7 @@ export async function transcodeForTikTok(videoUrl, baseUrl) {
       .on("error", (err) => {
         console.error(`[Transcode] Failed: ${err.message} — using original`);
         try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
-        resolve(videoUrl); // fall back to original
+        resolve(videoUrl);
       })
       .run();
   });
