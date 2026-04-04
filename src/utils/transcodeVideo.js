@@ -60,6 +60,9 @@ export async function transcodeForTikTok(videoUrl, baseUrl) {
         "-r 30",                // force 30fps
         "-crf 23",              // reasonable quality
         "-movflags +faststart", // streaming-friendly
+        // Scale up if smaller dimension < 720 (TikTok minimum is 360 but 720 is safe).
+        // Maintains aspect ratio; rounds to even numbers required by libx264.
+        "-vf", "scale='if(lt(iw,ih),max(iw*720/ih,720),-2)':'if(lt(iw,ih),-2,max(ih*720/iw,720))',scale=trunc(iw/2)*2:trunc(ih/2)*2",
       ])
       .output(outputPath)
       .on("end", () => {
