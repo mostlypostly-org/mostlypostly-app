@@ -701,6 +701,16 @@ export async function runSchedulerOnce() {
             && resolvedPlacement !== "story"   // stories never go to TikTok
             && isEnabledFor(salon, postType, 'tiktok');
 
+          console.log(`[TikTok] eligibility check for ${post.id}:`, {
+            tiktok_enabled: !!salon.tiktok_enabled,
+            has_access_token: !!salon.tiktok_access_token,
+            has_refresh_token: !!salon.tiktok_refresh_token,
+            placement: resolvedPlacement,
+            isEnabledFor: isEnabledFor(salon, postType, 'tiktok'),
+            tiktokPostedToday,
+            tiktokDailyCap,
+          });
+
           if (tiktokEligible && tiktokPostedToday < tiktokDailyCap) {
             try {
               // Build a dedicated TikTok caption: @tiktok_handle credit, no booking URL
