@@ -1913,6 +1913,27 @@ Log in to review: ${managerLink}
       } catch {}
     }
 
+    // If the stylist included a description with the video, use it immediately
+    if (cleanText) {
+      console.log(`[Router] Video received with inline description from ${chatId}: "${cleanText.slice(0, 80)}"`);
+      const reelStylist = resolvedVideoStylist || stylist;
+      await generateReelCaption({
+        chatId,
+        videoPublicUrl: videoResult.publicUrl,
+        serviceDescription: cleanText,
+        drafts,
+        generateCaption,
+        moderateAIOutput,
+        sendMessage,
+        stylist: reelStylist,
+        salon,
+        isCoordinator: stylist?.isCoordinator || false,
+        coordinator: stylist?.isCoordinator ? stylist : null,
+      });
+      endTimer(start);
+      return;
+    }
+
     pendingVideoDescriptions.set(chatId, {
       videoPublicUrl: videoResult.publicUrl,
       salonId: pendingVideoSalonId,
@@ -1922,7 +1943,7 @@ Log in to review: ${managerLink}
       resolvedStylist: resolvedVideoStylist || null,
     });
 
-    // Send the description prompt (locked decision from CONTEXT.md)
+    // Send the description prompt
     await sendMessage.sendText(chatId,
       "Got your video! What service is this? Give me a quick description and I'll write your caption."
     );
