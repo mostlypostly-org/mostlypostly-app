@@ -225,7 +225,7 @@ router.get("/", requireAuth, async (req, res) => {
   const salonName = getSalonName(salon_id) || "Your Salon";
 
   // Plan usage stats + booking URL for approve preview
-  const salonRow = db.prepare("SELECT plan, plan_status, booking_url, phone, google_location_id, timezone FROM salons WHERE slug = ?").get(salon_id);
+  const salonRow = db.prepare("SELECT plan, plan_status, booking_url, phone, google_location_id, timezone, tiktok_enabled, tiktok_username FROM salons WHERE slug = ?").get(salon_id);
   const salonBookingUrl = salonRow?.booking_url || "";
   const tz = salonRow?.timezone || "America/Indiana/Indianapolis";
   const planLimits = PLAN_LIMITS[salonRow?.plan] || PLAN_LIMITS.trial;
@@ -418,6 +418,9 @@ router.get("/", requireAuth, async (req, res) => {
                   <a href="/manager/approve?post=${p.id}"
                      data-action-post-id="${esc(p.id)}"
                      data-action-type="approve"
+                     data-tiktok-eligible="${salonRow.tiktok_enabled ? '1' : '0'}"
+                     data-post-image="${esc(toProxyUrl((() => { let u = []; try { u = JSON.parse(p.image_urls || '[]'); } catch {} return u[0] || p.image_url || ''; })()))}"
+                     data-post-caption="${esc((p.final_caption || p.base_caption || '').slice(0, 300))}"
                      class="mp-action-link px-3 py-1.5 bg-green-600 hover:bg-green-700 rounded text-xs text-white">
                     Approve
                   </a>
@@ -425,6 +428,9 @@ router.get("/", requireAuth, async (req, res) => {
                   <a href="/manager/post-now?post=${p.id}"
                      data-action-post-id="${esc(p.id)}"
                      data-action-type="post-now"
+                     data-tiktok-eligible="${salonRow.tiktok_enabled ? '1' : '0'}"
+                     data-post-image="${esc(toProxyUrl((() => { let u = []; try { u = JSON.parse(p.image_urls || '[]'); } catch {} return u[0] || p.image_url || ''; })()))}"
+                     data-post-caption="${esc((p.final_caption || p.base_caption || '').slice(0, 300))}"
                      class="mp-action-link px-3 py-1.5 bg-mpCharcoal hover:bg-mpCharcoalDark rounded text-xs text-white">
                     Post Now
                   </a>
@@ -702,7 +708,448 @@ router.get("/", requireAuth, async (req, res) => {
          style="max-width:90vw;max-height:90vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.6)" />
   </div>
 
+  <!-- TikTok Approval Modal -->
+  <div id="tiktok-modal" class="fixed inset-0 z-50 hidden items-center justify-center">
+    <div id="tiktok-modal-backdrop" class="absolute inset-0 bg-black/50"></div>
+    <div class="relative bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto mx-4 p-6">
+      <!-- Header -->
+      <div class="flex items-center gap-3 mb-5">
+        <div class="text-mpCharcoal">
+          <svg viewBox="0 0 24 24" class="w-6 h-6" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.34-6.34V8.83a8.24 8.24 0 004.84 1.56V6.89a4.85 4.85 0 01-1.08-.2z"/></svg>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-mpCharcoal">Post to TikTok</h3>
+          <p id="tiktok-nickname" class="text-xs text-mpMuted"></p>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div id="tiktok-loading" class="flex flex-col items-center gap-3 py-8">
+        <svg class="animate-spin w-8 h-8 text-mpAccent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <p class="text-sm text-mpMuted">Loading TikTok settings...</p>
+      </div>
+
+      <!-- Error state -->
+      <div id="tiktok-error" class="hidden py-6 text-center">
+        <p id="tiktok-error-msg" class="text-sm text-red-600 mb-4"></p>
+        <button onclick="closeTiktokModal()" class="px-4 py-2 bg-mpBg border border-mpBorder rounded-lg text-sm text-mpCharcoal hover:bg-gray-100">Close</button>
+      </div>
+
+      <!-- Form section -->
+      <div id="tiktok-form" class="hidden space-y-5">
+        <!-- Content preview -->
+        <div class="flex gap-3 p-3 bg-mpBg rounded-lg border border-mpBorder">
+          <img id="tiktok-preview-img" src="" class="w-16 h-16 rounded-lg object-cover border border-mpBorder" />
+          <p id="tiktok-preview-caption" class="text-xs text-mpMuted line-clamp-3 flex-1"></p>
+        </div>
+
+        <!-- Privacy Level -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Privacy Level</label>
+          <select id="tiktok-privacy" class="w-full border border-gray-200 bg-gray-50 rounded px-3 py-2 text-sm">
+            <option value="">Select privacy level...</option>
+          </select>
+        </div>
+
+        <!-- Interaction toggles -->
+        <div class="space-y-2">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Interactions</label>
+          <label id="tiktok-comment-row" class="flex items-center gap-2 text-sm text-mpCharcoal">
+            <input type="checkbox" id="tiktok-allow-comment" checked class="accent-blue-600" />
+            Allow Comments
+            <span id="tiktok-comment-disabled-note" class="text-xs text-mpMuted hidden">(disabled by creator settings)</span>
+          </label>
+          <label id="tiktok-duet-row" class="flex items-center gap-2 text-sm text-mpCharcoal">
+            <input type="checkbox" id="tiktok-allow-duet" checked class="accent-blue-600" />
+            Allow Duet
+            <span id="tiktok-duet-disabled-note" class="text-xs text-mpMuted hidden">(disabled by creator settings)</span>
+          </label>
+          <label id="tiktok-stitch-row" class="flex items-center gap-2 text-sm text-mpCharcoal">
+            <input type="checkbox" id="tiktok-allow-stitch" checked class="accent-blue-600" />
+            Allow Stitch
+            <span id="tiktok-stitch-disabled-note" class="text-xs text-mpMuted hidden">(disabled by creator settings)</span>
+          </label>
+        </div>
+
+        <!-- Commercial Content -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Commercial Content</label>
+          <button id="tiktok-commercial-toggle" type="button" onclick="toggleCommercial()"
+            class="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-300 transition-colors">
+            <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform translate-x-1"></span>
+          </button>
+          <div id="tiktok-commercial-options" class="hidden mt-3 space-y-2 pl-1">
+            <label class="flex items-center gap-2 text-sm text-mpCharcoal">
+              <input type="checkbox" id="tiktok-your-brand" class="accent-blue-600" />
+              Your Brand
+              <span class="text-xs text-mpMuted">— you are promoting yourself or your own business</span>
+            </label>
+            <label class="flex items-center gap-2 text-sm text-mpCharcoal">
+              <input type="checkbox" id="tiktok-branded-content" class="accent-blue-600" />
+              Branded Content
+              <span class="text-xs text-mpMuted">— paid promotion for a third party brand</span>
+            </label>
+            <p id="tiktok-commercial-warning" class="hidden text-xs text-yellow-600 mt-1">Select at least one option above when commercial content is enabled.</p>
+            <p id="tiktok-branded-private-warning" class="hidden text-xs text-yellow-600 mt-1">Branded content cannot be set to "Only Me". Privacy level has been updated.</p>
+          </div>
+        </div>
+
+        <!-- Compliance declaration -->
+        <div class="text-xs text-mpMuted leading-relaxed border-t border-mpBorder pt-4">
+          <p id="tiktok-declaration">By posting, you agree to TikTok's
+            <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener" class="text-mpAccent underline">Music Usage Confirmation</a>.
+          </p>
+        </div>
+
+        <!-- Processing notice -->
+        <p class="text-xs text-mpMuted italic">Content may take a few minutes to appear on TikTok after posting.</p>
+
+        <!-- Buttons -->
+        <div class="flex justify-end gap-3 pt-2">
+          <button onclick="closeTiktokModal()" class="px-4 py-2 bg-mpBg border border-mpBorder rounded-lg text-sm text-mpCharcoal hover:bg-gray-100">Cancel</button>
+          <button id="tiktok-confirm-btn" onclick="confirmTiktokApproval()" disabled
+            class="px-4 py-2 bg-mpAccent hover:bg-blue-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Select a privacy level to continue">
+            Confirm &amp; Post to TikTok
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
+  // --- TikTok Modal State ---
+  var tiktokModalPostId = null;
+  var tiktokModalActionType = null;
+  var tiktokIsPhoto = false;
+  var tiktokCommercialOn = false;
+  var tiktokCreatorInfo = null;
+  var PRIVACY_LABELS = {
+    'PUBLIC_TO_EVERYONE': 'Everyone',
+    'MUTUAL_FOLLOW_FRIENDS': 'Friends',
+    'FOLLOWER_OF_CREATOR': 'Followers',
+    'SELF_ONLY': 'Only Me'
+  };
+
+  function openTiktokModal(postId, actionType) {
+    tiktokModalPostId = postId;
+    tiktokModalActionType = actionType;
+    tiktokCreatorInfo = null;
+
+    // Find the link to get data attributes
+    var link = document.querySelector('[data-action-post-id="' + postId + '"][data-action-type="' + actionType + '"]');
+    var imgSrc = link ? link.getAttribute('data-post-image') : '';
+    var captionText = link ? link.getAttribute('data-post-caption') : '';
+
+    // Detect photo vs video
+    tiktokIsPhoto = !/\.(mp4|mov|avi|webm)$/i.test(imgSrc || '');
+
+    // Set preview
+    var previewImg = document.getElementById('tiktok-preview-img');
+    if (previewImg) previewImg.src = imgSrc || '';
+    var previewCap = document.getElementById('tiktok-preview-caption');
+    if (previewCap) previewCap.textContent = captionText || '';
+
+    // Show modal, hide form, show loading
+    var modal = document.getElementById('tiktok-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('tiktok-loading').classList.remove('hidden');
+    document.getElementById('tiktok-error').classList.add('hidden');
+    document.getElementById('tiktok-form').classList.add('hidden');
+
+    // Hide duet/stitch rows for photos
+    if (tiktokIsPhoto) {
+      document.getElementById('tiktok-duet-row').classList.add('hidden');
+      document.getElementById('tiktok-stitch-row').classList.add('hidden');
+    } else {
+      document.getElementById('tiktok-duet-row').classList.remove('hidden');
+      document.getElementById('tiktok-stitch-row').classList.remove('hidden');
+    }
+
+    // Reset checkboxes and commercial toggle
+    document.getElementById('tiktok-allow-comment').checked = true;
+    document.getElementById('tiktok-allow-duet').checked = true;
+    document.getElementById('tiktok-allow-stitch').checked = true;
+    resetCommercial();
+
+    // Fetch creator info
+    fetch('/manager/tiktok-creator-info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('tiktok-loading').classList.add('hidden');
+
+      if (data.error) {
+        var msg = 'Unable to connect to TikTok.';
+        if (data.error === 'tiktok_not_connected') msg = 'TikTok is not connected. Go to Integrations to connect.';
+        if (data.error === 'posting_limit_reached') msg = 'TikTok daily posting limit reached. Try again tomorrow.';
+        if (data.error === 'connection_error') msg = 'Could not reach TikTok. Please try again.';
+        document.getElementById('tiktok-error-msg').textContent = msg;
+        document.getElementById('tiktok-error').classList.remove('hidden');
+        return;
+      }
+
+      tiktokCreatorInfo = data;
+
+      // Set nickname
+      document.getElementById('tiktok-nickname').textContent = '@' + (data.nickname || 'unknown');
+
+      // Populate privacy dropdown
+      var privacySelect = document.getElementById('tiktok-privacy');
+      privacySelect.textContent = '';
+      var defaultOpt = document.createElement('option');
+      defaultOpt.value = '';
+      defaultOpt.textContent = 'Select privacy level...';
+      privacySelect.appendChild(defaultOpt);
+      (data.privacy_level_options || []).forEach(function(opt) {
+        var o = document.createElement('option');
+        o.value = opt;
+        o.textContent = PRIVACY_LABELS[opt] || opt;
+        privacySelect.appendChild(o);
+      });
+
+      // Handle disabled interactions
+      if (data.comment_disabled) {
+        document.getElementById('tiktok-allow-comment').checked = false;
+        document.getElementById('tiktok-allow-comment').disabled = true;
+        document.getElementById('tiktok-comment-disabled-note').classList.remove('hidden');
+      } else {
+        document.getElementById('tiktok-allow-comment').disabled = false;
+        document.getElementById('tiktok-comment-disabled-note').classList.add('hidden');
+      }
+      if (data.duet_disabled) {
+        document.getElementById('tiktok-allow-duet').checked = false;
+        document.getElementById('tiktok-allow-duet').disabled = true;
+        document.getElementById('tiktok-duet-disabled-note').classList.remove('hidden');
+      } else {
+        document.getElementById('tiktok-allow-duet').disabled = false;
+        document.getElementById('tiktok-duet-disabled-note').classList.add('hidden');
+      }
+      if (data.stitch_disabled) {
+        document.getElementById('tiktok-allow-stitch').checked = false;
+        document.getElementById('tiktok-allow-stitch').disabled = true;
+        document.getElementById('tiktok-stitch-disabled-note').classList.remove('hidden');
+      } else {
+        document.getElementById('tiktok-allow-stitch').disabled = false;
+        document.getElementById('tiktok-stitch-disabled-note').classList.add('hidden');
+      }
+
+      document.getElementById('tiktok-form').classList.remove('hidden');
+      updateConfirmState();
+    })
+    .catch(function(err) {
+      document.getElementById('tiktok-loading').classList.add('hidden');
+      document.getElementById('tiktok-error-msg').textContent = 'Network error: ' + err.message;
+      document.getElementById('tiktok-error').classList.remove('hidden');
+    });
+  }
+
+  function closeTiktokModal() {
+    var modal = document.getElementById('tiktok-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.body.style.overflow = '';
+    tiktokModalPostId = null;
+    tiktokModalActionType = null;
+  }
+
+  function toggleCommercial() {
+    tiktokCommercialOn = !tiktokCommercialOn;
+    var btn = document.getElementById('tiktok-commercial-toggle');
+    var opts = document.getElementById('tiktok-commercial-options');
+    var span = btn.querySelector('span');
+    if (tiktokCommercialOn) {
+      btn.classList.remove('bg-gray-300');
+      btn.classList.add('bg-mpAccent');
+      span.classList.remove('translate-x-1');
+      span.classList.add('translate-x-6');
+      opts.classList.remove('hidden');
+    } else {
+      btn.classList.remove('bg-mpAccent');
+      btn.classList.add('bg-gray-300');
+      span.classList.remove('translate-x-6');
+      span.classList.add('translate-x-1');
+      opts.classList.add('hidden');
+      document.getElementById('tiktok-your-brand').checked = false;
+      document.getElementById('tiktok-branded-content').checked = false;
+    }
+    updateCommercialState();
+    updateConfirmState();
+  }
+
+  function resetCommercial() {
+    tiktokCommercialOn = false;
+    var btn = document.getElementById('tiktok-commercial-toggle');
+    var opts = document.getElementById('tiktok-commercial-options');
+    var span = btn.querySelector('span');
+    btn.classList.remove('bg-mpAccent');
+    btn.classList.add('bg-gray-300');
+    span.classList.remove('translate-x-6');
+    span.classList.add('translate-x-1');
+    opts.classList.add('hidden');
+    document.getElementById('tiktok-your-brand').checked = false;
+    document.getElementById('tiktok-branded-content').checked = false;
+    document.getElementById('tiktok-commercial-warning').classList.add('hidden');
+    document.getElementById('tiktok-branded-private-warning').classList.add('hidden');
+  }
+
+  function updateCommercialState() {
+    var yourBrand = document.getElementById('tiktok-your-brand').checked;
+    var branded = document.getElementById('tiktok-branded-content').checked;
+    var warning = document.getElementById('tiktok-commercial-warning');
+    var brandedWarning = document.getElementById('tiktok-branded-private-warning');
+
+    // Show warning if toggle on but neither checkbox selected
+    if (tiktokCommercialOn && !yourBrand && !branded) {
+      warning.classList.remove('hidden');
+    } else {
+      warning.classList.add('hidden');
+    }
+
+    // Branded content: disable SELF_ONLY privacy option
+    var privacySelect = document.getElementById('tiktok-privacy');
+    var selfOnlyOpt = privacySelect.querySelector('option[value="SELF_ONLY"]');
+    if (branded) {
+      if (selfOnlyOpt) selfOnlyOpt.disabled = true;
+      if (privacySelect.value === 'SELF_ONLY') {
+        // Auto-switch to first available option
+        for (var i = 0; i < privacySelect.options.length; i++) {
+          if (privacySelect.options[i].value && !privacySelect.options[i].disabled) {
+            privacySelect.value = privacySelect.options[i].value;
+            break;
+          }
+        }
+        brandedWarning.classList.remove('hidden');
+      } else {
+        brandedWarning.classList.add('hidden');
+      }
+    } else {
+      if (selfOnlyOpt) selfOnlyOpt.disabled = false;
+      brandedWarning.classList.add('hidden');
+    }
+
+    updateDeclaration(branded);
+    updateConfirmState();
+  }
+
+  function updateDeclaration(branded) {
+    // Static legal links only — no user content interpolated
+    var el = document.getElementById('tiktok-declaration');
+    el.textContent = '';
+    var prefix = document.createTextNode('By posting, you agree to TikTok\\'s ');
+    el.appendChild(prefix);
+    if (branded) {
+      var bcLink = document.createElement('a');
+      bcLink.href = 'https://www.tiktok.com/legal/page/global/bc-policy/en';
+      bcLink.target = '_blank';
+      bcLink.rel = 'noopener';
+      bcLink.className = 'text-mpAccent underline';
+      bcLink.textContent = 'Branded Content Policy';
+      el.appendChild(bcLink);
+      el.appendChild(document.createTextNode(' and '));
+    }
+    var musicLink = document.createElement('a');
+    musicLink.href = 'https://www.tiktok.com/legal/page/global/music-usage-confirmation/en';
+    musicLink.target = '_blank';
+    musicLink.rel = 'noopener';
+    musicLink.className = 'text-mpAccent underline';
+    musicLink.textContent = 'Music Usage Confirmation';
+    el.appendChild(musicLink);
+    el.appendChild(document.createTextNode('.'));
+  }
+
+  function updateConfirmState() {
+    var btn = document.getElementById('tiktok-confirm-btn');
+    var privacyVal = document.getElementById('tiktok-privacy').value;
+    var yourBrand = document.getElementById('tiktok-your-brand').checked;
+    var branded = document.getElementById('tiktok-branded-content').checked;
+
+    var disabled = false;
+    var tooltip = '';
+
+    if (!privacyVal) {
+      disabled = true;
+      tooltip = 'Select a privacy level to continue';
+    } else if (tiktokCommercialOn && !yourBrand && !branded) {
+      disabled = true;
+      tooltip = 'Select at least one commercial content option';
+    }
+
+    btn.disabled = disabled;
+    btn.title = tooltip;
+  }
+
+  function confirmTiktokApproval() {
+    if (!tiktokModalPostId) return;
+
+    var privacyVal = document.getElementById('tiktok-privacy').value;
+    var allowComment = document.getElementById('tiktok-allow-comment').checked ? '1' : '0';
+    var allowDuet = document.getElementById('tiktok-allow-duet').checked ? '1' : '0';
+    var allowStitch = document.getElementById('tiktok-allow-stitch').checked ? '1' : '0';
+
+    // Commercial: 0=off, 1=your brand only, 2=branded content only, 3=both
+    var commercial = '0';
+    if (tiktokCommercialOn) {
+      var yb = document.getElementById('tiktok-your-brand').checked;
+      var bc = document.getElementById('tiktok-branded-content').checked;
+      if (yb && bc) commercial = '3';
+      else if (bc) commercial = '2';
+      else if (yb) commercial = '1';
+    }
+
+    // Gather content_type + placement from dashboard selectors
+    var sel = document.querySelector('select[data-post-id="' + tiktokModalPostId + '"]');
+    var ct = sel ? sel.value : 'standard_post';
+    var radio = document.querySelector('input[name="placement_' + tiktokModalPostId + '"]:checked');
+    var placement = radio ? radio.value : 'reel';
+    var recommended = MP_CT_PLACEMENT[ct] || 'post';
+    var overridden = placement !== recommended ? '1' : '0';
+
+    var action = tiktokModalActionType === 'post-now' ? '/manager/post-now' : '/manager/approve';
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = action;
+    var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    var pairs = [
+      ['post_id', tiktokModalPostId],
+      ['content_type', ct],
+      ['placement', placement],
+      ['placement_overridden', overridden],
+      ['tiktok_privacy_level', privacyVal],
+      ['tiktok_allow_comment', allowComment],
+      ['tiktok_allow_duet', allowDuet],
+      ['tiktok_allow_stitch', allowStitch],
+      ['tiktok_commercial', commercial]
+    ];
+    if (csrfMeta) pairs.push(['_csrf', csrfMeta.getAttribute('content')]);
+    pairs.forEach(function(pair) {
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = pair[0];
+      input.value = pair[1];
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+  }
+
+  // TikTok modal event listeners
+  document.getElementById('tiktok-privacy').addEventListener('change', updateConfirmState);
+  document.getElementById('tiktok-your-brand').addEventListener('change', updateCommercialState);
+  document.getElementById('tiktok-branded-content').addEventListener('change', updateCommercialState);
+  document.getElementById('tiktok-modal-backdrop').addEventListener('click', closeTiktokModal);
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeTiktokModal();
+  });
+
   document.addEventListener('click', function(e) {
     // Image zoom
     var zoomable = e.target.closest('.img-zoomable');
@@ -819,6 +1266,15 @@ router.get("/", requireAuth, async (req, res) => {
     var postId = link.dataset.actionPostId;
     var actionType = link.dataset.actionType;
     if (!postId || !actionType) return;
+
+    // TikTok modal interception: if reel placement + TikTok enabled, show modal
+    var tiktokEligible = link.getAttribute('data-tiktok-eligible') === '1';
+    var tiktokRadio = document.querySelector('input[name="placement_' + postId + '"]:checked');
+    var currentPlacement = tiktokRadio ? tiktokRadio.value : '';
+    if (tiktokEligible && currentPlacement === 'reel') {
+      openTiktokModal(postId, actionType);
+      return;
+    }
 
     var sel = document.querySelector('select[data-post-id="' + postId + '"]');
     var ct = sel ? sel.value : 'standard_post';
@@ -941,10 +1397,22 @@ router.post("/approve", requireAuth, requireRole("owner", "manager"), async (req
   const placement = VALID_PLACEMENTS.has(rawPlacement) ? rawPlacement : getDefaultPlacement(contentType);
   const placementOverridden = parseInt(req.body.placement_overridden || "0", 10);
 
+  // TikTok per-post metadata (nullable — only set when modal was shown)
+  const tiktokPrivacy = req.body.tiktok_privacy_level || null;
+  const tiktokAllowComment = req.body.tiktok_allow_comment != null ? parseInt(req.body.tiktok_allow_comment, 10) : null;
+  const tiktokAllowDuet = req.body.tiktok_allow_duet != null ? parseInt(req.body.tiktok_allow_duet, 10) : null;
+  const tiktokAllowStitch = req.body.tiktok_allow_stitch != null ? parseInt(req.body.tiktok_allow_stitch, 10) : null;
+  const tiktokCommercial = req.body.tiktok_commercial != null ? parseInt(req.body.tiktok_commercial, 10) : null;
+
   db.prepare(`
-    UPDATE posts SET content_type = ?, placement = ?, placement_overridden = ?
+    UPDATE posts SET content_type = ?, placement = ?, placement_overridden = ?,
+      tiktok_privacy_level = ?, tiktok_allow_comment = ?, tiktok_allow_duet = ?,
+      tiktok_allow_stitch = ?, tiktok_commercial = ?
     WHERE id = ? AND salon_id = ?
-  `).run(contentType, placement, placementOverridden, id, req.manager.salon_id);
+  `).run(contentType, placement, placementOverridden,
+    tiktokPrivacy, tiktokAllowComment, tiktokAllowDuet,
+    tiktokAllowStitch, tiktokCommercial,
+    id, req.manager.salon_id);
 
   // Look up salon settings for notification prefs
   const salonSettings = db.prepare(
@@ -1016,11 +1484,23 @@ router.post("/post-now", requireAuth, requireRole("owner", "manager"), (req, res
     const placement = VALID_PLACEMENTS.has(rawPlacement) ? rawPlacement : getDefaultPlacement(contentType);
     const placementOverridden = parseInt(req.body.placement_overridden || "0", 10);
 
+    // TikTok per-post metadata (nullable — only set when modal was shown)
+    const tiktokPrivacy = req.body.tiktok_privacy_level || null;
+    const tiktokAllowComment = req.body.tiktok_allow_comment != null ? parseInt(req.body.tiktok_allow_comment, 10) : null;
+    const tiktokAllowDuet = req.body.tiktok_allow_duet != null ? parseInt(req.body.tiktok_allow_duet, 10) : null;
+    const tiktokAllowStitch = req.body.tiktok_allow_stitch != null ? parseInt(req.body.tiktok_allow_stitch, 10) : null;
+    const tiktokCommercial = req.body.tiktok_commercial != null ? parseInt(req.body.tiktok_commercial, 10) : null;
+
     db.prepare(`
       UPDATE posts
-      SET content_type = ?, placement = ?, placement_overridden = ?
+      SET content_type = ?, placement = ?, placement_overridden = ?,
+        tiktok_privacy_level = ?, tiktok_allow_comment = ?, tiktok_allow_duet = ?,
+        tiktok_allow_stitch = ?, tiktok_commercial = ?
       WHERE id = ? AND salon_id = ?
-    `).run(contentType, placement, placementOverridden, id, salon_id);
+    `).run(contentType, placement, placementOverridden,
+      tiktokPrivacy, tiktokAllowComment, tiktokAllowDuet,
+      tiktokAllowStitch, tiktokCommercial,
+      id, salon_id);
 
     db.prepare(`
       UPDATE posts
