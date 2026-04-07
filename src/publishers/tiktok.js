@@ -70,7 +70,7 @@ function pickPrivacyLevel(creatorInfo) {
  * @param {string} caption - Caption text (max 2200 chars)
  * @returns {string} publish_id
  */
-export async function publishPhotoToTikTok(salon, imageUrls, caption) {
+export async function publishPhotoToTikTok(salon, imageUrls, caption, post = null) {
   const accessToken = await refreshTiktokToken(salon);
 
   const validImages = imageUrls.filter(Boolean).slice(0, 35);
@@ -90,12 +90,18 @@ export async function publishPhotoToTikTok(salon, imageUrls, caption) {
   console.log(`[TikTok] Creator info for ${salon.slug}:`, JSON.stringify(creatorInfo));
   console.log(`[TikTok] Using privacy_level=${privacyLevel} for salon ${salon.slug}`);
 
+  // Use per-post metadata from approval modal if available (TikTok UX compliance)
+  const finalPrivacy = post?.tiktok_privacy_level || privacyLevel;
+  const finalDisableComment = post?.tiktok_allow_comment != null
+    ? !post.tiktok_allow_comment   // invert: allow=1 → disable=false
+    : (creatorInfo.comment_disabled ?? false);
+
   const body = {
     post_info: {
       title:           safeTitle,
       description:     safeDescription,
-      privacy_level:   privacyLevel,
-      disable_comment: creatorInfo.comment_disabled ?? false,
+      privacy_level:   finalPrivacy,
+      disable_comment: finalDisableComment,
     },
     source_info: {
       source:            "PULL_FROM_URL",
@@ -105,6 +111,13 @@ export async function publishPhotoToTikTok(salon, imageUrls, caption) {
     post_mode:  "DIRECT_POST",
     media_type: "PHOTO",
   };
+
+  // Commercial content disclosure (TikTok UX Point 3)
+  if (post?.tiktok_commercial) {
+    const c = post.tiktok_commercial;
+    if (c === 1 || c === 3) body.post_info.brand_organic_toggle = true;   // "Your Brand"
+    if (c === 2 || c === 3) body.post_info.brand_content_toggle = true;   // "Branded Content"
+  }
 
   console.log(`[TikTok] Photo full request body:`, JSON.stringify(body));
 
@@ -136,7 +149,7 @@ export async function publishPhotoToTikTok(salon, imageUrls, caption) {
  * @param {string} caption - Caption text (max 2200 chars)
  * @returns {string} publish_id
  */
-export async function publishVideoToTikTok(salon, videoUrl, caption) {
+export async function publishVideoToTikTok(salon, videoUrl, caption, post = null) {
   const accessToken = await refreshTiktokToken(salon);
 
   if (!videoUrl) {
@@ -153,14 +166,20 @@ export async function publishVideoToTikTok(salon, videoUrl, caption) {
   const privacyLevel = pickPrivacyLevel(creatorInfo);
   console.log(`[TikTok] Using privacy_level=${privacyLevel} for salon ${salon.slug}`);
 
+  // Use per-post metadata from approval modal if available (TikTok UX compliance)
+  const finalPrivacy = post?.tiktok_privacy_level || privacyLevel;
+  const finalDisableComment = post?.tiktok_allow_comment != null ? !post.tiktok_allow_comment : (creatorInfo.comment_disabled ?? false);
+  const finalDisableDuet = post?.tiktok_allow_duet != null ? !post.tiktok_allow_duet : (creatorInfo.duet_disabled ?? false);
+  const finalDisableStitch = post?.tiktok_allow_stitch != null ? !post.tiktok_allow_stitch : (creatorInfo.stitch_disabled ?? false);
+
   const body = {
     post_info: {
       title:           safeTitle,
       description:     safeDescription,
-      privacy_level:   privacyLevel,
-      disable_duet:    creatorInfo.duet_disabled    ?? false,
-      disable_stitch:  creatorInfo.stitch_disabled  ?? false,
-      disable_comment: creatorInfo.comment_disabled ?? false,
+      privacy_level:   finalPrivacy,
+      disable_duet:    finalDisableDuet,
+      disable_stitch:  finalDisableStitch,
+      disable_comment: finalDisableComment,
     },
     source_info: {
       source:    "PULL_FROM_URL",
@@ -169,6 +188,13 @@ export async function publishVideoToTikTok(salon, videoUrl, caption) {
     post_mode:  "DIRECT_POST",
     media_type: "VIDEO",
   };
+
+  // Commercial content disclosure (TikTok UX Point 3)
+  if (post?.tiktok_commercial) {
+    const c = post.tiktok_commercial;
+    if (c === 1 || c === 3) body.post_info.brand_organic_toggle = true;   // "Your Brand"
+    if (c === 2 || c === 3) body.post_info.brand_content_toggle = true;   // "Branded Content"
+  }
 
   const resp = await fetch(`${API_BASE}/post/publish/video/init/`, {
     method: "POST",
