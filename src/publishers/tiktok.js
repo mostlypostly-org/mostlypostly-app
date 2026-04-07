@@ -17,7 +17,7 @@ const PRIVACY_PREFERENCE = [
  * Returns privacy_level_options, disable_* flags, etc.
  * Falls back to safe defaults on any error so publish can still proceed.
  */
-async function getCreatorInfo(accessToken) {
+export async function getCreatorInfo(accessToken) {
   try {
     const resp = await fetch(`${API_BASE}/post/publish/creator_info/query/`, {
       method: "POST",
