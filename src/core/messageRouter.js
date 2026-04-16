@@ -1474,6 +1474,10 @@ export async function handleIncomingMessage({
       const postId = draft._db_id;
       let portalUrl = null;
 
+      if (!postId) {
+        console.warn("[Router] Multi-image APPROVE: draft._db_id is null, cannot generate portal URL");
+      }
+
       if (postId) {
         // Reuse existing unexpired token
         const existingToken = db.prepare(
@@ -1483,7 +1487,7 @@ export async function handleIncomingMessage({
         ).get(postId);
 
         if (existingToken) {
-          const baseUrl = process.env.PUBLIC_BASE_URL || "";
+          const baseUrl = process.env.PUBLIC_BASE_URL || process.env.BASE_URL || "https://app.mostlypostly.com";
           portalUrl = `${baseUrl}/stylist/${postId}?token=${existingToken.token}`;
         } else {
           // Generate fresh token (server restart edge case — original token expired)
@@ -1492,7 +1496,7 @@ export async function handleIncomingMessage({
           db.prepare(
             "INSERT INTO stylist_portal_tokens (id, post_id, token, expires_at) VALUES (?, ?, ?, ?)"
           ).run(crypto.randomUUID(), postId, freshToken, expiresAt);
-          const baseUrl = process.env.PUBLIC_BASE_URL || "";
+          const baseUrl = process.env.PUBLIC_BASE_URL || process.env.BASE_URL || "https://app.mostlypostly.com";
           portalUrl = `${baseUrl}/stylist/${postId}?token=${freshToken}`;
         }
       }
