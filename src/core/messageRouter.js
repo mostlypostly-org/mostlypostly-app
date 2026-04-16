@@ -197,7 +197,7 @@ function enforceCreditName(caption, stylistName) {
   return `Styled By: ${name}`;
 }
 
-// Insert IG URL *under* the Styled By: line (used for Facebook)
+// Insert IG @handle *under* the Styled By: line (used for Facebook)
 function insertIGUnderStyledBy(caption, instagramHandle) {
   const rawHandle = (instagramHandle || "").toString().trim().replace(/^@+/, "");
   if (!rawHandle) return caption;
@@ -236,7 +236,7 @@ function removeIGUrlLine(caption) {
     const l = lines[i];
     // Remove old "IG: https://..." format
     if (/^IG:\s/i.test(l.trim())) continue;
-    // Remove bare "@handle" line that sits directly after a "Styled By:" line
+    // Strip bare @handle line that sits directly after "Styled By:" (insertIGUnderStyledBy always places it there)
     if (i > 0 && /^Styled [Bb]y[:]?\s/i.test(lines[i - 1].trim()) && /^@\w+$/.test(l.trim())) continue;
     out.push(l);
   }
@@ -247,7 +247,7 @@ function buildFacebookCaption(baseCaption, stylistName, igHandle) {
   const FB_SPACER = "\u200B";
 
   let c = enforceCreditName(baseCaption, stylistName); // "Styled by Full Name"
-  c = insertIGUnderStyledBy(c, igHandle);              // IG URL directly under Styled by
+  c = insertIGUnderStyledBy(c, igHandle);              // IG @handle directly under Styled by
   c = prettifyBody(c);                                  // normalize sections/collapses
 
   // Convert any blank lines into FB-safe spacer lines
