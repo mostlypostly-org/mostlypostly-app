@@ -201,7 +201,7 @@ function enforceCreditName(caption, stylistName) {
 function insertIGUnderStyledBy(caption, instagramHandle) {
   const rawHandle = (instagramHandle || "").toString().trim().replace(/^@+/, "");
   if (!rawHandle) return caption;
-  const igLine = `IG: https://instagram.com/${rawHandle}`;
+  const igLine = `@${rawHandle}`;
   const lines = String(caption || "").split("\n");
   const idx = lines.findIndex((l) => /^Styled [Bb]y[:]?\s/i.test(l));
   if (idx >= 0) {
@@ -230,8 +230,17 @@ function replaceStyledByLine(caption, newLine) {
 
 // Remove any IG URL helper line (for Instagram caption)
 function removeIGUrlLine(caption) {
-  const lines = String(caption || "").split("\n").filter((l) => !/^IG:\s/.test(l.trim()));
-  return lines.join("\n");
+  const lines = String(caption || "").split("\n");
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    // Remove old "IG: https://..." format
+    if (/^IG:\s/i.test(l.trim())) continue;
+    // Remove bare "@handle" line that sits directly after a "Styled By:" line
+    if (i > 0 && /^Styled [Bb]y[:]?\s/i.test(lines[i - 1].trim()) && /^@\w+$/.test(l.trim())) continue;
+    out.push(l);
+  }
+  return out.join("\n");
 }
 
 function buildFacebookCaption(baseCaption, stylistName, igHandle) {
