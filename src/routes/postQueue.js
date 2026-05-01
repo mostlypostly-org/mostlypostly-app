@@ -53,7 +53,7 @@ router.get("/", (req, res) => {
 
   const posts = db.prepare(`
     SELECT id, stylist_name, post_type, base_caption, final_caption,
-           image_url, image_urls, scheduled_for, salon_post_number
+           image_url, image_urls, scheduled_for, salon_post_number, pin_scheduled
     FROM posts
     WHERE salon_id = ? AND status = 'manager_approved' AND scheduled_for IS NOT NULL
     ORDER BY datetime(scheduled_for) ASC
@@ -73,18 +73,21 @@ router.get("/", (req, res) => {
     scheduledDt = scheduledDt.setZone(tz);
     const timeDisplay = scheduledDt.isValid ? scheduledDt.toFormat("EEE, MMM d · h:mm a") : "Unscheduled";
 
+    const isPinned = !!p.pin_scheduled;
     return `
-      <div class="queue-card group flex items-center gap-3 bg-white border border-mpBorder rounded-2xl px-4 py-3
+      <div class="queue-card group flex items-center gap-3 bg-white border ${isPinned ? 'border-mpAccent/30 bg-mpAccentLight/30' : 'border-mpBorder'} rounded-2xl px-4 py-3
                   cursor-default select-none hover:border-mpAccent/40 transition-colors"
-           data-id="${safe(p.id)}">
+           data-id="${safe(p.id)}" ${isPinned ? 'data-pinned="1"' : ''}>
 
-        <!-- Drag handle -->
-        <div class="drag-handle flex-shrink-0 cursor-grab active:cursor-grabbing text-mpBorder group-hover:text-mpMuted transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-            <circle cx="7" cy="4" r="1.4"/><circle cx="13" cy="4" r="1.4"/>
-            <circle cx="7" cy="10" r="1.4"/><circle cx="13" cy="10" r="1.4"/>
-            <circle cx="7" cy="16" r="1.4"/><circle cx="13" cy="16" r="1.4"/>
-          </svg>
+        <!-- Drag handle (lock icon for pinned posts) -->
+        <div class="flex-shrink-0 ${isPinned ? 'text-mpAccent/50' : 'drag-handle cursor-grab active:cursor-grabbing text-mpBorder group-hover:text-mpMuted'} transition-colors">
+          ${isPinned
+            ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd"/></svg>`
+            : `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <circle cx="7" cy="4" r="1.4"/><circle cx="13" cy="4" r="1.4"/>
+                <circle cx="7" cy="10" r="1.4"/><circle cx="13" cy="10" r="1.4"/>
+                <circle cx="7" cy="16" r="1.4"/><circle cx="13" cy="16" r="1.4"/>
+               </svg>`}
         </div>
 
         <!-- Position -->
@@ -120,7 +123,9 @@ router.get("/", (req, res) => {
         <!-- Scheduled time + remove -->
         <div class="flex-shrink-0 text-right min-w-[130px]">
           <div class="scheduled-time text-xs font-semibold text-mpCharcoal">${timeDisplay}</div>
-          <div class="text-[10px] text-mpMuted mt-0.5">Post #${safe(String(p.salon_post_number || "—"))}</div>
+          <div class="text-[10px] mt-0.5 ${isPinned ? 'text-mpAccent font-semibold' : 'text-mpMuted'}">
+            ${isPinned ? '📌 Pinned' : `Post #${safe(String(p.salon_post_number || "—"))}`}
+          </div>
           <div class="flex justify-end gap-3 mt-1">
             <a href="/manager/post-now?post=${safe(p.id)}"
                class="text-[10px] text-mpAccent hover:text-mpAccentDark font-semibold"
@@ -233,6 +238,11 @@ router.get("/", (req, res) => {
         handle: '.drag-handle',
         animation: 150,
         ghostClass: 'opacity-40',
+        filter: '[data-pinned="1"]',
+        onMove(evt) {
+          // Prevent dropping onto or past a pinned card's position
+          if (evt.related && evt.related.dataset.pinned === '1') return false;
+        },
         onEnd() {
           updatePositions();
           clearTimeout(saveTimer);
@@ -259,27 +269,43 @@ router.post("/reorder", requireRole("owner", "manager"), (req, res) => {
   // Fetch current scheduled times for only these posts (verify they belong to this salon)
   const placeholders = ids.map(() => "?").join(",");
   const rows = db.prepare(`
-    SELECT id, scheduled_for FROM posts
+    SELECT id, scheduled_for, pin_scheduled FROM posts
     WHERE salon_id = ? AND id IN (${placeholders}) AND status = 'manager_approved'
   `).all(salon_id, ...ids);
 
   if (rows.length !== ids.length) return res.json({ ok: false });
 
-  // Extract slots sorted chronologically — these are the "time positions" to fill
-  const slots = rows
+  const rowMap = Object.fromEntries(rows.map(r => [r.id, r]));
+
+  // Only unpinned posts participate in slot shuffling; pinned posts keep their exact time
+  const unpinnedSlots = rows
+    .filter(r => !r.pin_scheduled)
     .map(r => r.scheduled_for)
     .sort((a, b) => new Date(a) - new Date(b));
 
-  // Assign slots to new post order in a single transaction
+  let unpinnedIdx = 0;
   const update = db.prepare("UPDATE posts SET scheduled_for = ? WHERE id = ? AND salon_id = ?");
   db.transaction(() => {
-    ids.forEach((id, i) => update.run(slots[i], id, salon_id));
+    ids.forEach(id => {
+      const row = rowMap[id];
+      if (!row) return;
+      if (row.pin_scheduled) return; // leave pinned posts untouched
+      update.run(unpinnedSlots[unpinnedIdx++], id, salon_id);
+    });
   })();
 
-  // Return formatted times for the client to update displayed values
-  const formattedSlots = slots.map(s =>
-    DateTime.fromSQL(s, { zone: "utc" }).setZone(tz).toFormat("EEE, MMM d · h:mm a")
-  );
+  // Re-read final scheduled_for values from DB and return in client order
+  const updated = db.prepare(`
+    SELECT id, scheduled_for FROM posts
+    WHERE salon_id = ? AND id IN (${placeholders})
+  `).all(salon_id, ...ids);
+  const updatedMap = Object.fromEntries(updated.map(r => [r.id, r.scheduled_for]));
+
+  const formattedSlots = ids.map(id => {
+    const slot = updatedMap[id];
+    if (!slot) return "";
+    return DateTime.fromSQL(slot, { zone: "utc" }).setZone(tz).toFormat("EEE, MMM d · h:mm a");
+  });
 
   res.json({ ok: true, slots: formattedSlots });
 });

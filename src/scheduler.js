@@ -805,6 +805,17 @@ export async function runSchedulerOnce() {
 // ===================== Enqueue =====================
 
 export function enqueuePost(post) {
+  // Pinned posts: manager chose an exact publish time — don't overwrite it
+  const pinned = post.pin_scheduled
+    ? post.pin_scheduled
+    : db.prepare("SELECT pin_scheduled, scheduled_for FROM posts WHERE id = ?").get(post.id);
+
+  if (pinned?.pin_scheduled) {
+    db.prepare(`UPDATE posts SET status='manager_approved' WHERE id=?`).run(post.id);
+    console.log(`📌 [Enqueue] ${post.id} pinned → keeping scheduled_for ${pinned.scheduled_for}`);
+    return { ...post, status: "manager_approved", scheduled_for: pinned.scheduled_for };
+  }
+
   const salon = getSalonPolicy(post.salon_id);
 
   const min   = salon?.spacing_min ?? 20;
@@ -819,7 +830,7 @@ export function enqueuePost(post) {
     const extraNeeded = Math.ceil(fairnessWindow - minutesSince);
     if (delay < extraNeeded) {
       console.log(`⏳ [Enqueue] Stylist fairness: adding ${extraNeeded - delay}min extra delay for ${post.stylist_name}`);
-      delay = extraNeeded + randomDelay(5, 15); // add a little extra jitter
+      delay = extraNeeded + randomDelay(5, 15);
     }
   }
 
@@ -839,10 +850,6 @@ export function enqueuePost(post) {
   }
 
   const scheduled = toSqliteTimestamp(scheduledUtc);
-
-  // Note: UTM tracking short URL injection removed here.
-  // composeFinalCaption now handles booking URL tracking token injection at publish time
-  // (when salonId + postId are passed to it in the publish block).
 
   db.prepare(
     `UPDATE posts SET status='manager_approved', scheduled_for=? WHERE id=?`

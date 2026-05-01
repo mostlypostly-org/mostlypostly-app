@@ -1923,6 +1923,7 @@ router.get("/coordinator/upload", requireAuth, (req, res) => {
     : "";
 
   const prefillDate = req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : '';
+  const salonTz = db.prepare("SELECT timezone FROM salons WHERE slug = ?").get(salon_id)?.timezone || "America/Indiana/Indianapolis";
 
   const body = `
     <section class="mb-8">
@@ -2009,23 +2010,57 @@ router.get("/coordinator/upload", requireAuth, (req, res) => {
           })();
         </script>
 
-        ${prefillDate ? `
-        <div>
-          <label class="block text-xs font-semibold text-mpCharcoal mb-1.5">Schedule for date</label>
-          <input type="date" name="scheduled_date" value="${esc(prefillDate)}"
-            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-mpCharcoal focus:border-mpAccent focus:ring-1 focus:ring-mpAccent" />
-          <p class="text-[11px] text-mpMuted mt-1">Post will be scheduled for this date. Time will be auto-assigned by the scheduler.</p>
+        <!-- Scheduling section -->
+        <div class="border-t border-mpBorder pt-4 mt-2">
+          <div class="flex items-center gap-2 mb-3">
+            <input type="checkbox" id="use-pinned-schedule" name="use_pinned_schedule" value="1"
+              ${prefillDate ? 'checked' : ''}
+              class="h-4 w-4 rounded border-gray-300 text-mpAccent focus:ring-mpAccent cursor-pointer" />
+            <label for="use-pinned-schedule" class="text-xs font-semibold text-mpCharcoal cursor-pointer select-none">
+              Schedule for a specific date &amp; time <span class="font-normal text-mpMuted">(pin to exact slot)</span>
+            </label>
+          </div>
+          <div id="pinned-schedule-section" style="${prefillDate ? '' : 'display:none;'}">
+            <div class="flex gap-3">
+              <div class="flex-1">
+                <label class="block text-xs text-mpMuted mb-1">Date</label>
+                <input type="date" name="scheduled_date" id="pin-date" value="${esc(prefillDate)}"
+                  class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-mpCharcoal focus:border-mpAccent focus:ring-1 focus:ring-mpAccent" />
+              </div>
+              <div class="w-36">
+                <label class="block text-xs text-mpMuted mb-1">Time <span class="text-mpMuted">(${esc(salonTz.split('/').pop().replace(/_/g,' '))})</span></label>
+                <input type="time" name="scheduled_time" id="pin-time" value="10:00"
+                  class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-mpCharcoal focus:border-mpAccent focus:ring-1 focus:ring-mpAccent" />
+              </div>
+            </div>
+            <p class="text-[11px] text-mpMuted mt-1.5">Post will publish at exactly this time regardless of queue spacing. Times are in your salon's local timezone.</p>
+          </div>
         </div>
-        ` : ''}
+
+        <script>
+          (function() {
+            var schedToggle = document.getElementById('use-pinned-schedule');
+            var schedSection = document.getElementById('pinned-schedule-section');
+            var pinDate = document.getElementById('pin-date');
+            var pinTime = document.getElementById('pin-time');
+            schedToggle.addEventListener('change', function() {
+              schedSection.style.display = this.checked ? 'block' : 'none';
+              pinDate.required = this.checked;
+              pinTime.required = this.checked;
+            });
+            if (schedToggle.checked) { pinDate.required = true; pinTime.required = true; }
+          })();
+        </script>
+
         <button type="submit" id="coord-submit-btn"
           class="inline-flex items-center justify-center rounded-full bg-mpAccent px-6 py-2 text-sm font-semibold text-white shadow-md hover:bg-[#2E5E9E]">
           Upload &amp; Generate Caption
         </button>
         <script>
           (function() {
-            var toggle = document.getElementById('use-manual-caption');
+            var captionToggle = document.getElementById('use-manual-caption');
             var btn = document.getElementById('coord-submit-btn');
-            toggle.addEventListener('change', function() {
+            captionToggle.addEventListener('change', function() {
               btn.textContent = this.checked ? 'Upload Post' : 'Upload & Generate Caption';
             });
           })();
@@ -2045,7 +2080,7 @@ router.post("/coordinator/upload", requireAuth, coordinatorUpload.single("photo"
   const manager_id = req.manager.id;
 
   try {
-    const { stylist_id, caption_note, scheduled_date, manual_caption, use_manual_caption } = req.body;
+    const { stylist_id, caption_note, scheduled_date, scheduled_time, use_pinned_schedule, manual_caption, use_manual_caption } = req.body;
     if (!stylist_id || !req.file) {
       return res.redirect("/manager/coordinator/upload?error=missing");
     }
@@ -2107,13 +2142,13 @@ router.post("/coordinator/upload", requireAuth, coordinatorUpload.single("photo"
 
     const savedPost = savePost(null, stylistPayload, caption, [], "manager_pending", null, { salon_id });
 
-    if (scheduled_date && /^\d{4}-\d{2}-\d{2}$/.test(scheduled_date)) {
-      const salonTzRow = db.prepare("SELECT timezone FROM salons WHERE slug = ?").get(salon_id);
-      const tz = salonTzRow?.timezone || "America/Indiana/Indianapolis";
-      const localDt = DateTime.fromISO(scheduled_date + "T10:00:00", { zone: tz });
+    if (use_pinned_schedule === "1" && scheduled_date && /^\d{4}-\d{2}-\d{2}$/.test(scheduled_date)) {
+      const tz = db.prepare("SELECT timezone FROM salons WHERE slug = ?").get(salon_id)?.timezone || "America/Indiana/Indianapolis";
+      const timeStr = scheduled_time && /^\d{2}:\d{2}$/.test(scheduled_time) ? scheduled_time : "10:00";
+      const localDt = DateTime.fromISO(`${scheduled_date}T${timeStr}:00`, { zone: tz });
       if (localDt.isValid) {
         const utcStr = localDt.toUTC().toFormat("yyyy-LL-dd HH:mm:ss");
-        db.prepare("UPDATE posts SET scheduled_for = ? WHERE id = ?").run(utcStr, savedPost.id);
+        db.prepare("UPDATE posts SET scheduled_for = ?, pin_scheduled = 1 WHERE id = ?").run(utcStr, savedPost.id);
       }
     }
 

@@ -65,6 +65,7 @@ import { run as run061 } from "./061_video_upload_tokens.js";
 import { run as run062 } from "./062_insights_sync_log.js";
 import { run as run063 } from "./063_tiktok_post_metadata.js";
 import { run as run064 } from "./064_manual_caption.js";
+import { run as run065 } from "./065_pin_scheduled.js";
 
 export const migrations = [
   { name: "001_baseline_patches",        run: run001 },
@@ -131,4 +132,5 @@ export const migrations = [
   { name: "062_insights_sync_log",         run: run062 },
   { name: "063_tiktok_post_metadata",      run: run063 },
   { name: "064_manual_caption",            run: run064 },
+  { name: "065_pin_scheduled",             run: run065 },
 ];
