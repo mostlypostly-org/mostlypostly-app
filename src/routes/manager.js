@@ -1964,11 +1964,51 @@ router.get("/coordinator/upload", requireAuth, (req, res) => {
             });
           </script>
         </div>
-        <div>
+        <!-- AI caption note (shown by default, hidden in override mode) -->
+        <div id="ai-caption-section">
           <label class="block text-xs font-semibold text-mpCharcoal mb-1.5">Caption note <span class="font-normal text-mpMuted">(optional)</span></label>
           <textarea name="caption_note" rows="2" placeholder="Any context for the AI caption (e.g. 'balayage on a new client')"
             class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-mpCharcoal placeholder:text-mpMuted focus:border-mpAccent focus:ring-1 focus:ring-mpAccent"></textarea>
         </div>
+
+        <!-- Manual caption override toggle -->
+        <div class="flex items-center gap-2 pt-1">
+          <input type="checkbox" id="use-manual-caption" name="use_manual_caption" value="1"
+            class="h-4 w-4 rounded border-gray-300 text-mpAccent focus:ring-mpAccent cursor-pointer" />
+          <label for="use-manual-caption" class="text-xs font-semibold text-mpCharcoal cursor-pointer select-none">
+            Use my own caption <span class="font-normal text-mpMuted">(skip AI — post exactly as written)</span>
+          </label>
+        </div>
+
+        <!-- Manual caption textarea (hidden until checkbox checked) -->
+        <div id="manual-caption-section" style="display:none;">
+          <label class="block text-xs font-semibold text-mpCharcoal mb-1.5">Your caption</label>
+          <textarea id="manual-caption-input" name="manual_caption" rows="12"
+            placeholder="Paste your full caption here — emojis, hashtags, links, and all formatting will be preserved exactly as written."
+            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-mpCharcoal placeholder:text-mpMuted focus:border-mpAccent focus:ring-1 focus:ring-mpAccent font-mono leading-relaxed"></textarea>
+          <p class="text-[11px] text-mpMuted mt-1">AI generation is skipped. Caption, hashtags, and any URLs you include will be used as-is.</p>
+        </div>
+
+        <script>
+          (function() {
+            var toggle = document.getElementById('use-manual-caption');
+            var aiSection = document.getElementById('ai-caption-section');
+            var manualSection = document.getElementById('manual-caption-section');
+            var manualInput = document.getElementById('manual-caption-input');
+            toggle.addEventListener('change', function() {
+              if (this.checked) {
+                aiSection.style.display = 'none';
+                manualSection.style.display = 'block';
+                manualInput.required = true;
+              } else {
+                aiSection.style.display = 'block';
+                manualSection.style.display = 'none';
+                manualInput.required = false;
+              }
+            });
+          })();
+        </script>
+
         ${prefillDate ? `
         <div>
           <label class="block text-xs font-semibold text-mpCharcoal mb-1.5">Schedule for date</label>
@@ -1977,10 +2017,19 @@ router.get("/coordinator/upload", requireAuth, (req, res) => {
           <p class="text-[11px] text-mpMuted mt-1">Post will be scheduled for this date. Time will be auto-assigned by the scheduler.</p>
         </div>
         ` : ''}
-        <button type="submit"
+        <button type="submit" id="coord-submit-btn"
           class="inline-flex items-center justify-center rounded-full bg-mpAccent px-6 py-2 text-sm font-semibold text-white shadow-md hover:bg-[#2E5E9E]">
           Upload &amp; Generate Caption
         </button>
+        <script>
+          (function() {
+            var toggle = document.getElementById('use-manual-caption');
+            var btn = document.getElementById('coord-submit-btn');
+            toggle.addEventListener('change', function() {
+              btn.textContent = this.checked ? 'Upload Post' : 'Upload & Generate Caption';
+            });
+          })();
+        </script>
       </form>
     </section>
   `;
@@ -1996,7 +2045,7 @@ router.post("/coordinator/upload", requireAuth, coordinatorUpload.single("photo"
   const manager_id = req.manager.id;
 
   try {
-    const { stylist_id, caption_note, scheduled_date } = req.body;
+    const { stylist_id, caption_note, scheduled_date, manual_caption, use_manual_caption } = req.body;
     if (!stylist_id || !req.file) {
       return res.redirect("/manager/coordinator/upload?error=missing");
     }
@@ -2014,29 +2063,33 @@ router.post("/coordinator/upload", requireAuth, coordinatorUpload.single("photo"
 
     const imageUrl = toUploadUrl(newFilename);
 
-    // Read file as base64 data URI for OpenAI (no network round-trip needed)
-    const mimeType = req.file.mimetype || "image/jpeg";
-    const fileBuffer = readFileSync(newPath);
-    const imageDataUri = `data:${mimeType};base64,${fileBuffer.toString("base64")}`;
+    let caption;
+    if (use_manual_caption === "1" && manual_caption && manual_caption.trim()) {
+      // Use the manager's pre-written caption exactly as provided
+      caption = manual_caption;
+    } else {
+      // Generate AI caption
+      const mimeType = req.file.mimetype || "image/jpeg";
+      const fileBuffer = readFileSync(newPath);
+      const imageDataUri = `data:${mimeType};base64,${fileBuffer.toString("base64")}`;
 
-    // Generate AI caption
-    const { generateCaption } = await import("../openai.js");
-    const salonRow = db.prepare("SELECT * FROM salons WHERE slug = ?").get(salon_id);
-    const fullSalon = getSalonPolicy(salon_id) || salonRow;
-    const aiJson = await generateCaption({
-      imageDataUrl: imageDataUri,
-      notes: caption_note || "",
-      salon: fullSalon,
-      stylist: {
-        stylist_name: stylistRow.name,
-        name: stylistRow.name,
-        instagram_handle: stylistRow.instagram_handle || null,
-      },
-      postType: "standard_post",
-      city: salonRow?.city || "",
-    });
-
-    const caption = aiJson?.caption || "";
+      const { generateCaption } = await import("../openai.js");
+      const salonRow = db.prepare("SELECT * FROM salons WHERE slug = ?").get(salon_id);
+      const fullSalon = getSalonPolicy(salon_id) || salonRow;
+      const aiJson = await generateCaption({
+        imageDataUrl: imageDataUri,
+        notes: caption_note || "",
+        salon: fullSalon,
+        stylist: {
+          stylist_name: stylistRow.name,
+          name: stylistRow.name,
+          instagram_handle: stylistRow.instagram_handle || null,
+        },
+        postType: "standard_post",
+        city: salonRow?.city || "",
+      });
+      caption = aiJson?.caption || "";
+    }
 
     // Save the post attributed to the selected stylist, tracked to the coordinator
     const stylistPayload = {
