@@ -2092,6 +2092,7 @@ router.post("/coordinator/upload", requireAuth, coordinatorUpload.single("photo"
     }
 
     // Save the post attributed to the selected stylist, tracked to the coordinator
+    const isManual = use_manual_caption === "1" && manual_caption && manual_caption.trim();
     const stylistPayload = {
       stylist_id: stylistRow.id,
       manager_id,
@@ -2101,6 +2102,7 @@ router.post("/coordinator/upload", requireAuth, coordinatorUpload.single("photo"
       image_url: imageUrl,
       post_type: "standard_post",
       submitted_by: manager_id,
+      manual_caption: isManual ? manual_caption : null,
     };
 
     const savedPost = savePost(null, stylistPayload, caption, [], "manager_pending", null, { salon_id });

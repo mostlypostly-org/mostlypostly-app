@@ -507,7 +507,11 @@ export async function runSchedulerOnce() {
           const isVendorPost = !!post.vendor_campaign_id;
           let fbCaption, igCaption;
 
-          if (isVendorPost) {
+          if (post.manual_caption) {
+            // Manager-written caption: use verbatim on all platforms, no transforms
+            fbCaption = post.manual_caption;
+            igCaption = post.manual_caption;
+          } else if (isVendorPost) {
             // Vendor posts: use pre-built final_caption (assembled by vendorScheduler.js)
             fbCaption = post.final_caption;
             // IG: strip "Shop today: URL" line, strip any remaining URLs
@@ -717,15 +721,17 @@ export async function runSchedulerOnce() {
               const tiktokStylist = post.stylist_id
                 ? db.prepare('SELECT tiktok_handle, name FROM stylists WHERE id = ?').get(post.stylist_id)
                 : null;
-              const tiktokCaption = composeFinalCaption({
-                caption:      post.base_caption || post.final_caption || "",
-                hashtags:     (() => { try { return JSON.parse(post.hashtags || "[]"); } catch { return []; } })(),
-                stylistName:  post.stylist_name || "",
-                tiktokHandle: tiktokStylist?.tiktok_handle || "",
-                salon,
-                platform:     "tiktok",
-                noBookingCta: true,
-              }).trim();
+              const tiktokCaption = post.manual_caption
+                ? post.manual_caption
+                : composeFinalCaption({
+                    caption:      post.base_caption || post.final_caption || "",
+                    hashtags:     (() => { try { return JSON.parse(post.hashtags || "[]"); } catch { return []; } })(),
+                    stylistName:  post.stylist_name || "",
+                    tiktokHandle: tiktokStylist?.tiktok_handle || "",
+                    salon,
+                    platform:     "tiktok",
+                    noBookingCta: true,
+                  }).trim();
 
               let tiktokPublishId;
               // Determine by file type only — a photo can have placement='reel' (IG/FB reel format)
